@@ -1,0 +1,59 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="Hex & Hue: Magic Pixel Puzzle">
+  <main>
+    <div class="wisp" aria-hidden="true"></div>
+    <h1>Hex &amp; Hue</h1>
+    <p class="tagline">A Little Magic in Every Color</p>
+    <p>
+      Summon Wisps, collect every fragment of the mosaic and fill your Spellbook with magical art.
+      Free to play, forever.
+    </p>
+    <a class="play" href="/play">
+      Play now
+    </a>
+  </main>
+</Base>
+
+<style>
+  main {
+    min-height: 100dvh;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.75rem;
+    padding: 2rem 16px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 35%, var(--dusk), var(--night) 70%);
+  }
+  h1 {
+    font-size: clamp(2.5rem, 9vw, 4.5rem);
+    margin: 0;
+  }
+  .tagline {
+    color: var(--mist);
+    margin: 0;
+  }
+  p {
+    max-width: 32rem;
+  }
+  .wisp {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--glow);
+    box-shadow: 0 0 40px 12px rgb(246 217 122 / 0.35);
+  }
+  .play {
+    margin-top: 1rem;
+    padding: 0.9rem 2.4rem;
+    border-radius: 999px;
+    background: var(--glow);
+    color: var(--night);
+    font-weight: 700;
+    font-size: 1.15rem;
+    text-decoration: none;
+  }
+</style>

@@ -1,0 +1,38 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="Play · Hex & Hue">
+  <div id="game" aria-label="Hex & Hue game"></div>
+</Base>
+
+<script>
+  import { mountGame } from "@hexhue/game";
+
+  const parent = document.getElementById("game");
+  if (parent) mountGame(parent);
+</script>
+
+<style is:global>
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #game {
+    position: fixed;
+    inset: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+    box-sizing: border-box;
+  }
+  #game canvas {
+    display: block;
+  }
+</style>
