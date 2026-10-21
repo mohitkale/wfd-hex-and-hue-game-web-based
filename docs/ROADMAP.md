@@ -30,7 +30,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 - [x] **M3.1** Board scene: responsive portrait layout, mosaic rendering (fast batched pixels), track, portal, slots, summon columns.
 - [x] **M3.2** Wisps: sprites, movement interpolated from sim steps, collection beam/particle, portal flight; 1×/2× speed.
 - [x] **M3.3** Input & feedback: tap targets sized for thumbs, invalid-tap feedback, haptics, queued launches.
-- [ ] **M3.4** Win/lose flow: reveal animation of the finished illustration, lose dialog with free Retry, level select stub. Playable with 5 test levels.
+- [x] **M3.4** Win/lose flow: reveal animation of the finished illustration, lose dialog with free Retry, level select stub. Playable with 5 test levels.
 
 ## M4 — Content: 3 worlds × 20 levels
 
@@ -45,7 +45,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 - [ ] **M5.2** World map & level select with stars/completion, next-level auto-advance.
 - [ ] **M5.3** Coins & boosters: Undo, Shuffle, Extra Slot, Magic Wand, Revive; generous earn rates.
 - [ ] **M5.4** Rewards interface (provider-agnostic) with mock + "none" providers; 2× alternating free/ad policy; double-coins offer. Never blocks play.
-- [ ] **M5.5** Spellbook: collected illustrations, lore cards, world completion.
+- [ ] **M5.5** Spellbook: collected illustrations, lore cards, world completion; win card says "Added to your Spellbook" once this exists.
 
 ## M6 — Polish & native feel
 
