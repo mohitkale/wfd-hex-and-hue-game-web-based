@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { Haptics } from "../haptics";
 import { worlds } from "../levels";
 import { theme } from "../theme";
 import { ensureTextures, TEX } from "../view/textures";
@@ -10,6 +11,7 @@ import type { PlayData } from "./PlayScene";
  */
 export class LevelSelectScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
+  private readonly haptics = new Haptics();
 
   constructor() {
     super("levels");
@@ -104,11 +106,15 @@ export class LevelSelectScene extends Phaser.Scene {
         wordWrap: { width: size * 1.1 },
       })
       .setOrigin(0.5, 0);
+    // Only a press that started on this tile opens it (a future scrolling map must not misfire).
+    let pressed = false;
     disc.on("pointerdown", () => {
+      pressed = true;
       this.tweens.add({ targets: [disc, label], scale: 0.9, duration: 80, yoyo: true });
-      navigator.vibrate?.(8);
+      this.haptics.play("tap");
     });
-    disc.on("pointerup", () => this.scene.start("play", data));
+    disc.on("pointerout", () => (pressed = false));
+    disc.on("pointerup", () => pressed && this.scene.start("play", data));
     return [halo, disc, label, caption];
   }
 }

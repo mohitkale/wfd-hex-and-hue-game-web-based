@@ -36,7 +36,8 @@ export interface PlayData {
 }
 
 /** Draw order; explicit so rebuilt layers never cover persistent wisps. */
-const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, fx: 3, hud: 4, overlay: 5 } as const;
+// The HUD stays above result cards so Back always works.
+const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, fx: 3, overlay: 4, hud: 5 } as const;
 
 /** Win reveal: how long the finished artwork takes to bloom back in. */
 const REVEAL_MS = 1100;
@@ -79,6 +80,8 @@ export class PlayScene extends Phaser.Scene {
   private overlayKind: "win" | "lose" | null = null;
   /** Win reveal progress; `null` when not revealing. */
   private reveal: { order: number[]; shown: number; elapsed: number } | null = null;
+  /** Won, waiting for the last wisp to reach the portal before the reveal starts. */
+  private revealPending = false;
   private lastLayoutKey = "";
   private readonly haptics = new Haptics();
   private acc = 0;
@@ -109,6 +112,7 @@ export class PlayScene extends Phaser.Scene {
     this.overlay = [];
     this.overlayKind = null;
     this.reveal = null;
+    this.revealPending = false;
     this.speedLabel = null;
     this.lastLayoutKey = "";
     this.acc = 0;
@@ -197,8 +201,10 @@ export class PlayScene extends Phaser.Scene {
     }
     this.mosaic = new MosaicView(this, this.layout, level, this.session.state.cells);
     this.mosaic.image.setDepth(DEPTH.mosaic);
-    if (this.session.state.status === "won" && !this.reveal) this.paintArtwork(level.cells.length);
-    else if (this.reveal) this.paintArtwork(this.reveal.shown);
+    if (this.reveal) this.paintArtwork(this.reveal.shown);
+    else if (this.session.state.status === "won" && !this.revealPending) {
+      this.paintArtwork(level.cells.length);
+    }
     this.drawHud();
     this.createTapZones();
     this.moreLabels = this.layout.columns.map((zone) =>
@@ -275,7 +281,9 @@ export class PlayScene extends Phaser.Scene {
     this.updateSpeedLabel();
 
     this.hud = [backZone, back, title, subtitle, speedZone, this.speedLabel];
-    for (const o of [back, title, subtitle, this.speedLabel]) o.setDepth(DEPTH.hud);
+    for (const o of [backZone, back, title, subtitle, speedZone, this.speedLabel]) {
+      o.setDepth(DEPTH.hud);
+    }
   }
 
   /**
@@ -410,7 +418,9 @@ export class PlayScene extends Phaser.Scene {
       case "won":
         this.haptics.play("win");
         // Let the last wisp reach the portal, then bloom the artwork back in.
+        this.revealPending = true;
         this.time.delayedCall(450, () => {
+          this.revealPending = false;
           const cells = this.built.level.cells;
           this.reveal = {
             order: revealOrder(this.built.level.width, this.built.level.height, cells),
@@ -421,7 +431,9 @@ export class PlayScene extends Phaser.Scene {
         break;
       case "lost":
         this.haptics.play("lose");
-        this.time.delayedCall(350, () => this.showCard("lose"));
+        this.time.delayedCall(350, () => {
+          if (this.session.state.status === "lost") this.showCard("lose");
+        });
         break;
       case "undone":
       case "restarted":
@@ -723,7 +735,6 @@ export class PlayScene extends Phaser.Scene {
       text("✦  Mosaic complete  ✦", 14, "#f6d97a", { fontStyle: "bold" });
       text(this.built.level.name, 24, theme.text, { fontStyle: "bold" });
       text(this.built.lore, 15, theme.textDim, { fontStyle: "italic" });
-      text("Added to your Spellbook", 13, "#c9b8ff");
     } else {
       text("The slots are full", 22, theme.text, { fontStyle: "bold" });
       text(
@@ -782,12 +793,13 @@ export class PlayScene extends Phaser.Scene {
     panel.strokeRoundedRect(-width / 2, 0, width, height, px(20));
     card.add([panel, ...parts]);
 
-    // Centered in the space below the board (or the screen center if that's too small).
+    // Centered in the space below the board; on short screens anchored to the bottom so it covers
+    // as little of the (revealed) artwork as possible.
     const below = frame.y + frame.h - (boardRect.y + boardRect.h);
     const top =
       below >= height + px(16)
         ? boardRect.y + boardRect.h + (below - height) / 2
-        : frame.y + (frame.h - height) / 2;
+        : frame.y + frame.h - height - px(12);
     card.y = top;
     if (animate) {
       card.y = top + px(40);
@@ -798,7 +810,10 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private closeCard(): void {
-    for (const o of this.overlay) o.destroy();
+    for (const o of this.overlay) {
+      this.tweens.killTweensOf(o);
+      o.destroy();
+    }
     this.overlay = [];
     this.overlayKind = null;
   }
