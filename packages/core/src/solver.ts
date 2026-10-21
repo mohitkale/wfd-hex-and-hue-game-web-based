@@ -181,6 +181,12 @@ function noviceWins(level: Level, seed: number): boolean {
   return s.status === "won";
 }
 
+/** 0 (trivial) .. 1 (brutal): `0.7·lossRate + 0.3·minSlots/slots`, unsolved counts as 1. */
+export function difficultyScore(lossRate: number, minSlots: number | null, slots: number): number {
+  const tightness = minSlots === null ? 1 : minSlots / slots;
+  return Math.round((0.7 * lossRate + 0.3 * tightness) * 1000) / 1000;
+}
+
 export function analyzeLevel(level: Level, options: AnalyzeOptions = {}): DifficultyReport {
   const playouts = options.playouts ?? 100;
   const seed = options.seed ?? 1;
@@ -200,8 +206,7 @@ export function analyzeLevel(level: Level, options: AnalyzeOptions = {}): Diffic
   let losses = 0;
   for (let i = 0; i < playouts; i++) if (!noviceWins(level, seed + i * 7919)) losses++;
   const lossRate = playouts > 0 ? losses / playouts : 0;
-  const tightness = minSlots === null ? 1 : minSlots / level.slots;
-  const difficulty = Math.round((0.7 * lossRate + 0.3 * tightness) * 1000) / 1000;
+  const difficulty = difficultyScore(lossRate, minSlots, level.slots);
 
   return { solve: result, minSlots, lossRate, difficulty, wisps };
 }

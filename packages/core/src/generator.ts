@@ -1,7 +1,7 @@
-import { countFragments, validateLevel, type Level, type WispSpec } from "./level";
+import { LEVEL_LIMITS, countFragments, validateLevel, type Level, type WispSpec } from "./level";
 import { createRng, type Rng } from "./rng";
 import { cloneState, createState, launch, runQuiet, type LaunchSource, type SimState } from "./sim";
-import { analyzeLevel, type DifficultyReport } from "./solver";
+import { analyzeLevel, difficultyScore, verifySolution, type DifficultyReport } from "./solver";
 
 /** A finished mosaic before it becomes a puzzle: just colors on a grid. */
 export interface Art {
@@ -44,6 +44,8 @@ export interface GenerateOptions {
    * step reorders wisps and is kept only if the level stays solvable and gets closer to target.
    */
   refine?: number;
+  /** Solver node budget per check (default 20k). Over-budget candidates are skipped. */
+  maxNodes?: number;
 }
 
 export interface GeneratedLevel {
@@ -51,6 +53,8 @@ export interface GeneratedLevel {
   /** A verified sequential solution. */
   solution: LaunchSource[];
   report: DifficultyReport;
+  /** With a `targetDifficulty`: how far the result's difficulty is from it. */
+  targetMiss?: number;
 }
 
 /**
@@ -82,10 +86,12 @@ export function naturalSequence(art: Art, rng: Rng, chunk: GenerateOptions["chun
   while (s.remaining > 0) {
     const reach = left.map((n, color) => (n > 0 ? s.remaining - play(s, color, n).remaining : 0));
     const total = reach.reduce((a, b) => a + b, 0);
+    // The first fragment above each bottom-lane cell is always reachable by its own color, so this
+    // only happens for art with colors outside its palette.
     if (total === 0) throw new Error("art has fragments no wisp can reach");
     let pick = rng.next() * total;
     let color = reach.findIndex((r) => (pick -= r) < 0);
-    if (color === -1) color = reach.length - 1;
+    if (color === -1) color = reach.findLastIndex((r) => r > 0);
     const n = reach[color]!;
     let charge = Math.min(n, rng.int(chunk.min, chunk.max));
     // Don't leave a tiny remainder of this color behind if this wisp can take it all now.
@@ -128,15 +134,24 @@ export function fixedChunks(
   return placed.map((p) => p.wisp);
 }
 
-/** Deals a sequence into columns, keeping its order within each column (still solvable). */
-function deal(sequence: readonly WispSpec[], columns: number, rng: Rng): WispSpec[][] {
+/**
+ * Deals a sequence into columns, keeping its order within each column. Returns the columns and the
+ * launch order (one column launch per sequence entry) that replays the sequence.
+ */
+function deal(
+  sequence: readonly WispSpec[],
+  columns: number,
+  rng: Rng,
+): { columns: WispSpec[][]; order: LaunchSource[] } {
   const out: WispSpec[][] = Array.from({ length: columns }, () => []);
+  const order: LaunchSource[] = [];
   sequence.forEach((w, i) => {
-    // Round-robin start keeps columns balanced; random choice hides the pattern.
+    // Round-robin start keeps columns balanced (and none empty); random choice hides the pattern.
     const c = i < columns ? i : rng.int(0, columns - 1);
     out[c]!.push({ ...w });
+    order.push({ kind: "column", index: c });
   });
-  return out;
+  return { columns: out, order };
 }
 
 /** Moves each wisp (with probability `shuffle`) 1–3 places earlier in its column. */
@@ -153,8 +168,11 @@ function perturb(columns: WispSpec[][], shuffle: number, rng: Rng): WispSpec[][]
   return out;
 }
 
-/** Moves one random wisp to the front of a random column, or swaps two random wisps. */
-function mutate(columns: WispSpec[][], rng: Rng): WispSpec[][] {
+/**
+ * Moves one random wisp to the front of a random column, or swaps two random wisps. Returns `null`
+ * when the result would leave a column empty or not change anything.
+ */
+function mutate(columns: WispSpec[][], rng: Rng): WispSpec[][] | null {
   const out = columns.map((c) => c.map((w) => ({ ...w })));
   const nonEmpty = out.filter((c) => c.length > 0);
   const from = nonEmpty[rng.int(0, nonEmpty.length - 1)]!;
@@ -162,57 +180,95 @@ function mutate(columns: WispSpec[][], rng: Rng): WispSpec[][] {
   if (rng.next() < 0.5) {
     const [w] = from.splice(i, 1);
     out[rng.int(0, out.length - 1)]!.unshift(w!);
-    // Never leave a column empty: validateLevel rejects it.
-    if (out.some((c) => c.length === 0)) return columns;
+    if (out.some((c) => c.length === 0)) return null;
   } else {
     const to = nonEmpty[rng.int(0, nonEmpty.length - 1)]!;
     const j = rng.int(0, to.length - 1);
     [from[i], to[j]] = [to[j]!, from[i]!];
   }
-  return out;
+  return JSON.stringify(out) === JSON.stringify(columns) ? null : out;
+}
+
+function checkOptions(options: GenerateOptions): void {
+  const { chunk, columns, slots, trackCap, shuffle } = options;
+  const bad = (msg: string) => {
+    throw new Error(`invalid generate options: ${msg}`);
+  };
+  if (!Number.isInteger(chunk.min) || chunk.min < 1) bad("chunk.min must be an integer ≥ 1");
+  if (!Number.isInteger(chunk.max) || chunk.max < chunk.min) bad("chunk.max must be ≥ chunk.min");
+  if (!Number.isInteger(columns) || columns < 1 || columns > LEVEL_LIMITS.maxColumns)
+    bad(`columns must be 1..${LEVEL_LIMITS.maxColumns}`);
+  if (!Number.isInteger(slots) || slots < 1 || slots > LEVEL_LIMITS.maxSlots)
+    bad(`slots must be 1..${LEVEL_LIMITS.maxSlots}`);
+  if (!Number.isInteger(trackCap) || trackCap < 1 || trackCap > LEVEL_LIMITS.maxTrackCap)
+    bad(`trackCap must be 1..${LEVEL_LIMITS.maxTrackCap}`);
+  if (!(shuffle >= 0 && shuffle <= 1)) bad("shuffle must be 0..1");
 }
 
 /**
  * Turns art into a solver-verified level. Tries several seeded candidates and keeps the solvable
- * one closest to `targetDifficulty` (or the first solvable one). The unperturbed natural order is
- * always a fallback, so generation only fails on art that no wisp can clear.
+ * one closest to `targetDifficulty` (or the first solvable one), then hill-climbs towards the
+ * target. The last candidate is the natural order with one-lap charges: it wins by launching the
+ * sequence in order, which is verified by replay rather than search, so generation succeeds for
+ * any art the natural sequence can clear even when the solver's node budget runs out.
  */
 export function generateLevel(
   art: Art,
   meta: { id: string; name: string },
   options: GenerateOptions,
 ): GeneratedLevel {
+  checkOptions(options);
   const attempts = options.attempts ?? 12;
-  const playouts = options.playouts ?? 60;
-  let best: GeneratedLevel | null = null;
+  const analysis = {
+    playouts: options.playouts ?? 60,
+    seed: options.seed,
+    maxNodes: options.maxNodes ?? 20_000,
+  };
+  const target = options.targetDifficulty;
+  const seedFor = (n: number) => (Math.imul(options.seed, 0x9e3779b1) + n) >>> 0;
+  const finish = (g: Omit<GeneratedLevel, "targetMiss">): GeneratedLevel =>
+    target === undefined ? g : { ...g, targetMiss: Math.abs(g.report.difficulty - target) };
+
+  let best: Omit<GeneratedLevel, "targetMiss"> | null = null;
   let bestScore = Infinity;
 
   for (let attempt = 0; attempt <= attempts; attempt++) {
-    const rng = createRng(options.seed * 1000 + attempt);
+    const rng = createRng(seedFor(attempt));
     const natural = naturalSequence(art, rng, options.chunk);
-    // The last attempt is the fallback: natural order, reach-limited charges, no perturbation.
     const fallback = attempt === attempts;
     const sequence =
       options.charges === "fixed" && !fallback ? fixedChunks(natural, rng, options.chunk) : natural;
-    const dealt = deal(sequence, options.columns, rng);
-    const columns = fallback ? dealt : perturb(dealt, options.shuffle, rng);
+    const columnCount = Math.min(options.columns, sequence.length);
+    const dealt = deal(sequence, columnCount, rng);
     const level: Level = {
       ...meta,
       width: art.width,
       height: art.height,
       palette: art.palette.slice(),
       cells: art.cells.slice(),
-      columns,
+      columns: fallback ? dealt.columns : perturb(dealt.columns, options.shuffle, rng),
       slots: options.slots,
       trackCap: options.trackCap,
     };
     const errors = validateLevel(level);
     if (errors.length > 0) throw new Error(`generator produced an invalid level: ${errors[0]}`);
-    const report = analyzeLevel(level, { playouts, seed: options.seed });
-    if (report.solve.status !== "solved") continue;
+    let report = analyzeLevel(level, analysis);
+    if (report.solve.status !== "solved") {
+      if (!fallback) continue;
+      // The natural order is a known solution that needs no slot; use it as the proof.
+      if (!verifySolution(level, dealt.order)) {
+        throw new Error(`natural order failed to replay for ${meta.id} (generator bug)`);
+      }
+      report = {
+        ...report,
+        solve: { status: "solved", solution: dealt.order, nodes: report.solve.nodes },
+        minSlots: 1,
+        difficulty: difficultyScore(report.lossRate, 1, level.slots),
+      };
+    }
     const candidate = { level, solution: report.solve.solution!, report };
-    if (options.targetDifficulty === undefined) return candidate;
-    const score = Math.abs(report.difficulty - options.targetDifficulty);
+    if (target === undefined) return finish(candidate);
+    const score = Math.abs(report.difficulty - target);
     if (score < bestScore) {
       best = candidate;
       bestScore = score;
@@ -220,19 +276,18 @@ export function generateLevel(
   }
   if (!best) throw new Error(`no solvable level found for ${meta.id}`);
 
-  const target = options.targetDifficulty!;
-  const rng = createRng(options.seed * 1000 + 999);
+  const rng = createRng(seedFor(0xffff));
   for (let i = 0; i < (options.refine ?? 40) && bestScore > 0.02; i++) {
     const columns = mutate(best.level.columns, rng);
-    if (columns === best.level.columns) continue;
+    if (!columns) continue;
     const level: Level = { ...best.level, columns };
-    const report = analyzeLevel(level, { playouts, seed: options.seed });
+    const report = analyzeLevel(level, analysis);
     if (report.solve.status !== "solved") continue;
-    const score = Math.abs(report.difficulty - target);
+    const score = Math.abs(report.difficulty - target!);
     if (score < bestScore) {
       best = { level, solution: report.solve.solution!, report };
       bestScore = score;
     }
   }
-  return best;
+  return finish(best);
 }

@@ -26,6 +26,20 @@ function moonArt(): Art {
   return { width: size, height: size, palette: ["#f6d97a", "#2a1650", "#c9b8ff"], cells };
 }
 
+/** Random noise: the worst case for the solver (heavy layering everywhere). */
+function noiseArt(size: number, colors: number, seed: number): Art {
+  const rng = createRng(seed);
+  return {
+    width: size,
+    height: size,
+    palette: Array.from(
+      { length: colors },
+      (_, i) => `#${(i * 0x252525 + 0x101010).toString(16).padStart(6, "0")}`,
+    ),
+    cells: Array.from({ length: size * size }, () => rng.int(0, colors - 1)),
+  };
+}
+
 const base: GenerateOptions = {
   seed: 7,
   columns: 3,
@@ -127,5 +141,60 @@ describe("generateLevel", () => {
       { ...base, shuffle: 1, slots: 1, columns: 5, attempts: 4 },
     );
     expect(verifySolution(g.level, g.solution)).toBe(true);
+  });
+
+  it("the natural-order fallback succeeds even when the solver runs out of budget", () => {
+    for (const seed of [24, 25, 26]) {
+      const g = generateLevel(
+        noiseArt(18, 6, seed),
+        { id: "noise", name: "noise" },
+        {
+          ...base,
+          seed,
+          columns: 5,
+          slots: 1,
+          trackCap: 10,
+          attempts: 0,
+          maxNodes: 50,
+          playouts: 5,
+        },
+      );
+      expect(validateLevel(g.level)).toEqual([]);
+      expect(g.report.solve.status).toBe("solved");
+      expect(verifySolution(g.level, g.solution)).toBe(true);
+      expect(g.report.minSlots).toBe(1);
+    }
+  });
+
+  it("clamps columns to the number of wisps", () => {
+    const art: Art = { width: 2, height: 1, palette: ["#ffffff"], cells: [0, 0] };
+    const g = generateLevel(art, { id: "tiny", name: "tiny" }, { ...base, columns: 4 });
+    expect(g.level.columns).toHaveLength(1);
+    expect(validateLevel(g.level)).toEqual([]);
+  });
+
+  it("reports how far the result is from the target", () => {
+    const g = generateLevel(
+      moonArt(),
+      { id: "m", name: "m" },
+      { ...base, targetDifficulty: 0.95, refine: 5 },
+    );
+    expect(g.targetMiss).toBeCloseTo(Math.abs(g.report.difficulty - 0.95), 6);
+    const noTarget = generateLevel(moonArt(), { id: "m", name: "m" }, base);
+    expect(noTarget.targetMiss).toBeUndefined();
+  });
+
+  it("rejects invalid options instead of looping forever", () => {
+    const art = moonArt();
+    const meta = { id: "m", name: "m" };
+    expect(() => generateLevel(art, meta, { ...base, chunk: { min: 0, max: 0 } })).toThrow(
+      "chunk.min",
+    );
+    expect(() => generateLevel(art, meta, { ...base, chunk: { min: 5, max: 3 } })).toThrow(
+      "chunk.max",
+    );
+    expect(() => generateLevel(art, meta, { ...base, columns: 0 })).toThrow("columns");
+    expect(() => generateLevel(art, meta, { ...base, slots: 9 })).toThrow("slots");
+    expect(() => generateLevel(art, meta, { ...base, shuffle: 2 })).toThrow("shuffle");
   });
 });

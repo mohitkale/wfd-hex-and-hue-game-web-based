@@ -32,6 +32,7 @@ export {
 export { GameSession, type SessionEvent, type SessionListener } from "./session";
 export {
   analyzeLevel,
+  difficultyScore,
   playSequential,
   sequentialMoves,
   solve,
@@ -45,6 +46,7 @@ export {
   type SolveStatus,
 } from "./solver";
 export {
+  fixedChunks,
   generateLevel,
   naturalSequence,
   type Art,
