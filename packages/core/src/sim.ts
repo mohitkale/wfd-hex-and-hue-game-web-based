@@ -34,19 +34,28 @@ export interface SimState {
   /** Front-most (longest travelled) first. */
   track: TrackWisp[];
   trackCap: number;
-  /** Number of `step` calls so far. */
+  /** Number of effective `step` calls so far. Informational only: exclude it from state hashes. */
   step: number;
   status: Status;
 }
 
 export type SimEvent =
   | { type: "launched"; wispId: number; from: LaunchSource }
-  | { type: "collected"; wispId: number; cell: number; color: number; chargeLeft: number }
-  | { type: "portal"; wispId: number }
+  | {
+      type: "collected";
+      wispId: number;
+      /** Track position the wisp collected from. */
+      pos: number;
+      cell: number;
+      color: number;
+      chargeLeft: number;
+    }
+  | { type: "portal"; wispId: number; pos: number }
   | { type: "parked"; wispId: number; slot: number }
   | { type: "won" }
   | { type: "lost"; wispId: number };
 
+// Shared, never mutated; one small entry per board size used.
 const trackCache = new Map<string, TrackCell[]>();
 
 /** The (cached, shared, read-only) track for a mosaic size. */
@@ -67,7 +76,9 @@ export function createState(level: Level): SimState {
     height: level.height,
     cells: level.cells.slice(),
     remaining: level.cells.filter((c) => c !== EMPTY).length,
-    columns: level.columns.map((col) => col.map((w) => ({ id: nextId++, ...w }))),
+    columns: level.columns.map((col) =>
+      col.map((w) => ({ id: nextId++, color: w.color, charge: w.charge })),
+    ),
     slots: new Array<Wisp | null>(level.slots).fill(null),
     track: [],
     trackCap: level.trackCap,
@@ -112,7 +123,7 @@ export function launch(s: SimState, source: LaunchSource): SimEvent | null {
   const wisp =
     source.kind === "column" ? s.columns[source.index]!.shift()! : (s.slots[source.index] as Wisp);
   if (source.kind === "slot") s.slots[source.index] = null;
-  s.track.push({ ...wisp, pos: 0, traveled: 0 });
+  s.track.push({ id: wisp.id, color: wisp.color, charge: wisp.charge, pos: 0, traveled: 0 });
   return { type: "launched", wispId: wisp.id, from: source };
 }
 
@@ -120,7 +131,10 @@ export function launch(s: SimState, source: LaunchSource): SimEvent | null {
  * Advances the simulation by one step: every track wisp moves one cell, then, front-most first,
  * each either finishes its lap (parks in a slot, or loses the game if none is free) or collects the
  * first fragment in its line of sight when the color matches. A wisp reaching charge 0 leaves
- * through the portal.
+ * through the portal. The game is won once no fragments remain.
+ *
+ * On a loss the state freezes mid-step: wisps behind the losing one have moved but are not
+ * processed (no collection), and all of them, including the losing wisp, stay on `track`.
  */
 export function step(s: SimState): SimEvent[] {
   if (s.status !== "playing") return [];
@@ -161,22 +175,23 @@ export function step(s: SimState): SimEvent[] {
       events.push({
         type: "collected",
         wispId: w.id,
+        pos: w.pos,
         cell: target,
         color: w.color,
         chargeLeft: w.charge,
       });
       if (w.charge === 0) {
-        events.push({ type: "portal", wispId: w.id });
-        if (s.remaining === 0) {
-          s.status = "won";
-          events.push({ type: "won" });
-        }
+        events.push({ type: "portal", wispId: w.id, pos: w.pos });
         continue;
       }
     }
     stillOnTrack.push(w);
   }
   s.track = stillOnTrack;
+  if (s.status === "playing" && s.remaining === 0) {
+    s.status = "won";
+    events.push({ type: "won" });
+  }
   return events;
 }
 

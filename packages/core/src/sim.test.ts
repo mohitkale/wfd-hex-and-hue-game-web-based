@@ -94,8 +94,8 @@ describe("collection", () => {
     launch(s, col);
     const events = step(s); // pos 1: bottom lane, sees the only cell
     expect(events).toEqual([
-      { type: "collected", wispId: 0, cell: 0, color: 0, chargeLeft: 0 },
-      { type: "portal", wispId: 0 },
+      { type: "collected", wispId: 0, pos: 1, cell: 0, color: 0, chargeLeft: 0 },
+      { type: "portal", wispId: 0, pos: 1 },
       { type: "won" },
     ]);
     expect(s.status).toBe("won");
@@ -120,7 +120,9 @@ describe("collection", () => {
     const s = createState(level(1, 2, [0, 0], [[{ color: 0, charge: 2 }]]));
     launch(s, col);
     const events = step(s);
-    expect(events).toEqual([{ type: "collected", wispId: 0, cell: 1, color: 0, chargeLeft: 1 }]);
+    expect(events).toEqual([
+      { type: "collected", wispId: 0, pos: 1, cell: 1, color: 0, chargeLeft: 1 },
+    ]);
   });
 
   it("a wisp sweeping a full ring clears it in one lap", () => {
@@ -128,7 +130,7 @@ describe("collection", () => {
     launch(s, col);
     const events = runUntilIdle(s);
     expect(events.filter((e) => e.type === "collected")).toHaveLength(8);
-    expect(events.at(-1)).toEqual({ type: "portal", wispId: 0 });
+    expect(events.at(-1)).toMatchObject({ type: "portal", wispId: 0 });
     expect(s.cells).toEqual([_, _, _, _, 0, _, _, _, _]);
   });
 
@@ -142,6 +144,32 @@ describe("collection", () => {
     const events = step(s);
     expect(events[0]).toMatchObject({ type: "collected", wispId: 10 });
     expect(s.track.map((w) => w.id)).toEqual([11]);
+  });
+});
+
+describe("multiple wisps and authored data", () => {
+  it("two wisps cooperate: the leader opens a line the follower collects through", () => {
+    // Ring wisp leads by one cell; when it clears cell 7 (bottom of column 1) the center wisp,
+    // arriving at the same track cell next step, sees the center fragment.
+    const s = hiddenCenter([[{ color: 1, charge: 8 }], [{ color: 0, charge: 1 }]]);
+    launch(s, col);
+    step(s);
+    launch(s, col1);
+    step(s);
+    expect(step(s)).toEqual([
+      { type: "collected", wispId: 0, pos: 3, cell: 8, color: 1, chargeLeft: 5 },
+      { type: "collected", wispId: 1, pos: 2, cell: 4, color: 0, chargeLeft: 0 },
+      { type: "portal", wispId: 1, pos: 2 },
+    ]);
+    const rest = runUntilIdle(s);
+    expect(rest.at(-1)).toEqual({ type: "won" });
+    expect(s.track).toEqual([]);
+  });
+
+  it("ignores ids or extra fields on authored wisps", () => {
+    const lvl = level(1, 1, [0], [[{ color: 0, charge: 1, id: 99 } as WispSpec]]);
+    const s = createState(lvl);
+    expect(s.columns[0]).toEqual([{ id: 0, color: 0, charge: 1 }]);
   });
 });
 
@@ -168,6 +196,51 @@ describe("laps, slots and losing", () => {
     const events = runUntilIdle(s);
     expect(types(events)).toEqual(["collected", "portal", "won"]);
     expect(s.status).toBe("won");
+  });
+
+  it("parks into a slot freed by a relaunch earlier in the turn", () => {
+    const s = hiddenCenter([[{ color: 0, charge: 1 }], [{ color: 0, charge: 1 }]], 1);
+    launch(s, col);
+    runUntilIdle(s);
+    launch(s, slot0); // frees the only slot
+    step(s);
+    launch(s, col1);
+    const events = runUntilIdle(s);
+    expect(events.filter((e) => e.type === "parked")).toEqual([
+      { type: "parked", wispId: 0, slot: 0 },
+    ]);
+    expect(events.at(-1)).toEqual({ type: "lost", wispId: 1 });
+  });
+
+  it("freezes mid-step on a loss, leaving trailing wisps on the track", () => {
+    const s = hiddenCenter(
+      [[{ color: 0, charge: 1 }], [{ color: 0, charge: 1 }], [{ color: 0, charge: 1 }]],
+      1,
+    );
+    const lap = trackFor(3, 3).length;
+    launch(s, col);
+    runUntilIdle(s);
+    launch(s, col1);
+    step(s);
+    launch(s, { kind: "column", index: 2 });
+    for (let i = 2; i < lap; i++) step(s);
+    // Wisp 1 finishes its lap with the only slot taken; wisp 2 is one cell behind it.
+    expect(step(s)).toEqual([{ type: "lost", wispId: 1 }]);
+    expect(s.track.map((w) => [w.id, w.pos, w.traveled])).toEqual([
+      [1, 0, lap],
+      [2, lap - 1, lap - 1],
+    ]);
+    expect(step(s)).toEqual([]);
+  });
+
+  it("is inert after a win", () => {
+    const s = createState(level(1, 1, [0], [[{ color: 0, charge: 1 }]]));
+    launch(s, col);
+    step(s);
+    expect(s.status).toBe("won");
+    const stepsBefore = s.step;
+    expect(step(s)).toEqual([]);
+    expect(s.step).toBe(stepsBefore);
   });
 
   it("loses when a lap ends with every slot full", () => {
