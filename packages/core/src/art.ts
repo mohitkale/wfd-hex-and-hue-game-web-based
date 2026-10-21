@@ -12,6 +12,7 @@ export interface AsciiArt {
 }
 
 const EMPTY_CHARS = new Set([".", " "]);
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 export function parseAsciiArt(ascii: AsciiArt): Art {
   const { legend, rows } = ascii;
@@ -21,8 +22,13 @@ export function parseAsciiArt(ascii: AsciiArt): Art {
     if (row.length !== width)
       throw new Error(`row ${y} has ${row.length} cells, expected ${width}`);
   });
-  for (const key of Object.keys(legend)) {
+  const seen = new Map<string, string>();
+  for (const [key, color] of Object.entries(legend)) {
     if (key.length !== 1 || EMPTY_CHARS.has(key)) throw new Error(`invalid legend key "${key}"`);
+    if (!HEX_COLOR.test(color)) throw new Error(`legend "${key}" color "${color}" is not #rrggbb`);
+    const dup = seen.get(color.toLowerCase());
+    if (dup) throw new Error(`legend "${key}" repeats the color of "${dup}"`);
+    seen.set(color.toLowerCase(), key);
   }
 
   const used = new Set<string>();

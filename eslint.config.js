@@ -6,6 +6,14 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
     files: ["packages/core/**/*.ts"],
     rules: {
       // The engine must stay deterministic: use the seeded RNG and step counters instead.

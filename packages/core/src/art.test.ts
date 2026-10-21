@@ -37,4 +37,13 @@ describe("parseAsciiArt", () => {
       'invalid legend key "."',
     );
   });
+
+  it("rejects malformed and duplicate legend colors, even if unused", () => {
+    expect(() => parseAsciiArt({ legend: { a: "#111111", b: "gold" }, rows: ["a"] })).toThrow(
+      'legend "b" color "gold" is not #rrggbb',
+    );
+    expect(() => parseAsciiArt({ legend: { a: "#abcdef", b: "#ABCDEF" }, rows: ["ab"] })).toThrow(
+      'legend "b" repeats the color of "a"',
+    );
+  });
 });

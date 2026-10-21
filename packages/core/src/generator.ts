@@ -241,7 +241,8 @@ export function generateLevel(
     const columnCount = Math.min(options.columns, sequence.length);
     const dealt = deal(sequence, columnCount, rng);
     const level: Level = {
-      ...meta,
+      id: meta.id,
+      name: meta.name,
       width: art.width,
       height: art.height,
       palette: art.palette.slice(),
