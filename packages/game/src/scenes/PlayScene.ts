@@ -6,10 +6,20 @@ import {
   type LaunchSource,
   type SessionEvent,
   type TrackCell,
+  type TrackWisp,
 } from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
 import { levelAt, worlds } from "../levels";
-import { TICK_MS, accumulate, approach, trackPosition, type Speed } from "../motion";
+import {
+  LAUNCH_FLIGHT_MS,
+  TICK_MS,
+  accumulate,
+  approach,
+  flightPoint,
+  trackPosition,
+  type Point,
+  type Speed,
+} from "../motion";
 import { hexToNumber, theme } from "../theme";
 import { drawBoardChrome } from "../view/BoardChrome";
 import { MosaicView } from "../view/MosaicView";
@@ -29,8 +39,15 @@ const VISIBLE_STACK = 3;
 
 /** Where a wisp view should be: following the track, or resting at a spot. */
 type Target =
-  | { kind: "track"; pos: number; traveled: number }
+  | { kind: "track"; wisp: TrackWisp }
   | { kind: "rest"; x: number; y: number; r: number; alpha: number };
+
+/** A wisp hopping from a column or slot onto the track. */
+interface Flight {
+  from: Point;
+  fromR: number;
+  elapsed: number;
+}
 
 export class PlayScene extends Phaser.Scene {
   private data_!: PlayData;
@@ -42,9 +59,12 @@ export class PlayScene extends Phaser.Scene {
   private chrome: Phaser.GameObjects.GameObject[] = [];
   private hud: Phaser.GameObjects.GameObject[] = [];
   private zones: Phaser.GameObjects.Zone[] = [];
-  private extras: Phaser.GameObjects.Text[] = [];
+  private moreLabels: Phaser.GameObjects.Text[] = [];
   private wisps = new Map<number, WispView>();
   private targets = new Map<number, Target>();
+  private flights = new Map<number, Flight>();
+  /** Spent wisps still animating into the portal. */
+  private departing = new Set<WispView>();
   private speedLabel: Phaser.GameObjects.Text | null = null;
   private banner: Phaser.GameObjects.GameObject[] = [];
   private lastLayoutKey = "";
@@ -69,7 +89,9 @@ export class PlayScene extends Phaser.Scene {
     this.chrome = [];
     this.hud = [];
     this.zones = [];
-    this.extras = [];
+    this.moreLabels = [];
+    this.flights = new Map();
+    this.departing = new Set();
     this.banner = [];
     this.speedLabel = null;
     this.lastLayoutKey = "";
@@ -93,11 +115,18 @@ export class PlayScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
-    if (this.session.state.status === "playing") {
+    const s = this.session.state;
+    if (s.status === "playing" && (s.track.length > 0 || this.session.pending.length > 0)) {
       const { steps, acc } = accumulate(this.acc, delta, this.speed);
       this.acc = acc;
-      for (let i = 0; i < steps; i++) this.session.tick();
-      if (steps > 0) this.refreshTargets();
+      for (let i = 0; i < steps; i++) {
+        // Refresh per tick that changed something, so a wisp launched in one tick has a view
+        // before it collects in the next.
+        if (this.session.tick().length > 0) this.refreshTargets();
+      }
+    } else if (s.status === "playing") {
+      // Idle (nothing moving): the player can wait forever without the loop doing any work.
+      this.acc = 0;
     }
     this.mosaic?.flush();
     this.moveWisps(delta);
@@ -130,7 +159,7 @@ export class PlayScene extends Phaser.Scene {
     if (key === this.lastLayoutKey) return;
     this.lastLayoutKey = key;
 
-    for (const o of [...this.chrome, ...this.hud, ...this.zones]) o.destroy();
+    for (const o of [...this.chrome, ...this.hud, ...this.zones, ...this.moreLabels]) o.destroy();
     this.mosaic?.destroy();
     this.chrome = drawBoardChrome(
       this,
@@ -146,7 +175,18 @@ export class PlayScene extends Phaser.Scene {
     this.mosaic.image.setDepth(DEPTH.mosaic);
     this.drawHud();
     this.createTapZones();
-    this.refreshTargets();
+    this.moreLabels = this.layout.columns.map((zone) =>
+      this.add
+        .text(zone.x + zone.w / 2, zone.y + zone.h - 10 * dpr, "", {
+          fontFamily: theme.font,
+          fontSize: `${Math.round(12 * dpr)}px`,
+          color: theme.textDim,
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(DEPTH.wisps)
+        .setVisible(false),
+    );
+    this.refreshTargets(true);
     // Views keep their identity across relayouts; snap them to their new spots.
     for (const [id, view] of this.wisps) this.snap(id, view);
   }
@@ -266,8 +306,10 @@ export class PlayScene extends Phaser.Scene {
         break;
       case "undone":
       case "restarted":
+        for (const view of this.departing) view.destroy();
+        this.departing.clear();
         this.rebuildMosaic();
-        this.refreshTargets();
+        this.refreshTargets(true);
         break;
       default:
         break;
@@ -302,8 +344,10 @@ export class PlayScene extends Phaser.Scene {
     const view = this.wisps.get(id);
     this.wisps.delete(id);
     this.targets.delete(id);
+    this.flights.delete(id);
     if (!view) return;
     this.tweens.killTweensOf(view);
+    this.departing.add(view);
     const { x, y } = this.layout.portal;
     this.tweens.add({
       targets: view,
@@ -313,7 +357,10 @@ export class PlayScene extends Phaser.Scene {
       alpha: 0,
       duration: 420,
       ease: "Cubic.easeIn",
-      onComplete: () => view.destroy(),
+      onComplete: () => {
+        this.departing.delete(view);
+        view.destroy();
+      },
     });
   }
 
@@ -327,15 +374,16 @@ export class PlayScene extends Phaser.Scene {
 
   /**
    * Recomputes where every wisp belongs from the session state, creating views for new wisps and
-   * removing views for wisps that no longer exist (undo / restart).
+   * removing views for wisps that no longer exist (undo / restart). Track targets reference the
+   * engine's live wisp objects, so this only needs to run when something structural changed (an
+   * event was emitted), not on every tick. `snapNew` places new views exactly (level start,
+   * undo); otherwise wisps surfacing in a column fade in from below.
    */
-  private refreshTargets(): void {
+  private refreshTargets(snapNew = false): void {
     const s = this.session.state;
     const { dpr } = this.layout;
     const palette = this.built.level.palette;
     const next = new Map<number, Target>();
-    for (const t of this.extras) t.destroy();
-    this.extras = [];
 
     s.columns.forEach((column, c) => {
       const zone = this.layout.columns[c]!;
@@ -350,21 +398,11 @@ export class PlayScene extends Phaser.Scene {
           alpha: 1 - depth * 0.3,
         });
       });
-      if (column.length > VISIBLE_STACK) {
-        const more = this.add
-          .text(
-            zone.x + zone.w / 2,
-            zone.y + zone.h - 10 * dpr,
-            `+${column.length - VISIBLE_STACK}`,
-            {
-              fontFamily: theme.font,
-              fontSize: `${Math.round(12 * dpr)}px`,
-              color: theme.textDim,
-            },
-          )
-          .setOrigin(0.5, 1)
-          .setDepth(DEPTH.wisps);
-        this.extras.push(more);
+      const more = this.moreLabels[c];
+      if (more) {
+        const hidden = column.length - VISIBLE_STACK;
+        more.setVisible(hidden > 0);
+        if (hidden > 0) more.setText(`+${hidden}`);
       }
     });
 
@@ -375,21 +413,38 @@ export class PlayScene extends Phaser.Scene {
     });
 
     for (const w of s.track) {
-      next.set(w.id, { kind: "track", pos: w.pos, traveled: w.traveled });
+      next.set(w.id, { kind: "track", wisp: w });
+      // Leaving a column or slot: fly onto the track instead of teleporting.
+      const view = this.wisps.get(w.id);
+      if (view && this.targets.get(w.id)?.kind !== "track") {
+        this.flights.set(w.id, {
+          from: { x: view.x, y: view.y },
+          fromR: view.currentRadius,
+          elapsed: 0,
+        });
+      }
     }
 
     const all = [...s.columns.flat(), ...s.slots.filter((w) => w !== null), ...s.track];
     for (const w of all) {
-      if (!next.has(w.id) || this.wisps.has(w.id)) continue;
+      const target = next.get(w.id);
+      if (!target || this.wisps.has(w.id)) continue;
       const view = new WispView(this, w.id, palette[w.color]!, w.charge, 1).setDepth(DEPTH.wisps);
       this.wisps.set(w.id, view);
-      this.snap(w.id, view, next.get(w.id));
+      this.snap(w.id, view, target);
+      if (!snapNew && target.kind === "rest") {
+        view
+          .setPosition(target.x, target.y + target.r * 1.6)
+          .setRadius(target.r * 0.7)
+          .setAlpha(0);
+      }
     }
     for (const w of all) this.wisps.get(w.id)?.setCharge(w.charge);
     for (const [id, view] of this.wisps) {
       if (!next.has(id)) {
         view.destroy();
         this.wisps.delete(id);
+        this.flights.delete(id);
       }
     }
     this.targets = next;
@@ -398,8 +453,9 @@ export class PlayScene extends Phaser.Scene {
   /** Places a view exactly at its target (new views and relayouts). */
   private snap(id: number, view: WispView, target = this.targets.get(id)): void {
     if (!target) return;
+    this.flights.delete(id);
     if (target.kind === "track") {
-      const p = trackPosition(this.layout, this.track, target, this.alpha());
+      const p = trackPosition(this.layout, this.track, target.wisp, this.alpha());
       view.setPosition(p.x, p.y).setRadius(this.trackRadius()).setAlpha(1);
     } else {
       view.setPosition(target.x, target.y).setRadius(target.r).setAlpha(target.alpha);
@@ -413,14 +469,18 @@ export class PlayScene extends Phaser.Scene {
       const target = this.targets.get(id);
       if (!target) continue;
       if (target.kind === "track") {
-        const p = trackPosition(this.layout, this.track, target, alpha);
-        // Ride the track exactly once close; ease in when arriving from a column or slot.
-        const far = Math.hypot(p.x - view.x, p.y - view.y) > this.layout.cell * 1.2;
-        view.setPosition(
-          far ? approach(view.x, p.x, delta, 22) : p.x,
-          far ? approach(view.y, p.y, delta, 22) : p.y,
-        );
-        view.setRadius(approach(view.currentRadius, trackR, delta, 22));
+        const exact = trackPosition(this.layout, this.track, target.wisp, alpha);
+        const flight = this.flights.get(id);
+        if (flight) {
+          // Fixed-length hop that lands exactly on the moving track point, at any speed.
+          flight.elapsed += delta;
+          const p = flightPoint(flight.from, exact, flight.elapsed);
+          const t = Math.min(1, flight.elapsed / LAUNCH_FLIGHT_MS);
+          view.setPosition(p.x, p.y).setRadius(flight.fromR + (trackR - flight.fromR) * t);
+          if (t >= 1) this.flights.delete(id);
+        } else {
+          view.setPosition(exact.x, exact.y).setRadius(trackR);
+        }
         view.setAlpha(1);
       } else {
         view.setPosition(approach(view.x, target.x, delta), approach(view.y, target.y, delta));

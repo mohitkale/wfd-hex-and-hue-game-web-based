@@ -30,6 +30,7 @@ export class WispView extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     this.add([this.glow, this.core, this.label]);
+    this.radius = -1;
     this.setRadius(radius);
     this.setCharge(charge);
     scene.add.existing(this);
@@ -43,6 +44,8 @@ export class WispView extends Phaser.GameObjects.Container {
   }
 
   setRadius(radius: number): this {
+    // Rebuilding the arc and glow is not free; settled wisps call this every frame.
+    if (Math.abs(radius - this.radius) < 0.01) return this;
     this.radius = radius;
     this.core.setRadius(radius);
     this.core.setStrokeStyle(Math.max(1, radius * 0.14), 0xffffff, 0.85);

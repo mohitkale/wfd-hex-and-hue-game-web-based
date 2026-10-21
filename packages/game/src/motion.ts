@@ -55,3 +55,23 @@ export function accumulate(
   if (steps === maxSteps) acc = Math.min(acc, TICK_MS - 1);
   return { steps, acc };
 }
+
+/** Length of the hop from a column or slot onto the track. */
+export const LAUNCH_FLIGHT_MS = 140;
+
+/**
+ * Position `elapsed` ms into a launch hop from `from` towards `to`, where `to` is the (moving)
+ * track point this frame. Ease-out, and exactly `to` once the hop is over, so the wisp locks onto
+ * the track at any speed instead of trailing it.
+ */
+export function flightPoint(
+  from: Point,
+  to: Point,
+  elapsed: number,
+  duration = LAUNCH_FLIGHT_MS,
+): Point {
+  const t = Math.min(1, Math.max(0, elapsed / duration));
+  if (t >= 1) return { x: to.x, y: to.y };
+  const e = 1 - (1 - t) ** 3;
+  return { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
+}
