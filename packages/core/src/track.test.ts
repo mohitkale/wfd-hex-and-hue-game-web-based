@@ -80,6 +80,27 @@ describe("line of sight", () => {
     expect(firstInSight(cellsFull, at(-1, 1))).toBe(3);
   });
 
+  it("pins start, stride and length for every lane on a non-square grid", () => {
+    expect(at(1, H)).toEqual({ start: 4, stride: -W, length: H });
+    expect(at(W, 1)).toEqual({ start: 5, stride: -1, length: W });
+    expect(at(1, -1)).toEqual({ start: 1, stride: W, length: H });
+    expect(at(-1, 1)).toEqual({ start: 3, stride: 1, length: W });
+  });
+
+  it("returns -1 on clear lines from every lane", () => {
+    const cells = [_, _, _, _, _, _];
+    expect(firstInSight(cells, at(2, H))).toBe(-1);
+    expect(firstInSight(cells, at(W, 0))).toBe(-1);
+    expect(firstInSight(cells, at(0, -1))).toBe(-1);
+    expect(firstInSight(cells, at(-1, 1))).toBe(-1);
+  });
+
+  it("finds the far end of a line when nearer cells are empty", () => {
+    const cells = [0, _, _, _, _, 1];
+    expect(firstInSight(cells, at(W, 0))).toBe(0); // row 0 from the right
+    expect(firstInSight(cells, at(2, -1))).toBe(5); // column 2 from the top
+  });
+
   it("skips empty cells and returns -1 for a clear line", () => {
     const cells = [_, 1, _, _, _, 0];
     expect(firstInSight(cells, at(1, H))).toBe(1); // column 1, bottom empty → top
