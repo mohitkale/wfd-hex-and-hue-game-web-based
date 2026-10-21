@@ -21,6 +21,7 @@ export class MosaicView {
   private readonly texture: Phaser.Textures.CanvasTexture;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly key = `mosaic-${nextKey++}`;
+  private dirty = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -36,9 +37,16 @@ export class MosaicView {
     this.image = scene.add.image(layout.originX, layout.originY, this.key).setOrigin(0, 0);
   }
 
-  /** Removes a collected fragment (leaves the faint empty-cell mark). */
+  /** Removes a collected fragment (leaves the faint empty-cell mark). Takes effect on `flush`. */
   clearCell(index: number): void {
     this.paint(index, EMPTY);
+    this.dirty = true;
+  }
+
+  /** Uploads pending changes once; call after a batch of `clearCell`s (e.g. per frame). */
+  flush(): void {
+    if (!this.dirty) return;
+    this.dirty = false;
     this.texture.refresh();
   }
 

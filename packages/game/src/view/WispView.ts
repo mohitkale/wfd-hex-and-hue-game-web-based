@@ -37,6 +37,8 @@ export class WispView extends Phaser.GameObjects.Container {
 
   setCharge(charge: number): this {
     this.label.setText(String(charge));
+    // A spent wisp (on its way to the portal) shows no number.
+    this.label.setVisible(charge > 0);
     return this;
   }
 
