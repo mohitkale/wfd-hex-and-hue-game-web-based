@@ -97,6 +97,22 @@ describe("tap", () => {
   });
 });
 
+describe("track cap", () => {
+  it("holds queued wisps while the track is full and launches when one leaves", () => {
+    const lvl = hiddenCenter([[{ color: 0, charge: 1 }], [{ color: 1, charge: 8 }]]);
+    const s = new GameSession({ ...lvl, trackCap: 1 });
+    s.tap(col0);
+    s.tick();
+    s.tap(col1);
+    expect(s.pending).toEqual([1]);
+    for (let i = 0; i < 14; i++) s.tick();
+    expect(s.pending).toEqual([1]); // still blocked: wisp 0 is on its lap
+    const events = s.tick(); // wisp 0 parks, freeing the track
+    expect(events.map((e) => e.type)).toEqual(["parked", "launched"]);
+    expect(s.pending).toEqual([]);
+  });
+});
+
 describe("full play-throughs", () => {
   it("wins by clearing the ring and then relaunching the parked center wisp", () => {
     const s = centerFirst();
@@ -158,10 +174,73 @@ describe("undo and restart", () => {
     s.tick();
     const before = JSON.stringify(s.state);
     s.tap(col1);
-    tickUntilIdle(s);
+    s.tick(); // not enough to win (center not yet exposed)
+    expect(s.state.status).toBe("playing");
     expect(s.undo()).toBe(true);
     expect(JSON.stringify(s.state)).toEqual(before);
     expect(s.pending).toEqual([]);
+  });
+
+  it("restores a non-empty queue and keeps the queued wisp in its column", () => {
+    const s = ringFirst();
+    s.tap(col0);
+    s.tap(col1); // queued: entry busy
+    expect(s.pending).toEqual([1]);
+    s.tap(slot0); // no-op: empty slot, no snapshot
+    s.tick(); // wisp 1 launches
+    expect(s.state.columns[1]).toEqual([]);
+    expect(s.undo()).toBe(true); // back to just before tapping col1
+    expect(s.pending).toEqual([]);
+    expect(s.state.columns[1]).toHaveLength(1);
+    expect(s.undo()).toBe(true); // back to the start
+    expect(s.state.track).toEqual([]);
+    expect(s.canUndo).toBe(false);
+  });
+
+  it("restores the queue exactly when undoing a tap made while others were queued", () => {
+    const s = new GameSession(
+      hiddenCenter([
+        [
+          { color: 1, charge: 4 },
+          { color: 1, charge: 4 },
+        ],
+        [{ color: 0, charge: 1 }],
+      ]),
+    );
+    s.tap(col0); // wisp 0 launches
+    s.tap(col0); // wisp 1 queued
+    s.tap(col1); // wisp 2 queued
+    expect(s.pending).toEqual([1, 2]);
+    s.undo();
+    expect(s.pending).toEqual([1]);
+    expect(s.state.columns[1]?.[0]?.id).toBe(2);
+  });
+
+  it("undo, play on, undo again never aliases snapshots", () => {
+    const s = ringFirst();
+    s.tap(col0);
+    tickUntilIdle(s);
+    const afterRing = JSON.stringify(s.state);
+    s.tap(col1);
+    s.tick();
+    s.undo();
+    expect(JSON.stringify(s.state)).toEqual(afterRing);
+    s.tap(col1);
+    s.tick();
+    expect(s.state.status).toBe("playing");
+    s.undo();
+    expect(JSON.stringify(s.state)).toEqual(afterRing);
+  });
+
+  it("refuses undo after a win", () => {
+    const s = ringFirst();
+    s.tap(col0);
+    tickUntilIdle(s);
+    s.tap(col1);
+    tickUntilIdle(s);
+    expect(s.state.status).toBe("won");
+    expect(s.canUndo).toBe(false);
+    expect(s.undo()).toBe(false);
   });
 
   it("can undo out of a lost game", () => {

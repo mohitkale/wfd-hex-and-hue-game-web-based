@@ -24,6 +24,13 @@ interface Snapshot {
  * Owns one play-through of a level: turns player taps into launches, advances the simulation on
  * `tick()`, keeps undo snapshots and reports everything as events for the renderer. The renderer
  * decides how often to tick (that is where 1× / 2× speed lives); the session never reads time.
+ *
+ * Renderer notes:
+ * - `subscribe` is the canonical event channel; `tap`/`tick` also return their events for
+ *   convenience (tests, scripted play). Use one or the other, not both.
+ * - After `tick()`, `state` is already post-step. A track wisp moved from `(pos - 1) mod lap` to
+ *   `pos`, except one with `traveled === 0`, which was just launched onto the entry.
+ * - `state` is replaced (new object) on `undone` and `restarted`; re-read it after those events.
  */
 export class GameSession {
   private current: SimState;
@@ -43,13 +50,13 @@ export class GameSession {
     return this.current;
   }
 
-  /** Wisps waiting to launch (tapped while the entry was busy), first to launch first. */
+  /** Wisps waiting to launch (tapped while the entry was busy), first to launch first. A copy. */
   get pending(): readonly number[] {
-    return this.queue;
+    return this.queue.slice();
   }
 
   get canUndo(): boolean {
-    return this.history.length > 0;
+    return this.history.length > 0 && this.current.status !== "won";
   }
 
   subscribe(listener: SessionListener): () => void {
@@ -94,8 +101,12 @@ export class GameSession {
     return this.emit(events);
   }
 
-  /** Reverts to just before the last tap. */
+  /**
+   * Reverts the whole board to the moment of the last tap (including anything other wisps did
+   * since). Works out of a lost game; refused once the level is won.
+   */
   undo(): boolean {
+    if (!this.canUndo) return false;
     const snap = this.history.pop();
     if (!snap) return false;
     this.current = snap.state;
@@ -129,13 +140,16 @@ export class GameSession {
           ? { kind: "slot", index: slot }
           : null;
     this.queue.shift();
+    // Unreachable while the queue invariant holds (queued column wisps reach their column front in
+    // queue order); dropping is safer for players than throwing inside the game loop.
     if (!source) return [];
     const event = launch(s, source);
     return event ? [event] : [];
   }
 
   private emit(events: SessionEvent[]): SessionEvent[] {
-    for (const e of events) for (const l of this.listeners) l(e);
+    const listeners = [...this.listeners];
+    for (const e of events) for (const l of listeners) l(e);
     return events;
   }
 }
