@@ -27,3 +27,4 @@ export {
   type TrackWisp,
   type Wisp,
 } from "./sim";
+export { GameSession, type SessionEvent, type SessionListener } from "./session";
