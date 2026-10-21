@@ -62,7 +62,8 @@ const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInt
 /**
  * Checks every rule a level must satisfy, including the core invariant that for each color the
  * wisp charges add up to exactly the number of fragments. Returns human-readable errors; an empty
- * array means the level is valid.
+ * array means the level is valid. Expects a shape-correct `Level`; use `parseLevel` for untrusted
+ * data.
  */
 export function validateLevel(level: Level): string[] {
   const errors: string[] = [];
@@ -120,7 +121,8 @@ export function validateLevel(level: Level): string[] {
 
 /**
  * Parses untrusted JSON (e.g. a fetched level file) into a `Level`, checking its shape and then
- * every rule in `validateLevel`. Throws with all problems listed.
+ * every rule in `validateLevel`. Throws on the first shape error, or with all rule violations
+ * listed.
  */
 export function parseLevel(json: unknown): Level {
   const fail = (msg: string): never => {
