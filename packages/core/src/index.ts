@@ -11,11 +11,13 @@ export {
 } from "./level";
 export { buildTrack, firstInSight, type Lane, type Sight, type TrackCell } from "./track";
 export {
+  advance,
   canLaunch,
   cloneState,
   createState,
   entryOpen,
   launch,
+  runQuiet,
   runUntilIdle,
   step,
   trackFor,
@@ -28,3 +30,17 @@ export {
   type Wisp,
 } from "./sim";
 export { GameSession, type SessionEvent, type SessionListener } from "./session";
+export {
+  analyzeLevel,
+  playSequential,
+  sequentialMoves,
+  solve,
+  solveState,
+  stateWithSlots,
+  verifySolution,
+  type AnalyzeOptions,
+  type DifficultyReport,
+  type SolveOptions,
+  type SolveResult,
+  type SolveStatus,
+} from "./solver";

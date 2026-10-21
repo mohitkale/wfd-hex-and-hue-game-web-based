@@ -137,10 +137,18 @@ export function launch(s: SimState, source: LaunchSource): SimEvent | null {
  * processed (no collection), and all of them, including the losing wisp, stay on `track`.
  */
 export function step(s: SimState): SimEvent[] {
-  if (s.status !== "playing") return [];
-  const track = trackFor(s.width, s.height);
-  const lap = track.length;
   const events: SimEvent[] = [];
+  advance(s, trackFor(s.width, s.height), events);
+  return events;
+}
+
+/**
+ * `step` without the per-call track lookup, and with optional event collection (`null` skips
+ * building events entirely). Hot path for the solver and generator.
+ */
+export function advance(s: SimState, track: readonly TrackCell[], events: SimEvent[] | null): void {
+  if (s.status !== "playing") return;
+  const lap = track.length;
   s.step++;
 
   for (const w of s.track) {
@@ -158,11 +166,11 @@ export function step(s: SimState): SimEvent[] {
       const slot = s.slots.indexOf(null);
       if (slot === -1) {
         s.status = "lost";
-        events.push({ type: "lost", wispId: w.id });
+        events?.push({ type: "lost", wispId: w.id });
         stillOnTrack.push(w);
       } else {
         s.slots[slot] = { id: w.id, color: w.color, charge: w.charge };
-        events.push({ type: "parked", wispId: w.id, slot });
+        events?.push({ type: "parked", wispId: w.id, slot });
       }
       continue;
     }
@@ -172,7 +180,7 @@ export function step(s: SimState): SimEvent[] {
       s.cells[target] = EMPTY;
       s.remaining--;
       w.charge--;
-      events.push({
+      events?.push({
         type: "collected",
         wispId: w.id,
         pos: w.pos,
@@ -181,7 +189,7 @@ export function step(s: SimState): SimEvent[] {
         chargeLeft: w.charge,
       });
       if (w.charge === 0) {
-        events.push({ type: "portal", wispId: w.id, pos: w.pos });
+        events?.push({ type: "portal", wispId: w.id, pos: w.pos });
         continue;
       }
     }
@@ -190,9 +198,16 @@ export function step(s: SimState): SimEvent[] {
   s.track = stillOnTrack;
   if (s.status === "playing" && s.remaining === 0) {
     s.status = "won";
-    events.push({ type: "won" });
+    events?.push({ type: "won" });
   }
-  return events;
+}
+
+/** Steps until the track is empty or the game ends, without building events. */
+export function runQuiet(s: SimState, maxSteps = 100_000): void {
+  const track = trackFor(s.width, s.height);
+  for (let i = 0; i < maxSteps && s.status === "playing" && s.track.length > 0; i++) {
+    advance(s, track, null);
+  }
 }
 
 /** Steps until the track is empty or the game ends. Returns all events. */
