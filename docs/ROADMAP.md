@@ -23,7 +23,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 - [x] **M2.1** Solver: sequential-launch search with memoization; returns a solution and a difficulty score.
 - [x] **M2.2** Generator: art grid → level (charge chunking, column interleaving, `K`/`T` selection) driven by a difficulty target; seeded RNG; rejects unsolvable output.
-- [ ] **M2.3** Level pipeline CLI: build all levels from art sources, embed solution + score, fail CI on any unsolvable or invalid level. Shuffle-booster re-solve helper.
+- [x] **M2.3** Level pipeline CLI: build all levels from art sources, embed solution + score, fail CI on any unsolvable or invalid level. Shuffle-booster re-solve helper.
 
 ## M3 — Playable prototype (Phaser)
 
@@ -34,7 +34,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 ## M4 — Content: 3 worlds × 20 levels
 
-- [ ] **M4.1** Pixel-art authoring format (palette + ASCII grid) and PNG → art importer.
+- [ ] **M4.1** PNG → art importer and art preview tool (the ASCII art format shipped in M2.3).
 - [ ] **M4.2** World 1 "Moonlit Beginnings": 20 original artworks + lore lines, gentle curve with tutorial levels.
 - [ ] **M4.3** World 2 "Crystal Garden": 20 artworks + lore, layered colors introduced.
 - [ ] **M4.4** World 3 "Zodiac Realm": 20 artworks (12 signs + constellations) + lore, tighter slots.

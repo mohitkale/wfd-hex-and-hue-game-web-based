@@ -3,3 +3,4 @@ dist
 .astro
 coverage
 package-lock.json
+packages/game/src/levels/generated

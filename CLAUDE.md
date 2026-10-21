@@ -40,7 +40,8 @@ a session without another specific request in this project, run the **continue-r
 packages/core   pure TS engine: level model, track, simulation, solver, generator (no DOM, no Phaser)
 packages/game   Phaser 4 scenes, rendering, input, audio; consumes core's session API + event stream
 apps/web        Astro site: / landing, /play (mounts the game full-screen), /spellbook, /blog
-tools/          level pipeline CLI (art → validated levels JSON)
+content/        worlds, level configs and ASCII pixel art (source of truth for levels)
+tools/levels/   level pipeline: content → packages/game/src/levels/generated/*.json (+ CI check)
 ```
 
 - `core` is deterministic: seeded RNG only, no `Date.now()`/`Math.random()` in logic, state is plain
@@ -53,7 +54,8 @@ tools/          level pipeline CLI (art → validated levels JSON)
 npm install          # once
 npm run dev          # Astro dev server with the game at /play
 npm run verify       # lint + typecheck + test + build (must pass before any PR)
-npm test             # vitest
+npm test             # vitest (includes the shipped-level check)
+npm run levels       # rebuild changed levels after editing content/ (commit the JSON)
 ```
 
 ## Conventions
