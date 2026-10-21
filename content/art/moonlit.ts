@@ -57,3 +57,35 @@ export const candleJar: AsciiArt = {
     ".pppppppp.",
   ],
 };
+
+export const lantern: AsciiArt = {
+  legend: { h: starlight, g: "#7a4fd0", y: moon, o: "#ff9f43", w: "#fff6d8", f: "#ff5e7a" },
+  rows: [
+    ".....hh.....",
+    "....h..h....",
+    "...gggggg...",
+    "..gyyyyyyg..",
+    "..gyowwoyg..",
+    "..gyowwoyg..",
+    "..gyowwoyg..",
+    "..gyoffoyg..",
+    "..gyoffoyg..",
+    "..gyyyyyyg..",
+    "...gggggg...",
+    "....g..g....",
+    "...gggggg...",
+  ],
+};
+
+export const moonPhases: AsciiArt = {
+  legend: { n: night, d: "#2e2468", y: moon, s: starlight },
+  rows: [
+    "nnnnnnsnnnnnnnnnnns",
+    "nnddynnndyysnnyyynn",
+    "ndddyynddyyynyyyyyn",
+    "ndddyynddyyynyyyyyn",
+    "ndddyynddyyynyyyyyn",
+    "nnddynnndyynnnyyynn",
+    "snnnnnnnnnnnsnnnnnn",
+  ],
+};

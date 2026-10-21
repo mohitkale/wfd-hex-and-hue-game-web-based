@@ -1,5 +1,5 @@
 import type { AsciiArt, GenerateOptions } from "@hexhue/core";
-import { candleJar, crescent, wishingStar } from "./art/moonlit";
+import { candleJar, crescent, lantern, moonPhases, wishingStar } from "./art/moonlit";
 
 export interface LevelConfig {
   id: string;
@@ -62,6 +62,37 @@ export const worlds: WorldConfig[] = [
           charges: "fixed",
           shuffle: 0.4,
           targetDifficulty: 0.1,
+        },
+      },
+      {
+        id: "moonlit-04",
+        name: "Witch's Lantern",
+        lore: "A lantern in the window guides travellers and spirits safely home.",
+        art: lantern,
+        generate: {
+          ...gentle,
+          seed: 104,
+          columns: 3,
+          slots: 4,
+          charges: "fixed",
+          shuffle: 0.4,
+          targetDifficulty: 0.2,
+        },
+      },
+      {
+        id: "moonlit-05",
+        name: "Phases of the Moon",
+        lore: "Crescent, half, full: each phase invites its own kind of magic.",
+        art: moonPhases,
+        generate: {
+          ...gentle,
+          seed: 105,
+          columns: 3,
+          slots: 4,
+          chunk: { min: 5, max: 12 },
+          charges: "fixed",
+          shuffle: 0.5,
+          targetDifficulty: 0.3,
         },
       },
     ],

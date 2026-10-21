@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { theme } from "../theme";
 import { ensureTextures, TEX } from "../view/textures";
 
-/** Title screen. Tap anywhere to play the first level. */
+/** Title screen. Tap anywhere to open the level select. */
 export class BootScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
 
@@ -13,7 +13,7 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
-    this.input.once("pointerup", () => this.scene.start("play", { world: 0, level: 0 }));
+    this.input.once("pointerup", () => this.scene.start("levels"));
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();

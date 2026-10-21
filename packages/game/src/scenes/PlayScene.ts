@@ -23,7 +23,9 @@ import {
   type Speed,
 } from "../motion";
 import { hexToNumber, theme } from "../theme";
+import { revealOrder, revealedCount } from "../reveal";
 import { drawBoardChrome } from "../view/BoardChrome";
+import { Button } from "../view/Button";
 import { MosaicView } from "../view/MosaicView";
 import { WispView } from "../view/WispView";
 import { TEX, ensureTextures } from "../view/textures";
@@ -34,7 +36,10 @@ export interface PlayData {
 }
 
 /** Draw order; explicit so rebuilt layers never cover persistent wisps. */
-const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, fx: 3, hud: 4 } as const;
+const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, fx: 3, hud: 4, overlay: 5 } as const;
+
+/** Win reveal: how long the finished artwork takes to bloom back in. */
+const REVEAL_MS = 1100;
 
 /** How many wisps of each summon column are drawn (the rest show as "+n"). */
 const VISIBLE_STACK = 3;
@@ -70,7 +75,10 @@ export class PlayScene extends Phaser.Scene {
   /** Spent wisps still animating into the portal. */
   private departing = new Set<WispView>();
   private speedLabel: Phaser.GameObjects.Text | null = null;
-  private banner: Phaser.GameObjects.GameObject[] = [];
+  private overlay: Phaser.GameObjects.GameObject[] = [];
+  private overlayKind: "win" | "lose" | null = null;
+  /** Win reveal progress; `null` when not revealing. */
+  private reveal: { order: number[]; shown: number; elapsed: number } | null = null;
   private lastLayoutKey = "";
   private readonly haptics = new Haptics();
   private acc = 0;
@@ -98,7 +106,9 @@ export class PlayScene extends Phaser.Scene {
     this.flights = new Map();
     this.queued = new Set();
     this.departing = new Set();
-    this.banner = [];
+    this.overlay = [];
+    this.overlayKind = null;
+    this.reveal = null;
     this.speedLabel = null;
     this.lastLayoutKey = "";
     this.acc = 0;
@@ -141,6 +151,7 @@ export class PlayScene extends Phaser.Scene {
       // Idle (nothing moving): the player can wait forever without the loop doing any work.
       this.acc = 0;
     }
+    if (this.reveal) this.stepReveal(delta);
     this.mosaic?.flush();
     this.moveWisps(delta);
   }
@@ -186,6 +197,8 @@ export class PlayScene extends Phaser.Scene {
     }
     this.mosaic = new MosaicView(this, this.layout, level, this.session.state.cells);
     this.mosaic.image.setDepth(DEPTH.mosaic);
+    if (this.session.state.status === "won" && !this.reveal) this.paintArtwork(level.cells.length);
+    else if (this.reveal) this.paintArtwork(this.reveal.shown);
     this.drawHud();
     this.createTapZones();
     this.moreLabels = this.layout.columns.map((zone) =>
@@ -202,6 +215,7 @@ export class PlayScene extends Phaser.Scene {
     this.refreshTargets(true);
     // Views keep their identity across relayouts; snap them to their new spots.
     for (const [id, view] of this.wisps) this.snap(id, view);
+    if (this.overlayKind) this.showCard(this.overlayKind, false);
   }
 
   private drawHud(): void {
@@ -214,7 +228,7 @@ export class PlayScene extends Phaser.Scene {
       .zone(hud.x + 4 * dpr, hud.y + (hud.h - touch) / 2, touch, touch)
       .setOrigin(0, 0)
       .setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.scene.start("boot"));
+      .on("pointerup", () => this.scene.start("levels"));
     const back = this.add
       .text(backZone.x + touch / 2, hud.y + hud.h / 2, "‹", {
         fontFamily: theme.font,
@@ -395,14 +409,23 @@ export class PlayScene extends Phaser.Scene {
         break;
       case "won":
         this.haptics.play("win");
-        this.time.delayedCall(500, () => this.showBanner("Mosaic complete!", "Next level"));
+        // Let the last wisp reach the portal, then bloom the artwork back in.
+        this.time.delayedCall(450, () => {
+          const cells = this.built.level.cells;
+          this.reveal = {
+            order: revealOrder(this.built.level.width, this.built.level.height, cells),
+            shown: 0,
+            elapsed: 0,
+          };
+        });
         break;
       case "lost":
         this.haptics.play("lose");
-        this.time.delayedCall(300, () => this.showBanner("No room left", "Try again"));
+        this.time.delayedCall(350, () => this.showCard("lose"));
         break;
       case "undone":
       case "restarted":
+        this.closeCard();
         for (const view of this.departing) view.destroy();
         this.departing.clear();
         this.rebuildMosaic();
@@ -598,44 +621,185 @@ export class PlayScene extends Phaser.Scene {
     return this.layout.cell * 0.42;
   }
 
-  // ── Placeholder end-of-level banner (M3.4 replaces this) ────────────────
+  // ── End of level ────────────────────────────────────────────────────────
 
-  private showBanner(text: string, action: string): void {
-    for (const o of this.banner) o.destroy();
+  private stepReveal(delta: number): void {
+    const r = this.reveal!;
+    r.elapsed += delta;
+    const target = revealedCount(r.order.length, r.elapsed, REVEAL_MS);
+    const cells = this.built.level.cells;
+    for (; r.shown < target; r.shown++) {
+      const cell = r.order[r.shown]!;
+      this.mosaic?.paintCell(cell, cells[cell]!);
+      // A few sparkles ride the bloom's edge.
+      if (r.shown % 9 === 0 && this.mosaic) this.sparkle(this.mosaic.cellCenter(cell));
+    }
+    if (r.elapsed >= REVEAL_MS) {
+      this.reveal = null;
+      this.cameras.main.flash(260, 246, 217, 122);
+      this.showCard("win");
+    }
+  }
+
+  /** Paints the first `count` cells of the original artwork in reveal order. */
+  private paintArtwork(count: number): void {
+    const { width, height, cells } = this.built.level;
+    for (const cell of revealOrder(width, height, cells).slice(0, count)) {
+      this.mosaic?.paintCell(cell, cells[cell]!);
+    }
+    this.mosaic?.flush();
+  }
+
+  private sparkle(at: { x: number; y: number }): void {
+    const size = this.layout.cell * 0.9;
+    const s = this.add
+      .image(at.x, at.y, TEX.glow)
+      .setTint(theme.glow)
+      .setDisplaySize(size, size)
+      .setDepth(DEPTH.fx);
+    this.tweens.add({
+      targets: s,
+      y: at.y - this.layout.cell * 1.5,
+      alpha: 0,
+      scale: s.scale * 1.8,
+      duration: 600,
+      ease: "Quad.easeOut",
+      onComplete: () => s.destroy(),
+    });
+  }
+
+  /**
+   * Result card over the lower half of the screen, so a revealed artwork stays visible above it.
+   * Win: lore + Continue / Replay. Lose: Retry (always free) and, when possible, Undo.
+   */
+  private showCard(kind: "win" | "lose", animate = true): void {
+    this.closeCard();
+    this.overlayKind = kind;
     const { frame, dpr, boardRect } = this.layout;
+    const px = (v: number) => Math.round(v * dpr);
+    const font = (size: number) => `${px(size)}px`;
+    const width = Math.min(frame.w - px(24), px(380));
     const cx = frame.x + frame.w / 2;
-    const cy = boardRect.y + boardRect.h / 2;
-    const title = this.add
-      .text(cx, cy - 18 * dpr, text, {
-        fontFamily: theme.font,
-        fontStyle: "bold",
-        fontSize: `${Math.round(26 * dpr)}px`,
-        color: theme.text,
-        backgroundColor: "#140b2ecc",
-        padding: { x: Math.round(16 * dpr), y: Math.round(10 * dpr) },
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH.hud);
-    const button = this.add
-      .text(cx, cy + 34 * dpr, action, {
-        fontFamily: theme.font,
-        fontStyle: "bold",
-        fontSize: `${Math.round(18 * dpr)}px`,
-        color: "#140b2e",
-        backgroundColor: "#f6d97a",
-        padding: { x: Math.round(18 * dpr), y: Math.round(10 * dpr) },
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH.hud)
-      .setInteractive({ useHandCursor: true })
-      .on("pointerup", () => {
-        const won = this.session.state.status === "won";
-        const nextLevel = this.data_.level + 1;
-        const hasNext = levelAt(this.data_.world, nextLevel) !== null;
-        this.scene.restart(
-          won && hasNext ? { world: this.data_.world, level: nextLevel } : this.data_,
+
+    // Swallows taps so nothing behind the card can be launched.
+    const blocker = this.add
+      .rectangle(
+        0,
+        0,
+        this.scale.gameSize.width,
+        this.scale.gameSize.height,
+        0x07040f,
+        kind === "win" ? 0.25 : 0.55,
+      )
+      .setOrigin(0, 0)
+      .setInteractive()
+      .setDepth(DEPTH.overlay);
+
+    const card = this.add.container(cx, 0).setDepth(DEPTH.overlay);
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    let y = px(22);
+    const text = (
+      value: string,
+      size: number,
+      color: string,
+      style: Partial<Phaser.Types.GameObjects.Text.TextStyle> = {},
+    ) => {
+      const t = this.add
+        .text(0, y, value, {
+          fontFamily: theme.font,
+          fontSize: font(size),
+          color,
+          align: "center",
+          wordWrap: { width: width - px(40) },
+          ...style,
+        })
+        .setOrigin(0.5, 0);
+      parts.push(t);
+      y += t.height + px(8);
+      return t;
+    };
+
+    if (kind === "win") {
+      text("✦  Mosaic complete  ✦", 14, "#f6d97a", { fontStyle: "bold" });
+      text(this.built.level.name, 24, theme.text, { fontStyle: "bold" });
+      text(this.built.lore, 15, theme.textDim, { fontStyle: "italic" });
+      text("Added to your Spellbook", 13, "#c9b8ff");
+    } else {
+      text("The slots are full", 22, theme.text, { fontStyle: "bold" });
+      text(
+        "Every wisp needs somewhere to rest. Try launching them in a different order.",
+        15,
+        theme.textDim,
+      );
+    }
+
+    y += px(8);
+    const gap = px(12);
+    const half = (width - px(40) - gap) / 2;
+    const left = -half / 2 - gap / 2;
+    const right = half / 2 + gap / 2;
+    const by = y + px(24);
+    if (kind === "win") {
+      const next = levelAt(this.data_.world, this.data_.level + 1);
+      parts.push(
+        new Button(this, left, by, half, "Replay", {
+          dpr,
+          onPress: () => this.scene.restart(this.data_),
+        }),
+        new Button(this, right, by, half, next ? "Continue" : "Levels", {
+          dpr,
+          primary: true,
+          onPress: () =>
+            next
+              ? this.scene.restart({ world: this.data_.world, level: this.data_.level + 1 })
+              : this.scene.start("levels"),
+        }),
+      );
+    } else {
+      const canUndo = this.session.canUndo;
+      parts.push(
+        new Button(this, canUndo ? left : 0, by, canUndo ? half : width - px(40), "Retry", {
+          dpr,
+          primary: true,
+          onPress: () => this.session.restart(),
+        }),
+      );
+      if (canUndo) {
+        parts.push(
+          new Button(this, right, by, half, "Undo move", {
+            dpr,
+            onPress: () => this.session.undo(),
+          }),
         );
-      });
-    this.banner = [title, button];
+      }
+    }
+    const height = by + px(24) + px(22);
+
+    const panel = this.add.graphics();
+    panel.fillStyle(theme.panel, 0.96);
+    panel.fillRoundedRect(-width / 2, 0, width, height, px(20));
+    panel.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.35);
+    panel.strokeRoundedRect(-width / 2, 0, width, height, px(20));
+    card.add([panel, ...parts]);
+
+    // Centered in the space below the board (or the screen center if that's too small).
+    const below = frame.y + frame.h - (boardRect.y + boardRect.h);
+    const top =
+      below >= height + px(16)
+        ? boardRect.y + boardRect.h + (below - height) / 2
+        : frame.y + (frame.h - height) / 2;
+    card.y = top;
+    if (animate) {
+      card.y = top + px(40);
+      card.setAlpha(0);
+      this.tweens.add({ targets: card, y: top, alpha: 1, duration: 320, ease: "Back.easeOut" });
+    }
+    this.overlay = [blocker, card];
+  }
+
+  private closeCard(): void {
+    for (const o of this.overlay) o.destroy();
+    this.overlay = [];
+    this.overlayKind = null;
   }
 }

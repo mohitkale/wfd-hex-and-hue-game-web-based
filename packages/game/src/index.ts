@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { Insets } from "./layout";
 import { BootScene } from "./scenes/BootScene";
+import { LevelSelectScene } from "./scenes/LevelSelectScene";
 import { PlayScene } from "./scenes/PlayScene";
 import { theme } from "./theme";
 
@@ -45,7 +46,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr },
     input: { activePointers: 2 },
     disableContextMenu: true,
-    scene: [BootScene, PlayScene],
+    scene: [BootScene, LevelSelectScene, PlayScene],
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));

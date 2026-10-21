@@ -43,6 +43,12 @@ export class MosaicView {
     this.dirty = true;
   }
 
+  /** Paints a cell (used by the win reveal). Takes effect on `flush`. */
+  paintCell(index: number, color: number): void {
+    this.paint(index, color);
+    this.dirty = true;
+  }
+
   /** Uploads pending changes once; call after a batch of `clearCell`s (e.g. per frame). */
   flush(): void {
     if (!this.dirty) return;
