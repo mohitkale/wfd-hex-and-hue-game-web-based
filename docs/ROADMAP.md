@@ -21,7 +21,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 ## M2 — Solver & level generator
 
-- [ ] **M2.1** Solver: sequential-launch search with memoization; returns a solution and a difficulty score.
+- [x] **M2.1** Solver: sequential-launch search with memoization; returns a solution and a difficulty score.
 - [ ] **M2.2** Generator: art grid → level (charge chunking, column interleaving, `K`/`T` selection) driven by a difficulty target; seeded RNG; rejects unsolvable output.
 - [ ] **M2.3** Level pipeline CLI: build all levels from art sources, embed solution + score, fail CI on any unsolvable or invalid level. Shuffle-booster re-solve helper.
 
