@@ -1,12 +1,30 @@
 import Phaser from "phaser";
-import { GameSession, type BuiltLevel, type Wisp } from "@hexhue/core";
+import {
+  GameSession,
+  trackFor,
+  type BuiltLevel,
+  type LaunchSource,
+  type SessionEvent,
+  type TrackCell,
+  type TrackWisp,
+} from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
 import { levelAt, worlds } from "../levels";
-import { theme } from "../theme";
+import {
+  LAUNCH_FLIGHT_MS,
+  TICK_MS,
+  accumulate,
+  approach,
+  flightPoint,
+  trackPosition,
+  type Point,
+  type Speed,
+} from "../motion";
+import { hexToNumber, theme } from "../theme";
 import { drawBoardChrome } from "../view/BoardChrome";
 import { MosaicView } from "../view/MosaicView";
 import { WispView } from "../view/WispView";
-import { ensureTextures } from "../view/textures";
+import { TEX, ensureTextures } from "../view/textures";
 
 export interface PlayData {
   world: number;
@@ -14,22 +32,44 @@ export interface PlayData {
 }
 
 /** Draw order; explicit so rebuilt layers never cover persistent wisps. */
-const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, hud: 3 } as const;
+const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, fx: 3, hud: 4 } as const;
 
 /** How many wisps of each summon column are drawn (the rest show as "+n"). */
 const VISIBLE_STACK = 3;
+
+/** Where a wisp view should be: following the track, or resting at a spot. */
+type Target =
+  | { kind: "track"; wisp: TrackWisp }
+  | { kind: "rest"; x: number; y: number; r: number; alpha: number };
+
+/** A wisp hopping from a column or slot onto the track. */
+interface Flight {
+  from: Point;
+  fromR: number;
+  elapsed: number;
+}
 
 export class PlayScene extends Phaser.Scene {
   private data_!: PlayData;
   private built!: BuiltLevel;
   private session!: GameSession;
+  private track!: readonly TrackCell[];
   private layout!: Layout;
   private mosaic: MosaicView | null = null;
   private chrome: Phaser.GameObjects.GameObject[] = [];
   private hud: Phaser.GameObjects.GameObject[] = [];
+  private zones: Phaser.GameObjects.Zone[] = [];
+  private moreLabels: Phaser.GameObjects.Text[] = [];
   private wisps = new Map<number, WispView>();
-  private extras: Phaser.GameObjects.Text[] = [];
+  private targets = new Map<number, Target>();
+  private flights = new Map<number, Flight>();
+  /** Spent wisps still animating into the portal. */
+  private departing = new Set<WispView>();
+  private speedLabel: Phaser.GameObjects.Text | null = null;
+  private banner: Phaser.GameObjects.GameObject[] = [];
   private lastLayoutKey = "";
+  private acc = 0;
+  private speed: Speed = 1;
 
   constructor() {
     super("play");
@@ -44,23 +84,55 @@ export class PlayScene extends Phaser.Scene {
     // Phaser reuses this instance across restarts and destroys all game objects on shutdown, so
     // per-run state must start fresh here.
     this.wisps = new Map();
+    this.targets = new Map();
     this.mosaic = null;
     this.chrome = [];
     this.hud = [];
-    this.extras = [];
+    this.zones = [];
+    this.moreLabels = [];
+    this.flights = new Map();
+    this.departing = new Set();
+    this.banner = [];
+    this.speedLabel = null;
     this.lastLayoutKey = "";
+    this.acc = 0;
+    this.speed = 1;
 
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
-    this.session = new GameSession(this.built.level);
+    const level = this.built.level;
+    this.track = trackFor(level.width, level.height);
+    this.session = new GameSession(level);
+    const unsubscribe = this.session.subscribe((e) => this.onEvent(e));
     this.scale.on("resize", this.relayout, this);
     this.events.once("shutdown", () => {
+      unsubscribe();
       this.scale.off("resize", this.relayout, this);
       this.mosaic?.destroy();
       this.mosaic = null;
     });
     this.relayout();
   }
+
+  override update(_time: number, delta: number): void {
+    const s = this.session.state;
+    if (s.status === "playing" && (s.track.length > 0 || this.session.pending.length > 0)) {
+      const { steps, acc } = accumulate(this.acc, delta, this.speed);
+      this.acc = acc;
+      for (let i = 0; i < steps; i++) {
+        // Refresh per tick that changed something, so a wisp launched in one tick has a view
+        // before it collects in the next.
+        if (this.session.tick().length > 0) this.refreshTargets();
+      }
+    } else if (s.status === "playing") {
+      // Idle (nothing moving): the player can wait forever without the loop doing any work.
+      this.acc = 0;
+    }
+    this.mosaic?.flush();
+    this.moveWisps(delta);
+  }
+
+  // ── Layout ──────────────────────────────────────────────────────────────
 
   private relayout(): void {
     const { width, height } = this.scale.gameSize;
@@ -87,7 +159,7 @@ export class PlayScene extends Phaser.Scene {
     if (key === this.lastLayoutKey) return;
     this.lastLayoutKey = key;
 
-    for (const o of [...this.chrome, ...this.hud]) o.destroy();
+    for (const o of [...this.chrome, ...this.hud, ...this.zones, ...this.moreLabels]) o.destroy();
     this.mosaic?.destroy();
     this.chrome = drawBoardChrome(
       this,
@@ -96,18 +168,35 @@ export class PlayScene extends Phaser.Scene {
       level.height,
       this.session.state.slots.length,
     );
-    for (const o of this.chrome)
+    for (const o of this.chrome) {
       (o as unknown as Phaser.GameObjects.Components.Depth).setDepth(DEPTH.chrome);
+    }
     this.mosaic = new MosaicView(this, this.layout, level, this.session.state.cells);
     this.mosaic.image.setDepth(DEPTH.mosaic);
     this.drawHud();
-    this.placeWisps();
+    this.createTapZones();
+    this.moreLabels = this.layout.columns.map((zone) =>
+      this.add
+        .text(zone.x + zone.w / 2, zone.y + zone.h - 10 * dpr, "", {
+          fontFamily: theme.font,
+          fontSize: `${Math.round(12 * dpr)}px`,
+          color: theme.textDim,
+        })
+        .setOrigin(0.5, 1)
+        .setDepth(DEPTH.wisps)
+        .setVisible(false),
+    );
+    this.refreshTargets(true);
+    // Views keep their identity across relayouts; snap them to their new spots.
+    for (const [id, view] of this.wisps) this.snap(id, view);
   }
 
   private drawHud(): void {
     const { hud, dpr } = this.layout;
     const world = worlds[this.data_.world]!;
     const touch = 48 * dpr;
+    const font = (size: number) => `${Math.round(size * dpr)}px`;
+
     const backZone = this.add
       .zone(hud.x + 4 * dpr, hud.y + (hud.h - touch) / 2, touch, touch)
       .setOrigin(0, 0)
@@ -116,7 +205,7 @@ export class PlayScene extends Phaser.Scene {
     const back = this.add
       .text(backZone.x + touch / 2, hud.y + hud.h / 2, "‹", {
         fontFamily: theme.font,
-        fontSize: `${Math.round(34 * dpr)}px`,
+        fontSize: font(34),
         color: theme.text,
       })
       .setOrigin(0.5, 0.55);
@@ -124,7 +213,7 @@ export class PlayScene extends Phaser.Scene {
       .text(hud.x + hud.w / 2, hud.y + hud.h / 2 - 8 * dpr, this.built.level.name, {
         fontFamily: theme.font,
         fontStyle: "bold",
-        fontSize: `${Math.round(18 * dpr)}px`,
+        fontSize: font(18),
         color: theme.text,
       })
       .setOrigin(0.5);
@@ -135,76 +224,318 @@ export class PlayScene extends Phaser.Scene {
         `${world.name} · ${this.data_.level + 1}`,
         {
           fontFamily: theme.font,
-          fontSize: `${Math.round(12 * dpr)}px`,
+          fontSize: font(12),
           color: theme.textDim,
         },
       )
       .setOrigin(0.5);
-    this.hud = [backZone, back, title, subtitle];
-    for (const o of [back, title, subtitle]) o.setDepth(DEPTH.hud);
+
+    const speedZone = this.add
+      .zone(hud.x + hud.w - touch - 4 * dpr, hud.y + (hud.h - touch) / 2, touch, touch)
+      .setOrigin(0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerup", () => this.toggleSpeed());
+    this.speedLabel = this.add
+      .text(speedZone.x + touch / 2, hud.y + hud.h / 2, "", {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: font(16),
+        color: theme.text,
+        backgroundColor: "#2a1650",
+        padding: { x: Math.round(8 * dpr), y: Math.round(4 * dpr) },
+      })
+      .setOrigin(0.5);
+    this.updateSpeedLabel();
+
+    this.hud = [backZone, back, title, subtitle, speedZone, this.speedLabel];
+    for (const o of [back, title, subtitle, this.speedLabel]) o.setDepth(DEPTH.hud);
   }
 
+  /** Whole summon columns and slots are tap targets; M3.3 adds feedback. */
+  private createTapZones(): void {
+    const add = (r: { x: number; y: number; w: number; h: number }, source: LaunchSource) =>
+      this.add
+        .zone(r.x, r.y, r.w, r.h)
+        .setOrigin(0, 0)
+        .setInteractive()
+        .on("pointerdown", () => this.tap(source));
+    this.zones = [
+      ...this.layout.columns.map((r, index) => add(r, { kind: "column", index })),
+      ...this.layout.slots.map((r, index) => add(r, { kind: "slot", index })),
+    ];
+  }
+
+  // ── Input ───────────────────────────────────────────────────────────────
+
+  private tap(source: LaunchSource): void {
+    if (this.session.state.status !== "playing") return;
+    if (this.session.tap(source).length > 0) this.refreshTargets();
+  }
+
+  private toggleSpeed(): void {
+    // The free/ad alternation for 2× arrives with the rewards interface (M5.4).
+    this.speed = this.speed === 1 ? 2 : 1;
+    this.updateSpeedLabel();
+  }
+
+  private updateSpeedLabel(): void {
+    this.speedLabel?.setText(`${this.speed}×`).setColor(this.speed === 2 ? "#f6d97a" : theme.text);
+  }
+
+  // ── Engine events ───────────────────────────────────────────────────────
+
+  private onEvent(e: SessionEvent): void {
+    switch (e.type) {
+      case "collected": {
+        this.mosaic?.clearCell(e.cell);
+        const view = this.wisps.get(e.wispId);
+        if (view) {
+          view.setCharge(e.chargeLeft);
+          this.spark(e.cell, view);
+        }
+        break;
+      }
+      case "portal":
+        this.departToPortal(e.wispId);
+        break;
+      case "won":
+        this.time.delayedCall(500, () => this.showBanner("Mosaic complete!", "Next level"));
+        break;
+      case "lost":
+        this.time.delayedCall(300, () => this.showBanner("No room left", "Try again"));
+        break;
+      case "undone":
+      case "restarted":
+        for (const view of this.departing) view.destroy();
+        this.departing.clear();
+        this.rebuildMosaic();
+        this.refreshTargets(true);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** A fragment flies from its cell into the collecting wisp. */
+  private spark(cell: number, view: WispView): void {
+    if (!this.mosaic) return;
+    const from = this.mosaic.cellCenter(cell);
+    const size = this.layout.cell * 0.7;
+    const fx = this.add
+      .image(from.x, from.y, TEX.spark)
+      .setTint(hexToNumber(view.colorHex))
+      .setDisplaySize(size, size)
+      .setDepth(DEPTH.fx);
+    this.tweens.add({
+      targets: fx,
+      x: view.x,
+      y: view.y,
+      scale: fx.scale * 0.3,
+      duration: 160,
+      ease: "Quad.easeIn",
+      onComplete: () => fx.destroy(),
+    });
+    this.tweens.killTweensOf(view);
+    view.setScale(1.18);
+    this.tweens.add({ targets: view, scale: 1, duration: 140, ease: "Quad.easeOut" });
+  }
+
+  private departToPortal(id: number): void {
+    const view = this.wisps.get(id);
+    this.wisps.delete(id);
+    this.targets.delete(id);
+    this.flights.delete(id);
+    if (!view) return;
+    this.tweens.killTweensOf(view);
+    this.departing.add(view);
+    const { x, y } = this.layout.portal;
+    this.tweens.add({
+      targets: view,
+      x,
+      y,
+      scale: 0.25,
+      alpha: 0,
+      duration: 420,
+      ease: "Cubic.easeIn",
+      onComplete: () => {
+        this.departing.delete(view);
+        view.destroy();
+      },
+    });
+  }
+
+  private rebuildMosaic(): void {
+    this.mosaic?.destroy();
+    this.mosaic = new MosaicView(this, this.layout, this.built.level, this.session.state.cells);
+    this.mosaic.image.setDepth(DEPTH.mosaic);
+  }
+
+  // ── Wisp reconciliation ─────────────────────────────────────────────────
+
   /**
-   * Creates or moves a view for every wisp in the columns and slots. Static placement only: M3.2
-   * replaces this with a per-frame reconciler over columns, slots and the track.
+   * Recomputes where every wisp belongs from the session state, creating views for new wisps and
+   * removing views for wisps that no longer exist (undo / restart). Track targets reference the
+   * engine's live wisp objects, so this only needs to run when something structural changed (an
+   * event was emitted), not on every tick. `snapNew` places new views exactly (level start,
+   * undo); otherwise wisps surfacing in a column fade in from below.
    */
-  private placeWisps(): void {
+  private refreshTargets(snapNew = false): void {
     const s = this.session.state;
+    const { dpr } = this.layout;
     const palette = this.built.level.palette;
-    const seen = new Set<number>();
-    for (const t of this.extras) t.destroy();
-    this.extras = [];
+    const next = new Map<number, Target>();
 
     s.columns.forEach((column, c) => {
       const zone = this.layout.columns[c]!;
-      const front = Math.min(zone.w * 0.3, zone.h * 0.16, 30 * this.layout.dpr);
+      const front = Math.min(zone.w * 0.3, zone.h * 0.16, 30 * dpr);
       column.forEach((w, depth) => {
         if (depth >= VISIBLE_STACK) return;
-        const r = front * (1 - depth * 0.18);
-        const y = zone.y + front * 1.3 + depth * front * 1.75;
-        this.place(w, palette, zone.x + zone.w / 2, y, r, 1 - depth * 0.3);
-        seen.add(w.id);
+        next.set(w.id, {
+          kind: "rest",
+          x: zone.x + zone.w / 2,
+          y: zone.y + front * 1.3 + depth * front * 1.75,
+          r: front * (1 - depth * 0.18),
+          alpha: 1 - depth * 0.3,
+        });
       });
-      if (column.length > VISIBLE_STACK) {
-        const more = this.add
-          .text(
-            zone.x + zone.w / 2,
-            zone.y + zone.h - 10 * this.layout.dpr,
-            `+${column.length - VISIBLE_STACK}`,
-            {
-              fontFamily: theme.font,
-              fontSize: `${Math.round(12 * this.layout.dpr)}px`,
-              color: theme.textDim,
-            },
-          )
-          .setOrigin(0.5, 1);
-        more.setDepth(DEPTH.wisps);
-        this.extras.push(more);
+      const more = this.moreLabels[c];
+      if (more) {
+        const hidden = column.length - VISIBLE_STACK;
+        more.setVisible(hidden > 0);
+        if (hidden > 0) more.setText(`+${hidden}`);
       }
     });
 
     s.slots.forEach((w, i) => {
       if (!w) return;
       const r = this.layout.slots[i]!;
-      this.place(w, palette, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.32, 1);
-      seen.add(w.id);
+      next.set(w.id, { kind: "rest", x: r.x + r.w / 2, y: r.y + r.h / 2, r: r.w * 0.32, alpha: 1 });
     });
 
+    for (const w of s.track) {
+      next.set(w.id, { kind: "track", wisp: w });
+      // Leaving a column or slot: fly onto the track instead of teleporting.
+      const view = this.wisps.get(w.id);
+      if (view && this.targets.get(w.id)?.kind !== "track") {
+        this.flights.set(w.id, {
+          from: { x: view.x, y: view.y },
+          fromR: view.currentRadius,
+          elapsed: 0,
+        });
+      }
+    }
+
+    const all = [...s.columns.flat(), ...s.slots.filter((w) => w !== null), ...s.track];
+    for (const w of all) {
+      const target = next.get(w.id);
+      if (!target || this.wisps.has(w.id)) continue;
+      const view = new WispView(this, w.id, palette[w.color]!, w.charge, 1).setDepth(DEPTH.wisps);
+      this.wisps.set(w.id, view);
+      this.snap(w.id, view, target);
+      if (!snapNew && target.kind === "rest") {
+        view
+          .setPosition(target.x, target.y + target.r * 1.6)
+          .setRadius(target.r * 0.7)
+          .setAlpha(0);
+      }
+    }
+    for (const w of all) this.wisps.get(w.id)?.setCharge(w.charge);
     for (const [id, view] of this.wisps) {
-      if (!seen.has(id)) {
+      if (!next.has(id)) {
         view.destroy();
         this.wisps.delete(id);
+        this.flights.delete(id);
+      }
+    }
+    this.targets = next;
+  }
+
+  /** Places a view exactly at its target (new views and relayouts). */
+  private snap(id: number, view: WispView, target = this.targets.get(id)): void {
+    if (!target) return;
+    this.flights.delete(id);
+    if (target.kind === "track") {
+      const p = trackPosition(this.layout, this.track, target.wisp, this.alpha());
+      view.setPosition(p.x, p.y).setRadius(this.trackRadius()).setAlpha(1);
+    } else {
+      view.setPosition(target.x, target.y).setRadius(target.r).setAlpha(target.alpha);
+    }
+  }
+
+  private moveWisps(delta: number): void {
+    const alpha = this.alpha();
+    const trackR = this.trackRadius();
+    for (const [id, view] of this.wisps) {
+      const target = this.targets.get(id);
+      if (!target) continue;
+      if (target.kind === "track") {
+        const exact = trackPosition(this.layout, this.track, target.wisp, alpha);
+        const flight = this.flights.get(id);
+        if (flight) {
+          // Fixed-length hop that lands exactly on the moving track point, at any speed.
+          flight.elapsed += delta;
+          const p = flightPoint(flight.from, exact, flight.elapsed);
+          const t = Math.min(1, flight.elapsed / LAUNCH_FLIGHT_MS);
+          view.setPosition(p.x, p.y).setRadius(flight.fromR + (trackR - flight.fromR) * t);
+          if (t >= 1) this.flights.delete(id);
+        } else {
+          view.setPosition(exact.x, exact.y).setRadius(trackR);
+        }
+        view.setAlpha(1);
+      } else {
+        view.setPosition(approach(view.x, target.x, delta), approach(view.y, target.y, delta));
+        view.setRadius(approach(view.currentRadius, target.r, delta));
+        view.setAlpha(approach(view.alpha, target.alpha, delta));
       }
     }
   }
 
-  private place(w: Wisp, palette: string[], x: number, y: number, r: number, alpha: number): void {
-    let view = this.wisps.get(w.id);
-    if (!view) {
-      view = new WispView(this, w.id, palette[w.color]!, w.charge, r);
-      view.setDepth(DEPTH.wisps);
-      this.wisps.set(w.id, view);
-    }
-    view.setPosition(x, y).setRadius(r).setCharge(w.charge).setAlpha(alpha);
+  private alpha(): number {
+    return this.acc / TICK_MS;
+  }
+
+  private trackRadius(): number {
+    return this.layout.cell * 0.42;
+  }
+
+  // ── Placeholder end-of-level banner (M3.4 replaces this) ────────────────
+
+  private showBanner(text: string, action: string): void {
+    for (const o of this.banner) o.destroy();
+    const { frame, dpr, boardRect } = this.layout;
+    const cx = frame.x + frame.w / 2;
+    const cy = boardRect.y + boardRect.h / 2;
+    const title = this.add
+      .text(cx, cy - 18 * dpr, text, {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${Math.round(26 * dpr)}px`,
+        color: theme.text,
+        backgroundColor: "#140b2ecc",
+        padding: { x: Math.round(16 * dpr), y: Math.round(10 * dpr) },
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH.hud);
+    const button = this.add
+      .text(cx, cy + 34 * dpr, action, {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${Math.round(18 * dpr)}px`,
+        color: "#140b2e",
+        backgroundColor: "#f6d97a",
+        padding: { x: Math.round(18 * dpr), y: Math.round(10 * dpr) },
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH.hud)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerup", () => {
+        const won = this.session.state.status === "won";
+        const nextLevel = this.data_.level + 1;
+        const hasNext = levelAt(this.data_.world, nextLevel) !== null;
+        this.scene.restart(
+          won && hasNext ? { world: this.data_.world, level: nextLevel } : this.data_,
+        );
+      });
+    this.banner = [title, button];
   }
 }
