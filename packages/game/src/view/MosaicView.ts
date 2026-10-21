@@ -4,6 +4,14 @@ import type { Layout } from "../layout";
 
 let nextKey = 0;
 
+/** `roundRect` needs Chrome 99 / Safari 16; older Android WebViews fall back to square tiles. */
+function tile(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, r: number): void {
+  ctx.beginPath();
+  if (r > 0 && typeof ctx.roundRect === "function") ctx.roundRect(x, y, size, size, r);
+  else ctx.rect(x, y, size, size);
+  ctx.fill();
+}
+
 /**
  * The pixel mosaic as one canvas texture drawn at exact device-pixel cell size, so it stays crisp
  * and costs a single draw call. Collected cells are cleared in place.
@@ -65,9 +73,7 @@ export class MosaicView {
       return;
     }
     ctx.fillStyle = this.level.palette[color]!;
-    ctx.beginPath();
-    ctx.roundRect(x + inset, y + inset, size, size, radius);
-    ctx.fill();
+    tile(ctx, x + inset, y + inset, size, radius);
     if (cell >= 6) {
       // Soft bevel so neighbouring tiles of one color still read as individual fragments.
       ctx.fillStyle = "rgba(255,255,255,0.16)";

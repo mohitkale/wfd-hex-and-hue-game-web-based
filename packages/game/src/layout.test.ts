@@ -85,6 +85,32 @@ describe.each(Object.entries(screens))("%s", (_name, screen) => {
   });
 });
 
+describe("usable sizes", () => {
+  const css = (l: Layout, v: number) => v / l.dpr;
+
+  it("keeps the board usable on a landscape phone", () => {
+    const l12 = computeLayout({ ...screens["phone landscape"]!, ...boards[0]! });
+    const l24 = computeLayout({ ...screens["phone landscape"]!, ...boards[1]! });
+    expect(css(l12, l12.cell)).toBeGreaterThanOrEqual(10);
+    expect(css(l24, l24.cell)).toBeGreaterThanOrEqual(5);
+  });
+
+  it("keeps column and slot tap zones thumb-sized on the narrowest phone", () => {
+    for (const board of boards) {
+      const l = computeLayout({ ...screens["iPhone SE"]!, ...board, columns: 6, slots: 8 });
+      for (const c of l.columns) expect(css(l, c.w)).toBeGreaterThanOrEqual(44);
+      for (const s of l.slots) expect(css(l, s.w)).toBeGreaterThanOrEqual(28);
+    }
+  });
+
+  it("shrinks fixed chrome on short screens but not on tall ones", () => {
+    const tall = computeLayout({ ...screens["iPhone 15 (notch)"]!, ...boards[0]! });
+    const short = computeLayout({ ...screens["phone landscape"]!, ...boards[0]! });
+    expect(css(tall, tall.hud.h)).toBe(52);
+    expect(css(short, short.hud.h)).toBeLessThan(52);
+  });
+});
+
 describe("computeLayout", () => {
   it("caps the play width on desktop and centers it", () => {
     const l = computeLayout({ ...screens["desktop browser"]!, ...boards[0]! });

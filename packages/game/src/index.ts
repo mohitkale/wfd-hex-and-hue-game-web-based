@@ -50,10 +50,21 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
 
+  // Coalesce bursts (address-bar show/hide, drag-resize, rotation) into one resize per frame and
+  // skip no-op ones.
+  let pending = 0;
   const onResize = () => {
-    const next = size();
-    game.registry.set("insets", readInsets(dpr));
-    game.scale.resize(next.w, next.h);
+    if (pending) return;
+    pending = requestAnimationFrame(() => {
+      pending = 0;
+      const next = size();
+      const insets = readInsets(dpr);
+      const prev = game.registry.get("insets") as Insets;
+      const insetsChanged = JSON.stringify(insets) !== JSON.stringify(prev);
+      if (next.w === game.scale.width && next.h === game.scale.height && !insetsChanged) return;
+      game.registry.set("insets", insets);
+      game.scale.resize(next.w, next.h);
+    });
   };
   window.addEventListener("resize", onResize);
   // Dev-only handle for debugging and browser-driven checks.

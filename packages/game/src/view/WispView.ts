@@ -49,7 +49,7 @@ export class WispView extends Phaser.GameObjects.Container {
     return this;
   }
 
-  get size(): number {
+  get currentRadius(): number {
     return this.radius;
   }
 }

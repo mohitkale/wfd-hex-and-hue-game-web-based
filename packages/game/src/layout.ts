@@ -69,13 +69,18 @@ export const CSS = {
   columnsMax: 210,
 } as const;
 
+/** Below this safe height (CSS px) fixed regions shrink, down to `MIN_COMPACT` of their size. */
+const COMPACT_BELOW = 720;
+const MIN_COMPACT = 0.6;
+
 export function computeLayout(input: LayoutInput): Layout {
   const { dpr, insets } = input;
-  const px = (css: number) => Math.round(css * dpr);
-
   const safeW = input.width - insets.left - insets.right;
   const safeH = input.height - insets.top - insets.bottom;
-  const frameW = Math.min(safeW, px(CSS.maxPlayWidth));
+  // Short screens (landscape phones, split view) scale the fixed chrome so the board stays usable.
+  const compact = Math.max(MIN_COMPACT, Math.min(1, safeH / dpr / COMPACT_BELOW));
+  const px = (css: number) => Math.round(css * dpr * compact);
+  const frameW = Math.min(safeW, Math.round(CSS.maxPlayWidth * dpr));
   const frame: Rect = {
     x: insets.left + Math.floor((safeW - frameW) / 2),
     y: insets.top,
@@ -83,8 +88,10 @@ export function computeLayout(input: LayoutInput): Layout {
     h: safeH,
   };
 
-  const gap = px(CSS.gap);
-  const pad = px(CSS.sidePad);
+  // Many columns get tighter spacing so each keeps a thumb-sized zone.
+  const crowded = input.columns > 4;
+  const gap = px(crowded ? 6 : CSS.gap);
+  const pad = px(crowded ? 8 : CSS.sidePad);
   const hud: Rect = { x: frame.x, y: frame.y, w: frame.w, h: px(CSS.hud) };
 
   const columnsH = clamp(Math.round(frame.h * 0.24), px(CSS.columnsMin), px(CSS.columnsMax));
