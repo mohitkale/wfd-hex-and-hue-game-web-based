@@ -1,66 +1,57 @@
 import Phaser from "phaser";
 import { theme } from "../theme";
+import { ensureTextures, TEX } from "../view/textures";
 
-/** Placeholder title scene: proves rendering, resize and touch input on every device. */
+/** Title screen. Tap anywhere to play the first level. */
 export class BootScene extends Phaser.Scene {
-  private title!: Phaser.GameObjects.Text;
-  private tagline!: Phaser.GameObjects.Text;
-  private wisp!: Phaser.GameObjects.Arc;
-  private halo!: Phaser.GameObjects.Arc;
+  private objects: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super("boot");
   }
 
   create(): void {
+    ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
-
-    this.halo = this.add.circle(0, 0, 46, theme.glow, 0.18);
-    this.wisp = this.add.circle(0, 0, 22, theme.glow);
-    this.title = this.add
-      .text(0, 0, "Hex & Hue", { fontFamily: theme.font, fontSize: "44px", color: theme.text })
-      .setOrigin(0.5);
-    this.tagline = this.add
-      .text(0, 0, "A Little Magic in Every Color", {
-        fontFamily: theme.font,
-        fontSize: "18px",
-        color: "#c9b8ff",
-      })
-      .setOrigin(0.5);
-
-    this.tweens.add({
-      targets: this.halo,
-      scale: 1.35,
-      alpha: 0.05,
-      duration: 1400,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
-
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      this.tweens.killTweensOf(this.wisp);
-      this.tweens.add({
-        targets: this.wisp,
-        x: p.x,
-        y: p.y,
-        duration: 220,
-        onUpdate: () => this.halo.setPosition(this.wisp.x, this.wisp.y),
-      });
-      navigator.vibrate?.(8);
-    });
-
+    this.input.once("pointerup", () => this.scene.start("play", { world: 0, level: 0 }));
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
   }
 
   private layout(): void {
+    for (const o of this.objects) o.destroy();
     const { width, height } = this.scale.gameSize;
+    const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     const cx = width / 2;
-    this.wisp.setPosition(cx, height * 0.42);
-    this.halo.setPosition(cx, height * 0.42);
-    this.title.setPosition(cx, height * 0.58);
-    this.tagline.setPosition(cx, height * 0.58 + 44);
+    const halo = this.add
+      .image(cx, height * 0.4, TEX.glow)
+      .setTint(theme.glow)
+      .setDisplaySize(160 * dpr, 160 * dpr);
+    const wisp = this.add.circle(cx, height * 0.4, 22 * dpr, theme.glow);
+    const title = this.add
+      .text(cx, height * 0.56, "Hex & Hue", {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(44 * dpr)}px`,
+        color: theme.text,
+      })
+      .setOrigin(0.5);
+    const tagline = this.add
+      .text(cx, height * 0.56 + 44 * dpr, "A Little Magic in Every Color", {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(18 * dpr)}px`,
+        color: theme.textDim,
+      })
+      .setOrigin(0.5);
+    const hint = this.add
+      .text(cx, height * 0.8, "Tap to begin", {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(16 * dpr)}px`,
+        color: theme.text,
+      })
+      .setOrigin(0.5);
+    this.tweens.add({ targets: halo, alpha: 0.4, duration: 1400, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: hint, alpha: 0.35, duration: 900, yoyo: true, repeat: -1 });
+    this.objects = [halo, wisp, title, tagline, hint];
   }
 }

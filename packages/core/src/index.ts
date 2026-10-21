@@ -55,3 +55,4 @@ export {
 } from "./generator";
 export { parseAsciiArt, type AsciiArt } from "./art";
 export { shuffleColumns } from "./shuffle";
+export type { BuiltLevel, BuiltWorld } from "./content";

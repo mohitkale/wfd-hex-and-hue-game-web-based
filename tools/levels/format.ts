@@ -1,24 +1,8 @@
 import { readFileSync } from "node:fs";
-import type { LaunchSource, Level } from "@hexhue/core";
+import type { BuiltLevel, BuiltWorld } from "@hexhue/core";
 import type { LevelConfig, WorldConfig } from "../../content/worlds";
 
-export interface BuiltLevel {
-  level: Level;
-  lore: string;
-  /** Verified sequential solution. */
-  solution: LaunchSource[];
-  difficulty: number;
-  minSlots: number | null;
-  lossRate: number;
-  /** Hash of everything that determines the generated puzzle (see `sourceHash`). */
-  source: string;
-}
-
-export interface BuiltWorld {
-  id: string;
-  name: string;
-  levels: BuiltLevel[];
-}
+export type { BuiltLevel, BuiltWorld };
 
 /** FNV-1a 32-bit, hex. Stable across platforms; guards against accidental staleness only. */
 export function hash(text: string): string {
