@@ -24,7 +24,8 @@ import Base from "../layouts/Base.astro";
     place-content: center;
     justify-items: center;
     gap: 0.75rem;
-    padding: 2rem 16px;
+    padding: max(2rem, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+      max(2rem, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     text-align: center;
     background: radial-gradient(circle at 50% 35%, var(--dusk), var(--night) 70%);
   }

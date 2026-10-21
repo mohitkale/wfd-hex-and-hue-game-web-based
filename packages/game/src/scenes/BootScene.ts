@@ -39,11 +39,19 @@ export class BootScene extends Phaser.Scene {
     });
 
     this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      this.tweens.add({ targets: [this.wisp, this.halo], x: p.x, y: p.y, duration: 220 });
+      this.tweens.killTweensOf(this.wisp);
+      this.tweens.add({
+        targets: this.wisp,
+        x: p.x,
+        y: p.y,
+        duration: 220,
+        onUpdate: () => this.halo.setPosition(this.wisp.x, this.wisp.y),
+      });
       navigator.vibrate?.(8);
     });
 
     this.scale.on("resize", this.layout, this);
+    this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
   }
 

@@ -2,9 +2,12 @@
 interface Props {
   title: string;
   description?: string;
+  /** Pinch-zoom stays on for content pages; only the game disables it. */
+  zoomable?: boolean;
 }
 const {
   title,
+  zoomable = true,
   description = "A free magical color-sorting pixel puzzle. A Little Magic in Every Color.",
 } = Astro.props;
 ---
@@ -15,7 +18,7 @@ const {
     <meta charset="utf-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+      content={`width=device-width, initial-scale=1, viewport-fit=cover${zoomable ? "" : ", maximum-scale=1, user-scalable=no"}`}
     />
     <meta name="theme-color" content="#140b2e" />
     <meta name="description" content={description} />
@@ -31,6 +34,11 @@ const {
 </html>
 
 <style is:global>
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
   :root {
     color-scheme: dark;
     --night: #140b2e;

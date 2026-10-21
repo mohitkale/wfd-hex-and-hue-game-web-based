@@ -2,15 +2,17 @@
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="Play · Hex & Hue">
-  <div id="game" aria-label="Hex & Hue game"></div>
+<Base title="Play · Hex & Hue" zoomable={false}>
+  <div id="game"></div>
 </Base>
 
 <script>
   import { mountGame } from "@hexhue/game";
 
   const parent = document.getElementById("game");
-  if (parent) mountGame(parent);
+  if (parent) {
+    mountGame(parent).canvas?.setAttribute("aria-label", "Hex & Hue game");
+  }
 </script>
 
 <style is:global>
@@ -27,10 +29,9 @@ import Base from "../layouts/Base.astro";
   }
   #game {
     position: fixed;
+    /* Full-bleed and unpadded: Phaser sizes the canvas from the parent box and ignores padding.
+       Safe-area insets are handled inside the game layout. */
     inset: 0;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-      env(safe-area-inset-left);
-    box-sizing: border-box;
   }
   #game canvas {
     display: block;
