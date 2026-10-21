@@ -24,15 +24,15 @@ these rules, deterministically, so the solver and the player see the same game.
                     [ .. ] [ .. ] [ .. ]
 ```
 
-| Term          | Rule                                                                                          |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| Mosaic        | `W×H` grid. Each cell is empty or holds one **fragment** of a palette color.                  |
-| Wisp          | Has a `color` and a `charge` (the number shown). Collects fragments of its own color only.    |
-| Summon column | Stack of wisps. Only the front wisp of each column can be tapped.                             |
-| Track         | Clockwise loop one cell outside the mosaic. Wisps enter at the bottom-left entry.             |
-| Track cap     | At most `T` wisps on the track at once (level parameter, default 5).                          |
-| Holding slots | `K` slots (default 5). A wisp that finishes a lap with charge left parks here.                |
-| Portal        | A wisp whose charge reaches 0 flies to the portal immediately and leaves play.                |
+| Term          | Rule                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| Mosaic        | `W×H` grid. Each cell is empty or holds one **fragment** of a palette color.               |
+| Wisp          | Has a `color` and a `charge` (the number shown). Collects fragments of its own color only. |
+| Summon column | Stack of wisps. Only the front wisp of each column can be tapped.                          |
+| Track         | Clockwise loop one cell outside the mosaic. Wisps enter at the bottom-left entry.          |
+| Track cap     | At most `T` wisps on the track at once (level parameter, default 5).                       |
+| Holding slots | `K` slots (default 5). A wisp that finishes a lap with charge left parks here.             |
+| Portal        | A wisp whose charge reaches 0 flies to the portal immediately and leaves play.             |
 
 ### Movement and collection
 
@@ -86,12 +86,12 @@ slot usage required. Level curves are tuned on this score.
 
 ## 4. Boosters (MVP)
 
-| Booster     | Effect                                                     | How to get                       |
-| ----------- | ---------------------------------------------------------- | -------------------------------- |
-| Undo        | Revert to before the last launch                           | Coins or rewarded ad             |
-| Shuffle     | Re-order wisps within summon columns (keeps it solvable)   | Coins                            |
-| Extra Slot  | +1 holding slot for this level                             | Rewarded ad or consumable        |
-| Magic Wand  | Collect every exposed fragment of one chosen color          | Coins or consumable              |
+| Booster    | Effect                                                   | How to get                |
+| ---------- | -------------------------------------------------------- | ------------------------- |
+| Undo       | Revert to before the last launch                         | Coins or rewarded ad      |
+| Shuffle    | Re-order wisps within summon columns (keeps it solvable) | Coins                     |
+| Extra Slot | +1 holding slot for this level                           | Rewarded ad or consumable |
+| Magic Wand | Collect every exposed fragment of one chosen color       | Coins or consumable       |
 
 On a loss the player is offered **Revive** (Extra Slot) or **Retry**. Retry is always free and instant.
 

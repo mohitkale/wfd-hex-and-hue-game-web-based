@@ -8,7 +8,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 ## M0 — Foundation
 
-- [ ] **M0.1** Workspace scaffold: npm workspaces (`packages/core`, `packages/game`, `apps/web`), TypeScript, ESLint, Prettier, Vitest, root scripts (`lint`, `typecheck`, `test`, `build`).
+- [x] **M0.1** Workspace scaffold: npm workspaces (`packages/core`, `packages/game`, `apps/web`), TypeScript, ESLint, Prettier, Vitest, root scripts (`lint`, `typecheck`, `test`, `build`).
 - [ ] **M0.2** CI: GitHub Actions running lint, typecheck, test, build on every PR and on `main`.
 - [ ] **M0.3** App shells: Phaser 4 game package with a boot scene; Astro site with `/` and full-screen `/play` mounting the game; mobile viewport/no-zoom/safe-area setup.
 
