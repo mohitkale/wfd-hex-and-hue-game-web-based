@@ -9,3 +9,4 @@ export {
   type Level,
   type WispSpec,
 } from "./level";
+export { buildTrack, firstInSight, type Lane, type Sight, type TrackCell } from "./track";

@@ -24,15 +24,15 @@ these rules, deterministically, so the solver and the player see the same game.
                     [ .. ] [ .. ] [ .. ]
 ```
 
-| Term          | Rule                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------ |
-| Mosaic        | `W×H` grid. Each cell is empty or holds one **fragment** of a palette color.               |
-| Wisp          | Has a `color` and a `charge` (the number shown). Collects fragments of its own color only. |
-| Summon column | Stack of wisps. Only the front wisp of each column can be tapped.                          |
-| Track         | Clockwise loop one cell outside the mosaic. Wisps enter at the bottom-left entry.          |
-| Track cap     | At most `T` wisps on the track at once (level parameter, default 5).                       |
-| Holding slots | `K` slots (default 5). A wisp that finishes a lap with charge left parks here.             |
-| Portal        | A wisp whose charge reaches 0 flies to the portal immediately and leaves play.             |
+| Term          | Rule                                                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Mosaic        | `W×H` grid. Each cell is empty or holds one **fragment** of a palette color.                                             |
+| Wisp          | Has a `color` and a `charge` (the number shown). Collects fragments of its own color only.                               |
+| Summon column | Stack of wisps. Only the front wisp of each column can be tapped.                                                        |
+| Track         | Loop one cell outside the mosaic: right along the bottom, up, left along the top, down. Entry is the bottom-left corner. |
+| Track cap     | At most `T` wisps on the track at once (level parameter, default 5).                                                     |
+| Holding slots | `K` slots (default 5). A wisp that finishes a lap with charge left parks here.                                           |
+| Portal        | A wisp whose charge reaches 0 flies to the portal immediately and leaves play.                                           |
 
 ### Movement and collection
 

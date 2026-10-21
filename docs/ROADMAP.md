@@ -15,7 +15,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 ## M1 — Core engine (pure TypeScript, no rendering)
 
 - [x] **M1.1** Level data model & JSON schema: mosaic grid, palette, summon columns, `K`, `T`; validation of the charge/fragment invariant.
-- [ ] **M1.2** Track geometry: perimeter path, lane directions, line-of-sight lookup per track cell.
+- [x] **M1.2** Track geometry: perimeter path, lane directions, line-of-sight lookup per track cell.
 - [ ] **M1.3** Step simulation: launch, movement, collection, portal exit, lap completion, holding slots, track cap, win/lose. Deterministic and serializable.
 - [ ] **M1.4** Game session API: action queue, event stream (collected, parked, portal, won, lost) for the renderer, undo snapshots. Thorough unit tests incl. edge cases.
 
