@@ -10,6 +10,7 @@ export class WispView extends Phaser.GameObjects.Container {
   private readonly glow: Phaser.GameObjects.Image;
   private readonly core: Phaser.GameObjects.Arc;
   private readonly label: Phaser.GameObjects.Text;
+  private readonly ring: Phaser.GameObjects.Arc;
 
   constructor(
     scene: Phaser.Scene,
@@ -29,7 +30,9 @@ export class WispView extends Phaser.GameObjects.Container {
         color: luminance(colorHex) > 0.45 ? "#1a0f33" : "#ffffff",
       })
       .setOrigin(0.5);
-    this.add([this.glow, this.core, this.label]);
+    // Pulsing ring shown while the wisp waits to launch (tapped while the entry was busy).
+    this.ring = scene.add.circle(0, 0, radius).setFillStyle().setVisible(false);
+    this.add([this.glow, this.ring, this.core, this.label]);
     this.radius = -1;
     this.setRadius(radius);
     this.setCharge(charge);
@@ -50,7 +53,16 @@ export class WispView extends Phaser.GameObjects.Container {
     this.core.setRadius(radius);
     this.core.setStrokeStyle(Math.max(1, radius * 0.14), 0xffffff, 0.85);
     this.glow.setDisplaySize(radius * 4.2, radius * 4.2);
+    this.ring.setRadius(radius * 1.32);
+    this.ring.setStrokeStyle(Math.max(1.5, radius * 0.16), 0xf6d97a, 1);
     this.label.setFontSize(Math.round(radius * (String(this.label.text).length > 1 ? 0.95 : 1.1)));
+    return this;
+  }
+
+  /** Shows the queued ring; `pulse` (0..1) animates it. */
+  setQueued(queued: boolean, pulse = 0): this {
+    this.ring.setVisible(queued);
+    if (queued) this.ring.setAlpha(0.45 + 0.55 * pulse).setScale(1 + 0.08 * pulse);
     return this;
   }
 
