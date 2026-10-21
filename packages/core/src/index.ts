@@ -53,3 +53,5 @@ export {
   type GenerateOptions,
   type GeneratedLevel,
 } from "./generator";
+export { parseAsciiArt, type AsciiArt } from "./art";
+export { shuffleColumns } from "./shuffle";
