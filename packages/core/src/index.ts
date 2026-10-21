@@ -44,3 +44,10 @@ export {
   type SolveResult,
   type SolveStatus,
 } from "./solver";
+export {
+  generateLevel,
+  naturalSequence,
+  type Art,
+  type GenerateOptions,
+  type GeneratedLevel,
+} from "./generator";
