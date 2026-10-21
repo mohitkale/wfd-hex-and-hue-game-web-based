@@ -59,11 +59,37 @@ export class WispView extends Phaser.GameObjects.Container {
     return this;
   }
 
-  /** Shows the queued ring; `pulse` (0..1) animates it. */
-  setQueued(queued: boolean, pulse = 0): this {
-    this.ring.setVisible(queued);
-    if (queued) this.ring.setAlpha(0.45 + 0.55 * pulse).setScale(1 + 0.08 * pulse);
+  /** Shows or hides the queued ring. */
+  setQueued(queued: boolean): this {
+    if (queued !== this.ring.visible) this.ring.setVisible(queued);
     return this;
+  }
+
+  /** Animates the queued ring; `pulse` is 0..1. */
+  pulseRing(pulse: number): this {
+    this.ring.setAlpha(0.45 + 0.55 * pulse).setScale(1 + 0.08 * pulse);
+    return this;
+  }
+
+  /**
+   * "Nope" shake: a damped, symmetric side-to-side wobble of the wisp's body. It moves the
+   * children, not the container, so the wisp's real position (used for launch flights) is untouched.
+   */
+  shake(amplitude: number): void {
+    const parts = [this.glow, this.ring, this.core, this.label];
+    this.scene.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: 280,
+      onUpdate: (tween) => {
+        const t = tween.getValue() ?? 1;
+        const dx = amplitude * Math.sin(t * Math.PI * 5) * (1 - t);
+        for (const p of parts) p.x = dx;
+      },
+      onComplete: () => {
+        for (const p of parts) p.x = 0;
+      },
+    });
   }
 
   get currentRadius(): number {
