@@ -9,6 +9,8 @@ import {
   type TrackWisp,
 } from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
+import { Haptics } from "../haptics";
+import { keyToSource } from "../keys";
 import { levelAt, worlds } from "../levels";
 import {
   LAUNCH_FLIGHT_MS,
@@ -63,11 +65,14 @@ export class PlayScene extends Phaser.Scene {
   private wisps = new Map<number, WispView>();
   private targets = new Map<number, Target>();
   private flights = new Map<number, Flight>();
+  /** Wisps tapped but waiting for the entry; refreshed with targets, read every frame. */
+  private queued = new Set<number>();
   /** Spent wisps still animating into the portal. */
   private departing = new Set<WispView>();
   private speedLabel: Phaser.GameObjects.Text | null = null;
   private banner: Phaser.GameObjects.GameObject[] = [];
   private lastLayoutKey = "";
+  private readonly haptics = new Haptics();
   private acc = 0;
   private speed: Speed = 1;
 
@@ -91,6 +96,7 @@ export class PlayScene extends Phaser.Scene {
     this.zones = [];
     this.moreLabels = [];
     this.flights = new Map();
+    this.queued = new Set();
     this.departing = new Set();
     this.banner = [];
     this.speedLabel = null;
@@ -104,9 +110,16 @@ export class PlayScene extends Phaser.Scene {
     this.track = trackFor(level.width, level.height);
     this.session = new GameSession(level);
     const unsubscribe = this.session.subscribe((e) => this.onEvent(e));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const source = keyToSource(e.code, level.columns.length, this.session.state.slots.length);
+      if (source) this.tap(source);
+    };
+    this.input.keyboard?.on("keydown", onKey);
     this.scale.on("resize", this.relayout, this);
     this.events.once("shutdown", () => {
       unsubscribe();
+      this.input.keyboard?.off("keydown", onKey);
       this.scale.off("resize", this.relayout, this);
       this.mosaic?.destroy();
       this.mosaic = null;
@@ -251,13 +264,16 @@ export class PlayScene extends Phaser.Scene {
     for (const o of [back, title, subtitle, this.speedLabel]) o.setDepth(DEPTH.hud);
   }
 
-  /** Whole summon columns and slots are tap targets; M3.3 adds feedback. */
+  /**
+   * Whole summon columns and slots are tap targets (thumb-sized by layout). Feedback happens on
+   * pointerdown, in the same frame as the touch.
+   */
   private createTapZones(): void {
     const add = (r: { x: number; y: number; w: number; h: number }, source: LaunchSource) =>
       this.add
         .zone(r.x, r.y, r.w, r.h)
         .setOrigin(0, 0)
-        .setInteractive()
+        .setInteractive({ useHandCursor: true })
         .on("pointerdown", () => this.tap(source));
     this.zones = [
       ...this.layout.columns.map((r, index) => add(r, { kind: "column", index })),
@@ -269,7 +285,81 @@ export class PlayScene extends Phaser.Scene {
 
   private tap(source: LaunchSource): void {
     if (this.session.state.status !== "playing") return;
-    if (this.session.tap(source).length > 0) this.refreshTargets();
+    const id = this.session.tapTarget(source);
+    if (id === null) {
+      this.rejectTap(source);
+      return;
+    }
+    this.session.tap(source);
+    this.haptics.play("tap");
+    const view = this.wisps.get(id);
+    if (view) {
+      // Squish: immediate acknowledgement, even if the launch has to wait for the entry.
+      this.tweens.killTweensOf(view);
+      view.setScale(0.82);
+      this.tweens.add({ targets: view, scale: 1, duration: 180, ease: "Back.easeOut" });
+    } else if (source.kind === "column") {
+      // The wisp is still hidden in the "+n" part of the stack: pulse that count instead.
+      const more = this.moreLabels[source.index];
+      if (more) {
+        this.tweens.killTweensOf(more);
+        more.setScale(1.35);
+        this.tweens.add({ targets: more, scale: 1, duration: 200, ease: "Back.easeOut" });
+      }
+    }
+    this.refreshTargets();
+  }
+
+  /**
+   * Nothing to launch there (empty column or slot, or everything in it already queued): shake the
+   * wisp that's there, or flash the empty zone, and buzz.
+   */
+  private rejectTap(source: LaunchSource): void {
+    this.haptics.play("invalid");
+    const s = this.session.state;
+    const w = source.kind === "column" ? s.columns[source.index]?.[0] : s.slots[source.index];
+    const view = w ? this.wisps.get(w.id) : undefined;
+    const amplitude = 6 * this.layout.dpr;
+    if (view) {
+      view.shake(amplitude);
+      return;
+    }
+    const zone =
+      source.kind === "column"
+        ? this.layout.columns[source.index]
+        : this.layout.slots[source.index];
+    if (!zone) return;
+    const g = this.flashZone(zone);
+    const x0 = g.x;
+    this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: 280,
+      onUpdate: (tween) => {
+        const t = tween.getValue() ?? 1;
+        g.x = x0 + amplitude * Math.sin(t * Math.PI * 5) * (1 - t);
+      },
+    });
+  }
+
+  /** A brief outline over an empty zone, used as the thing that shakes. */
+  private flashZone(r: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  }): Phaser.GameObjects.Graphics {
+    const g = this.add.graphics({ x: r.x, y: r.y }).setDepth(DEPTH.fx);
+    g.lineStyle(Math.max(1, 2 * this.layout.dpr), 0xff8fa3, 0.9);
+    g.strokeRoundedRect(0, 0, r.w, Math.min(r.h, r.w), r.w * 0.2);
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      delay: 200,
+      duration: 200,
+      onComplete: () => g.destroy(),
+    });
+    return g;
   }
 
   private toggleSpeed(): void {
@@ -287,6 +377,7 @@ export class PlayScene extends Phaser.Scene {
   private onEvent(e: SessionEvent): void {
     switch (e.type) {
       case "collected": {
+        this.haptics.play("collect");
         this.mosaic?.clearCell(e.cell);
         const view = this.wisps.get(e.wispId);
         if (view) {
@@ -296,12 +387,18 @@ export class PlayScene extends Phaser.Scene {
         break;
       }
       case "portal":
+        this.haptics.play("portal");
         this.departToPortal(e.wispId);
         break;
+      case "parked":
+        this.haptics.play("park");
+        break;
       case "won":
+        this.haptics.play("win");
         this.time.delayedCall(500, () => this.showBanner("Mosaic complete!", "Next level"));
         break;
       case "lost":
+        this.haptics.play("lose");
         this.time.delayedCall(300, () => this.showBanner("No room left", "Try again"));
         break;
       case "undone":
@@ -439,7 +536,8 @@ export class PlayScene extends Phaser.Scene {
           .setAlpha(0);
       }
     }
-    for (const w of all) this.wisps.get(w.id)?.setCharge(w.charge);
+    this.queued = new Set(this.session.pending);
+    for (const w of all) this.wisps.get(w.id)?.setCharge(w.charge).setQueued(this.queued.has(w.id));
     for (const [id, view] of this.wisps) {
       if (!next.has(id)) {
         view.destroy();
@@ -465,7 +563,9 @@ export class PlayScene extends Phaser.Scene {
   private moveWisps(delta: number): void {
     const alpha = this.alpha();
     const trackR = this.trackRadius();
+    const pulse = this.queued.size > 0 ? 0.5 + 0.5 * Math.sin(this.time.now / 140) : 0;
     for (const [id, view] of this.wisps) {
+      if (this.queued.has(id)) view.pulseRing(pulse);
       const target = this.targets.get(id);
       if (!target) continue;
       if (target.kind === "track") {

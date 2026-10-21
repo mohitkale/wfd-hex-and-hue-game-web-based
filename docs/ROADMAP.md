@@ -29,7 +29,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 - [x] **M3.1** Board scene: responsive portrait layout, mosaic rendering (fast batched pixels), track, portal, slots, summon columns.
 - [x] **M3.2** Wisps: sprites, movement interpolated from sim steps, collection beam/particle, portal flight; 1×/2× speed.
-- [ ] **M3.3** Input & feedback: tap targets sized for thumbs, invalid-tap feedback, haptics, queued launches.
+- [x] **M3.3** Input & feedback: tap targets sized for thumbs, invalid-tap feedback, haptics, queued launches.
 - [ ] **M3.4** Win/lose flow: reveal animation of the finished illustration, lose dialog with free Retry, level select stub. Playable with 5 test levels.
 
 ## M4 — Content: 3 worlds × 20 levels
