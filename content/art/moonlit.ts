@@ -1,6 +1,7 @@
 import type { AsciiArt } from "@hexhue/core";
 
-const night = "#2a1650";
+// Sky is a playable color, so it must stand apart from the dark board panel.
+const night = "#4b3c9e";
 const moon = "#f6d97a";
 const starlight = "#c9b8ff";
 
