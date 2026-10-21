@@ -8,13 +8,17 @@ import { cloneState, createState, launch, runQuiet, type LaunchSource, type SimS
  * is a winning strategy for the real game.
  */
 
+/**
+ * `unsolvable` is a proof within the sequential model only; a level could still be winnable with
+ * several wisps on the track at once. Shipping requires a sequential solution, so this errs safe.
+ */
 export type SolveStatus = "solved" | "unsolvable" | "unknown";
 
 export interface SolveResult {
   status: SolveStatus;
   /** Launches that win when each is played to idle before the next. `null` unless solved. */
   solution: LaunchSource[] | null;
-  /** States expanded. */
+  /** Launches simulated (child states evaluated). */
   nodes: number;
 }
 
@@ -28,7 +32,8 @@ function stateKey(s: SimState): string {
   let k = "";
   for (const col of s.columns) k += col.length + ",";
   const parked: number[] = [];
-  for (const w of s.slots) if (w) parked.push(w.id * 4096 + w.charge);
+  // Charge ≤ 64² cells < 2^16, so id·2^16 + charge is unique.
+  for (const w of s.slots) if (w) parked.push(w.id * 65536 + w.charge);
   parked.sort((a, b) => a - b);
   k += "|" + parked.join(",") + "|";
   // Cells only ever empty, and each cell's color is fixed, so occupancy bits identify the board.
@@ -138,9 +143,12 @@ export function verifySolution(level: Level, solution: readonly LaunchSource[]):
 
 export interface DifficultyReport {
   solve: SolveResult;
-  /** Fewest holding slots that still allow a win (1..level.slots), or `null` if unsolved. */
+  /**
+   * Fewest holding slots that still allow a sequential win (1..level.slots), or `null` if
+   * unsolved. A budget-limited (`unknown`) check counts as not enough, so this may overestimate.
+   */
   minSlots: number | null;
-  /** Share of random sequential play-throughs that lose (0..1). */
+  /** Share of sensible-novice sequential play-throughs that lose (0..1). */
   lossRate: number;
   /** Heuristic 0 (trivial) .. 1 (brutal); tuned in M4. */
   difficulty: number;
@@ -155,17 +163,20 @@ export interface AnalyzeOptions extends SolveOptions {
 }
 
 /**
- * A random sequential player: picks uniformly among available launches until the game ends, or
- * until it has made many more launches than there are wisps (counted as a loss: it got stuck
- * cycling parked wisps).
+ * A "sensible novice" sequential player: picks at random among launches that collect at least one
+ * fragment, and only launches a wisp that collects nothing when no other launch does. It never
+ * plans ahead, so it falls into the traps a level sets (burying needed wisps, filling slots).
+ * Making far more launches than there are wisps counts as a loss (stuck cycling parked wisps).
  */
-function randomPlayout(level: Level, seed: number): boolean {
+function noviceWins(level: Level, seed: number): boolean {
   const rng = createRng(seed);
   let s = stateWithSlots(level);
   const wisps = level.columns.reduce((n, c) => n + c.length, 0);
   for (let i = 0; i < wisps * 4 && s.status === "playing"; i++) {
-    const moves = sequentialMoves(s);
-    s = playSequential(s, moves[rng.int(0, moves.length - 1)]!);
+    const outcomes = sequentialMoves(s).map((move) => playSequential(s, move));
+    const useful = outcomes.filter((o) => o.remaining < s.remaining);
+    const pool = useful.length > 0 ? useful : outcomes;
+    s = pool[rng.int(0, pool.length - 1)]!;
   }
   return s.status === "won";
 }
@@ -187,7 +198,7 @@ export function analyzeLevel(level: Level, options: AnalyzeOptions = {}): Diffic
   }
 
   let losses = 0;
-  for (let i = 0; i < playouts; i++) if (!randomPlayout(level, seed + i * 7919)) losses++;
+  for (let i = 0; i < playouts; i++) if (!noviceWins(level, seed + i * 7919)) losses++;
   const lossRate = playouts > 0 ? losses / playouts : 0;
   const tightness = minSlots === null ? 1 : minSlots / level.slots;
   const difficulty = Math.round((0.7 * lossRate + 0.3 * tightness) * 1000) / 1000;
