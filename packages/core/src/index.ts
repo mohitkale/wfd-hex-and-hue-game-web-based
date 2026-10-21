@@ -10,3 +10,20 @@ export {
   type WispSpec,
 } from "./level";
 export { buildTrack, firstInSight, type Lane, type Sight, type TrackCell } from "./track";
+export {
+  canLaunch,
+  cloneState,
+  createState,
+  entryOpen,
+  launch,
+  runUntilIdle,
+  step,
+  trackFor,
+  wispAt,
+  type LaunchSource,
+  type SimEvent,
+  type SimState,
+  type Status,
+  type TrackWisp,
+  type Wisp,
+} from "./sim";
