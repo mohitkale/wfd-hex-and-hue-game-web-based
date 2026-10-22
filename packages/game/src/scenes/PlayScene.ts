@@ -501,11 +501,22 @@ export class PlayScene extends Phaser.Scene {
       case "restarted":
         this.assists = e.type === "undone" ? this.assists + 1 : 0;
         if (e.type === "restarted") getSave(this)?.update((d) => d.stats.plays++);
+        if (e.type === "undone" && e.reverted !== "tap") {
+          // Undoing a booster gives it back (as stock), so nothing paid is lost.
+          const kind = e.reverted;
+          getSave(this)?.update((d) => d.boosters[kind]++);
+          this.toast("Booster returned");
+        }
         this.closeCard();
+        this.closeWandPicker();
         for (const view of this.departing) view.destroy();
         this.departing.clear();
+        // The slot count may have changed (revive undone, or retry after a revive).
+        this.relayout();
         this.rebuildMosaic();
         this.refreshTargets(true);
+        // Undo can land back on a lost board: show its card so Retry is always reachable.
+        if (this.session.state.status === "lost") this.showCard("lose", false);
         break;
       default:
         break;
@@ -752,13 +763,18 @@ export class PlayScene extends Phaser.Scene {
     const save = getSave(this);
     const status = this.session.state.status;
     if (!save || status === "won") return;
-    if (kind === "wand" && color === undefined) return this.openWandPicker();
     const payment = paymentFor(save.data, kind);
+    if (kind === "wand" && color === undefined && payment.kind !== "short") {
+      return this.openWandPicker();
+    }
     if (payment.kind === "short") {
       this.haptics.play("invalid");
       this.toast(`Need ${payment.missing} more ◉ — clear mosaics to earn coins`);
       return;
     }
+    // Count the assist first: a booster can win the level synchronously (Wand), and the win
+    // records its stars immediately. Undo counts itself through the "undone" event.
+    if (kind !== "undo") this.assists++;
     const used =
       kind === "undo"
         ? this.session.undo()
@@ -768,6 +784,7 @@ export class PlayScene extends Phaser.Scene {
             ? this.session.extraSlot()
             : this.session.wand(color!);
     if (!used) {
+      if (kind !== "undo") this.assists--;
       this.haptics.play("invalid");
       this.toast(
         kind === "undo"
@@ -779,8 +796,6 @@ export class PlayScene extends Phaser.Scene {
       return;
     }
     save.update((d) => pay(d, kind, payment));
-    // Undo already counts itself through the "undone" event.
-    if (kind !== "undo") this.assists++;
     this.haptics.play("tap");
     if (payment.kind === "coins") this.boosterBar?.pulseCoins();
   }
@@ -789,7 +804,11 @@ export class PlayScene extends Phaser.Scene {
   private openWandPicker(): void {
     if (this.wandPicker.length > 0) return this.closeWandPicker();
     const colors = wandColors(this.session.state);
-    if (this.session.state.status !== "playing" || colors.length === 0) return;
+    if (this.session.state.status !== "playing") return;
+    if (colors.length === 0) {
+      this.toast("Nothing exposed to collect right now");
+      return;
+    }
     const { boosters, dpr, frame } = this.layout;
     const r = 16 * dpr;
     const y = boosters.y - 26 * dpr;
@@ -904,6 +923,7 @@ export class PlayScene extends Phaser.Scene {
    */
   private showCard(kind: "win" | "lose", animate = true): void {
     this.closeCard();
+    this.closeWandPicker();
     this.overlayKind = kind;
     const { frame, dpr, boardRect } = this.layout;
     const px = (v: number) => Math.round(v * dpr);

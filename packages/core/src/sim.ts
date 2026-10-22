@@ -174,32 +174,44 @@ export function advance(s: SimState, track: readonly TrackCell[], events: SimEve
       }
       continue;
     }
-    const sight = track[w.pos]!.sight;
-    const target = sight ? firstInSight(s.cells, sight) : -1;
-    if (target !== -1 && s.cells[target] === w.color) {
-      s.cells[target] = EMPTY;
-      s.remaining--;
-      w.charge--;
-      events?.push({
-        type: "collected",
-        wispId: w.id,
-        pos: w.pos,
-        cell: target,
-        color: w.color,
-        chargeLeft: w.charge,
-      });
-      if (w.charge === 0) {
-        events?.push({ type: "portal", wispId: w.id, pos: w.pos });
-        continue;
-      }
-    }
-    stillOnTrack.push(w);
+    if (collectAt(s, w, track, events)) stillOnTrack.push(w);
   }
   s.track = stillOnTrack;
   if (s.status === "playing" && s.remaining === 0) {
     s.status = "won";
     events?.push({ type: "won" });
   }
+}
+
+/**
+ * The collection half of a step for one track wisp at its current position: collects the first
+ * fragment in sight if the color matches. Returns false if the wisp spent its charge and left
+ * through the portal. Shared by `advance` and the revive booster (which finishes a step that a
+ * loss interrupted).
+ */
+export function collectAt(
+  s: SimState,
+  w: TrackWisp,
+  track: readonly TrackCell[],
+  events: SimEvent[] | null,
+): boolean {
+  const sight = track[w.pos]!.sight;
+  const target = sight ? firstInSight(s.cells, sight) : -1;
+  if (target === -1 || s.cells[target] !== w.color) return true;
+  s.cells[target] = EMPTY;
+  s.remaining--;
+  w.charge--;
+  events?.push({
+    type: "collected",
+    wispId: w.id,
+    pos: w.pos,
+    cell: target,
+    color: w.color,
+    chargeLeft: w.charge,
+  });
+  if (w.charge > 0) return true;
+  events?.push({ type: "portal", wispId: w.id, pos: w.pos });
+  return false;
 }
 
 /** Steps until the track is empty or the game ends, without building events. */

@@ -1,8 +1,9 @@
 import type { BoosterKind, SaveData } from "./save/schema";
 
 /**
- * Booster prices in coins. A first clear pays 10–25, so one booster costs one to three levels of
- * play: earnable, never necessary (Retry is always free, and skipping is offered after 3 losses).
+ * Booster prices in coins. A first clear pays 10–45 (most levels 12–30), so one booster costs one to
+ * four levels of play: earnable, never necessary (Retry is always free, and skipping is offered
+ * after 3 losses). Replays pay a token 3, so farming is possible but slow, by design.
  */
 export const PRICES: Record<BoosterKind, number> = {
   undo: 20,

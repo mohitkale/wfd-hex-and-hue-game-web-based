@@ -33,10 +33,16 @@ export class BoosterBar {
     const cy = rect.y + rect.h * 0.42;
     BUTTONS.forEach((b, i) => {
       const cx = rect.x + slotW * (i + 0.5);
+      // The visible disc can be small on compact layouts; the touch target is always ≥ 48 px.
+      const hit = Math.max(r, 24 * dpr);
       const disc = scene.add
         .circle(cx, cy, r, theme.dusk)
         .setStrokeStyle(Math.max(1, 1.5 * dpr), theme.mist, 0.6)
-        .setInteractive({ useHandCursor: true });
+        .setInteractive({
+          hitArea: new Phaser.Geom.Circle(r, r, hit),
+          hitAreaCallback: Phaser.Geom.Circle.Contains,
+          useHandCursor: true,
+        });
       const glyph = scene.add
         .text(cx, cy, b.glyph, {
           fontFamily: theme.font,

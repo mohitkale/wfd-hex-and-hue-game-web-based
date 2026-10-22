@@ -353,3 +353,60 @@ describe("booster actions", () => {
     expect(JSON.stringify(s.state.columns)).toEqual(before);
   });
 });
+
+describe("booster edge cases", () => {
+  it("wand drops a spent wisp from the launch queue", () => {
+    const s = new GameSession(
+      hiddenCenter([
+        [
+          { color: 1, charge: 4 },
+          { color: 1, charge: 4 },
+        ],
+        [{ color: 0, charge: 1 }],
+      ]),
+    );
+    s.tap(col0);
+    s.tap(col0); // second wisp queued
+    expect(s.pending).toEqual([1]);
+    expect(s.wand(1)).toBe(true);
+    expect(s.pending).toEqual([]);
+  });
+
+  it("wand that clears the board emits won", () => {
+    const s = new GameSession({
+      id: "t",
+      name: "t",
+      width: 2,
+      height: 2,
+      palette: ["#aa66ff"],
+      cells: [0, 0, 0, 0],
+      columns: [[{ color: 0, charge: 4 }]],
+      slots: 1,
+      trackCap: 5,
+    });
+    const seen: string[] = [];
+    s.subscribe((e) => seen.push(e.type));
+    s.wand(0);
+    expect(seen).toEqual(["wand", "won"]);
+  });
+
+  it("undoing a revive returns to the lost state and says what was reverted", () => {
+    const s = new GameSession(
+      hiddenCenter(
+        [[{ color: 0, charge: 1 }], [{ color: 0, charge: 1 }], [{ color: 1, charge: 8 }]],
+        1,
+      ),
+    );
+    s.tap(col0);
+    tickUntilIdle(s);
+    s.tap(col1);
+    tickUntilIdle(s);
+    s.extraSlot();
+    const seen: SessionEvent[] = [];
+    s.subscribe((e) => seen.push(e));
+    expect(s.undo()).toBe(true);
+    expect(s.state.status).toBe("lost");
+    expect(s.state.slots).toHaveLength(1);
+    expect(seen).toEqual([{ type: "undone", reverted: "extraSlot" }]);
+  });
+});

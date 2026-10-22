@@ -1,5 +1,5 @@
 import { EMPTY } from "./level";
-import { trackFor, type SimState } from "./sim";
+import { collectAt, trackFor, type SimEvent, type SimState } from "./sim";
 import { firstInSight } from "./track";
 
 /** Mosaic cells of `color` that some lane can see right now (the ones a wisp could collect). */
@@ -64,18 +64,25 @@ export function applyWand(s: SimState, color: number): WandResult {
 
 /**
  * Extra Slot: adds a holding slot. On a lost level (a wisp finished its lap with every slot full)
- * it also revives: that wisp parks in the new slot and play continues. Returns the revived wisp id,
- * or `null` if nothing needed reviving.
+ * it also revives: that wisp parks in the new slot, and the step the loss interrupted is finished
+ * for the wisps behind it (they had moved but not yet collected; the loser is always the
+ * front-most wisp, so all of them). Returns the revived wisp id, or `null` if nothing needed
+ * reviving. Events from the finished step are appended to `events`.
  */
-export function addSlot(s: SimState): number | null {
+export function addSlot(s: SimState, events: SimEvent[] | null = null): number | null {
   if (s.status === "won") return null;
   s.slots.push(null);
   if (s.status !== "lost") return null;
-  const lap = trackFor(s.width, s.height).length;
-  const loser = s.track.find((w) => w.traveled >= lap);
+  const track = trackFor(s.width, s.height);
+  const loser = s.track.find((w) => w.traveled >= track.length);
   if (!loser) return null;
-  s.track = s.track.filter((w) => w !== loser);
   s.slots[s.slots.length - 1] = { id: loser.id, color: loser.color, charge: loser.charge };
+  events?.push({ type: "parked", wispId: loser.id, slot: s.slots.length - 1 });
   s.status = "playing";
+  s.track = s.track.filter((w) => w !== loser && collectAt(s, w, track, events));
+  if (s.remaining === 0) {
+    s.status = "won";
+    events?.push({ type: "won" });
+  }
   return loser.id;
 }

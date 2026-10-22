@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addSlot, applyWand, exposedCells, wandColors } from "./boosters";
 import { EMPTY, type Level } from "./level";
-import { createState, launch, runQuiet } from "./sim";
+import { createState, launch, runQuiet, step, type SimEvent } from "./sim";
 import { solveState } from "./solver";
 
 /** 3×3 color-0 center under a color-1 ring. */
@@ -114,5 +114,61 @@ describe("addSlot", () => {
     s.status = "won";
     expect(addSlot(s)).toBeNull();
     expect(s.slots).toHaveLength(1);
+  });
+});
+
+describe("revive finishes the interrupted step", () => {
+  it("lets a wisp behind the loser collect what it would have collected", () => {
+    // Cell 3 (left of center, color 2) is visible only from the left lane at row 1 (pos 14).
+    const lvl: Level = {
+      ...ring,
+      palette: ["#aa66ff", "#ffd966", "#66ddff"],
+      cells: [1, 1, 1, 2, 0, 1, 1, 1, 1],
+      columns: [[{ color: 0, charge: 1 }], [{ color: 0, charge: 1 }], [{ color: 2, charge: 1 }]],
+    };
+    const s = createState(lvl);
+    launch(s, { kind: "column", index: 0 });
+    runQuiet(s); // parks in the only slot
+    launch(s, { kind: "column", index: 1 });
+    step(s);
+    step(s);
+    launch(s, { kind: "column", index: 2 }); // two cells behind
+    for (let i = 0; i < 40 && s.status === "playing"; i++) step(s);
+    expect(s.status).toBe("lost");
+    expect(s.cells[3]).toBe(2); // frozen: the trailing wisp hasn't collected yet
+    const events: SimEvent[] = [];
+    expect(addSlot(s, events)).toBe(1);
+    expect(events).toEqual([
+      { type: "parked", wispId: 1, slot: 1 },
+      { type: "collected", wispId: 2, pos: 14, cell: 3, color: 2, chargeLeft: 0 },
+      { type: "portal", wispId: 2, pos: 14 },
+    ]);
+    expect(s.cells[3]).toBe(EMPTY);
+    expect(s.status).toBe("playing");
+  });
+});
+
+describe("applyWand charge order", () => {
+  it("takes owed charge from waiting columns, then slots, then the track", () => {
+    const lvl: Level = {
+      ...ring,
+      width: 2,
+      height: 2,
+      cells: [1, 1, 1, 1],
+      columns: [
+        [
+          { color: 1, charge: 1 },
+          { color: 1, charge: 1 },
+        ],
+        [{ color: 1, charge: 2 }],
+      ],
+    };
+    const s = createState(lvl);
+    launch(s, { kind: "column", index: 1 }); // charge-2 wisp on the track
+    const r = applyWand(s, 1);
+    expect(r.cells).toHaveLength(4);
+    expect(r.spent.sort()).toEqual([0, 1, 2]);
+    expect(s.track).toEqual([]);
+    expect(s.status).toBe("won");
   });
 });

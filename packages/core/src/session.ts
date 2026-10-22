@@ -17,7 +17,7 @@ import {
 export type SessionEvent =
   | SimEvent
   | { type: "queued"; wispId: number }
-  | { type: "undone" }
+  | { type: "undone"; reverted: SnapshotKind }
   | { type: "restarted" }
   | { type: "wand"; color: number; cells: number[]; spent: number[] }
   | { type: "slotAdded"; slot: number; revivedWispId: number | null }
@@ -25,9 +25,13 @@ export type SessionEvent =
 
 export type SessionListener = (event: SessionEvent) => void;
 
+/** What created an undo snapshot: a launch tap, or a booster. */
+export type SnapshotKind = "tap" | "wand" | "extraSlot" | "shuffle";
+
 interface Snapshot {
   state: SimState;
   queue: number[];
+  kind: SnapshotKind;
 }
 
 /**
@@ -121,14 +125,18 @@ export class GameSession {
     if (!snap) return false;
     this.current = snap.state;
     this.queue = snap.queue;
-    this.emit([{ type: "undone" }]);
+    this.emit([{ type: "undone", reverted: snap.kind }]);
     return true;
   }
 
   /** Magic Wand on `color`. Undoable. Returns false (and changes nothing) if it would do nothing. */
   wand(color: number): boolean {
     if (this.current.status !== "playing") return false;
-    const snapshot = { state: cloneState(this.current), queue: this.queue.slice() };
+    const snapshot: Snapshot = {
+      state: cloneState(this.current),
+      queue: this.queue.slice(),
+      kind: "wand",
+    };
     const result = applyWand(this.current, color);
     if (result.cells.length === 0) return false;
     this.history.push(snapshot);
@@ -144,9 +152,13 @@ export class GameSession {
   /** Extra Slot: one more holding slot; revives a lost level. Undoable. */
   extraSlot(): boolean {
     if (this.current.status === "won") return false;
-    this.pushHistory();
-    const revived = addSlot(this.current);
-    this.emit([{ type: "slotAdded", slot: this.current.slots.length - 1, revivedWispId: revived }]);
+    this.pushHistory("extraSlot");
+    const finished: SimEvent[] = [];
+    const revived = addSlot(this.current, finished);
+    this.emit([
+      { type: "slotAdded", slot: this.current.slots.length - 1, revivedWispId: revived },
+      ...finished,
+    ]);
     return true;
   }
 
@@ -155,7 +167,7 @@ export class GameSession {
     if (this.current.status !== "playing") return false;
     const next = shuffleColumns(this.current, rng);
     if (!next) return false;
-    this.pushHistory();
+    this.pushHistory("shuffle");
     this.current = next;
     // Queued taps referred to the old order.
     this.queue = [];
@@ -170,8 +182,8 @@ export class GameSession {
     this.emit([{ type: "restarted" }]);
   }
 
-  private pushHistory(): void {
-    this.history.push({ state: cloneState(this.current), queue: this.queue.slice() });
+  private pushHistory(kind: SnapshotKind = "tap"): void {
+    this.history.push({ state: cloneState(this.current), queue: this.queue.slice(), kind });
     if (this.history.length > this.maxUndo) this.history.shift();
   }
 
