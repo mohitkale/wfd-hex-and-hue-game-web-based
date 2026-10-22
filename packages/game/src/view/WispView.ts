@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { hexToNumber, luminance, theme } from "../theme";
-import { TEX } from "./textures";
+import { TEX, symbolTexture } from "./textures";
 
 /**
  * A wisp: a soft glow, a bright core in its color with a light rim (so dark colors still read on
@@ -11,6 +11,8 @@ export class WispView extends Phaser.GameObjects.Container {
   private readonly core: Phaser.GameObjects.Arc;
   private readonly label: Phaser.GameObjects.Text;
   private readonly ring: Phaser.GameObjects.Arc;
+  /** Colorblind badge: the color's symbol on a dark disc at the wisp's shoulder. */
+  private readonly badge: Phaser.GameObjects.Container | null;
 
   constructor(
     scene: Phaser.Scene,
@@ -18,6 +20,8 @@ export class WispView extends Phaser.GameObjects.Container {
     readonly colorHex: string,
     charge: number,
     private radius: number,
+    /** Palette index whose symbol to show, or `null` (colorblind symbols off). */
+    symbol: number | null = null,
   ) {
     super(scene, 0, 0);
     const color = hexToNumber(colorHex);
@@ -33,6 +37,14 @@ export class WispView extends Phaser.GameObjects.Container {
     // Pulsing ring shown while the wisp waits to launch (tapped while the entry was busy).
     this.ring = scene.add.circle(0, 0, radius).setFillStyle().setVisible(false);
     this.add([this.glow, this.ring, this.core, this.label]);
+    this.badge =
+      symbol === null
+        ? null
+        : scene.add.container(0, 0, [
+            scene.add.circle(0, 0, 1, theme.panel).setStrokeStyle(1, 0xffffff, 0.9),
+            scene.add.image(0, 0, symbolTexture(scene, symbol)),
+          ]);
+    if (this.badge) this.add(this.badge);
     this.radius = -1;
     this.setRadius(radius);
     this.setCharge(charge);
@@ -56,6 +68,13 @@ export class WispView extends Phaser.GameObjects.Container {
     this.ring.setRadius(radius * 1.32);
     this.ring.setStrokeStyle(Math.max(1.5, radius * 0.16), 0xf6d97a, 1);
     this.label.setFontSize(Math.round(radius * (String(this.label.text).length > 1 ? 0.95 : 1.1)));
+    if (this.badge) {
+      const r = Math.max(5, radius * 0.5);
+      this.badge.setPosition(radius * 0.74, -radius * 0.74);
+      const [disc, icon] = this.badge.list as [Phaser.GameObjects.Arc, Phaser.GameObjects.Image];
+      disc.setRadius(r).setStrokeStyle(Math.max(1, r * 0.14), 0xffffff, 0.9);
+      icon.setDisplaySize(r * 1.25, r * 1.25);
+    }
     return this;
   }
 
@@ -77,6 +96,7 @@ export class WispView extends Phaser.GameObjects.Container {
    */
   shake(amplitude: number): void {
     const parts = [this.glow, this.ring, this.core, this.label];
+    if (this.badge) parts.push(this.badge as never);
     this.scene.tweens.addCounter({
       from: 0,
       to: 1,

@@ -4,7 +4,9 @@ import { BootScene } from "./scenes/BootScene";
 import { SpellbookScene } from "./scenes/SpellbookScene";
 import { WorldMapScene } from "./scenes/WorldMapScene";
 import { PlayScene } from "./scenes/PlayScene";
+import { SettingsScene } from "./scenes/SettingsScene";
 import { AudioEngine, audioSettings } from "./audio";
+import { reducedMotion } from "./a11y";
 import { nextRenderDpr, renderDpr } from "./display";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
@@ -56,7 +58,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     // All sound comes from our own Web Audio engine; Phaser's would be a second, unused context.
     audio: { noAudio: true },
     disableContextMenu: true,
-    scene: [BootScene, WorldMapScene, SpellbookScene, PlayScene],
+    scene: [BootScene, WorldMapScene, SpellbookScene, SettingsScene, PlayScene],
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
@@ -75,11 +77,26 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     for (const g of gestures) window.removeEventListener(g, unlock, { capture: true });
     document.removeEventListener("visibilitychange", onVisibility);
     unsubscribe();
+    motionQuery?.removeEventListener("change", applyMotion);
     audio.dispose();
   });
+  // Reduced motion: the player's setting, or the OS preference on "system". Scenes read the
+  // "reducedMotion" registry flag when they play effects.
+  const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
+  let motionSetting: "system" | "on" | "off" = "system";
+  const applyMotion = () =>
+    game.registry.set("reducedMotion", reducedMotion(motionSetting, !!motionQuery?.matches));
+  applyMotion();
+  motionQuery?.addEventListener("change", applyMotion);
   void loadSave(game).then((save) => {
     audio.configure(audioSettings(save.data.settings));
-    const off = save.subscribe((d) => audio.configure(audioSettings(d.settings)));
+    motionSetting = save.data.settings.reducedMotion;
+    applyMotion();
+    const off = save.subscribe((d) => {
+      audio.configure(audioSettings(d.settings));
+      motionSetting = d.settings.reducedMotion;
+      applyMotion();
+    });
     unsubscribe = () => void off();
   });
   game.registry.set(

@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { EMPTY, type Level } from "@hexhue/core";
+import { paintSymbol } from "../a11y";
 import type { Layout } from "../layout";
+import { luminance } from "../theme";
 
 let nextKey = 0;
 
@@ -28,6 +30,8 @@ export class MosaicView {
     private readonly layout: Layout,
     private readonly level: Level,
     cells: readonly number[],
+    /** Colorblind mode: each fragment shows its color's symbol. */
+    private readonly symbols = false,
   ) {
     const { cell } = layout;
     this.texture = scene.textures.createCanvas(this.key, level.width * cell, level.height * cell)!;
@@ -99,6 +103,14 @@ export class MosaicView {
         size - radius,
         Math.max(1, size * 0.14),
       );
+    }
+    if (this.symbols && cell >= 9) {
+      // Dark ink on light colors, light ink on dark ones.
+      ctx.fillStyle =
+        luminance(this.level.palette[color]!) > 0.4
+          ? "rgba(26,15,51,0.72)"
+          : "rgba(255,255,255,0.82)";
+      paintSymbol(ctx, color, x + cell / 2, y + cell / 2, cell * 0.52);
     }
   }
 }

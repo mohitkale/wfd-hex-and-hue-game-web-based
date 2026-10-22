@@ -55,9 +55,24 @@ describe("migrate", () => {
       music: true,
       sfxVolume: 0.8,
       musicVolume: 0.5,
+      colorblind: false,
+      reducedMotion: "system",
     });
     expect(m.stats).toEqual({ plays: 0, wins: 3, losses: 0 });
     expect(m.lastPlayed).toBeNull();
+  });
+
+  it("reads accessibility settings, defaulting missing or junk values", () => {
+    const m = migrate({
+      version: SAVE_VERSION,
+      settings: { colorblind: true, reducedMotion: "on" },
+    });
+    expect(m.settings).toMatchObject({ colorblind: true, reducedMotion: "on" });
+    const junk = migrate({
+      version: SAVE_VERSION,
+      settings: { colorblind: 1, reducedMotion: "x" },
+    });
+    expect(junk.settings).toMatchObject({ colorblind: false, reducedMotion: "system" });
   });
 
   it("clamps volumes to 0..1 and defaults missing ones", () => {
