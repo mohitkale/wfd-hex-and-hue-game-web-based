@@ -1,6 +1,6 @@
 import { EMPTY } from "../level";
 import { computeDist, topologyFor } from "./grid";
-import type { CollectState } from "./state";
+import { cachesOf, type CollectState } from "./state";
 
 /**
  * Checks the engine's invariants and returns a description of the first violation, or null.
@@ -13,6 +13,25 @@ export function violation(s: CollectState): string | null {
   const fresh = computeDist(t, s.grid, s.params.portal);
   for (let i = 0; i < fresh.length; i++) {
     if (fresh[i] !== s.dist[i]) return `dist[${i}] = ${s.dist[i]}, fresh BFS says ${fresh[i]}`;
+  }
+
+  // The accessible-cube cache equals a rebuild: cubes with at least one reachable neighbour.
+  const accessible = cachesOf(s).accessible;
+  for (let cell = 0; cell < s.grid.length; cell++) {
+    const color = s.grid[cell]!;
+    let reachable = false;
+    if (color !== EMPTY) {
+      for (let k = 0; k < 4; k++) {
+        const n = t.neighbors[cell * 4 + k]!;
+        if (n >= 0 && s.dist[n]! >= 0) reachable = true;
+      }
+    }
+    const cached = color !== EMPTY && (accessible[color]?.has(cell) ?? false);
+    if (cached !== reachable) return `accessible cache wrong for cell ${cell} (cached ${cached})`;
+  }
+  for (const [color, set] of accessible.entries()) {
+    for (const cell of set)
+      if (s.grid[cell] !== color) return `cache lists cell ${cell} under colour ${color}`;
   }
 
   // Reservations: one per cube, matching the familiars exactly.
