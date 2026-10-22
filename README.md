@@ -8,6 +8,8 @@ illustration for your Spellbook.
 
 - Game design: [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md)
 - Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
+- Deploying (Netlify or VPS): [docs/DEPLOY.md](docs/DEPLOY.md)
+- Launch QA results: [docs/QA.md](docs/QA.md) · [CHANGELOG.md](CHANGELOG.md)
 - Contributor / agent guide: [CLAUDE.md](CLAUDE.md)
 
 Stack: Phaser 4 · TypeScript · Vite · Astro · PWA. Hosting: Netlify or VPS.
