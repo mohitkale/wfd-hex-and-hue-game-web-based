@@ -9,7 +9,7 @@ const curve: WorldCurve = {
   world: 2,
   from: 0.15,
   to: 0.5,
-  minSlots: 4,
+  minSlots: 3,
   chunk: { min: 5, max: 12 },
 };
 
@@ -23,24 +23,30 @@ export const crystal: WorldConfig = {
   levels: worldLevels("crystal", curve, [
     [
       "Amethyst Point",
-      "Amethyst has long been kept by the bed for calm sleep and clear dreams.",
+      "Folklore keeps amethyst by the bed for calm sleep and clear dreams.",
       art.amethystPoint,
-    ],
-    [
-      "Rose Quartz Heart",
-      "Rose quartz is the stone of gentle love, beginning with love for yourself.",
-      art.roseQuartzHeart,
-    ],
-    [
-      "Citrine Sun",
-      "Citrine carries the warmth of the sun into the darkest season.",
-      art.citrineSun,
     ],
     ["Pendulum", "Hold the pendulum still, ask your question, and let it swing.", art.pendulum],
     [
       "Garden Path",
       "Every path through the garden begins with a single stepping stone.",
       art.gardenPath,
+    ],
+    [
+      "Crystal Cluster",
+      "A cluster grows together; every point shares one root.",
+      art.crystalCluster,
+    ],
+    [
+      "Rose Quartz Heart",
+      "Rose quartz is called the stone of gentle love, beginning with love for yourself.",
+      art.roseQuartzHeart,
+      open,
+    ],
+    [
+      "Citrine Sun",
+      "Citrine carries the warmth of the sun into the darkest season.",
+      art.citrineSun,
       open,
     ],
     [
@@ -61,22 +67,22 @@ export const crystal: WorldConfig = {
       art.chakraStones,
       open,
     ],
-    [
-      "Crystal Cluster",
-      "A cluster grows together; every point shares one root.",
-      art.crystalCluster,
-    ],
     ["Geode", "A plain stone can hold a cave of stars; never judge by the outer shell.", art.geode],
     [
-      "Sapphire Drop",
-      "Sapphire blue has long stood for wisdom and true words.",
-      art.sapphireDrop,
-      open,
+      "Fairy Ring",
+      "Folklore says a ring of mushrooms marks where the fae danced; step around, never through.",
+      art.fairyRing,
     ],
     [
       "Crystal Grid",
       "Stones laid out with intention make a grid; the pattern holds the purpose.",
       art.crystalGrid,
+    ],
+    [
+      "Selenite Wand",
+      "Selenite, named for the moon, is swept through a room to clear it with light.",
+      art.selenite,
+      open,
     ],
     [
       "Moonstone",
@@ -89,15 +95,10 @@ export const crystal: WorldConfig = {
       art.crystalBall,
     ],
     [
-      "Selenite Wand",
-      "Selenite, named for the moon, is swept through a room to clear it with light.",
-      art.selenite,
+      "Sapphire Drop",
+      "Sapphire blue has long stood for wisdom and true words.",
+      art.sapphireDrop,
       open,
-    ],
-    [
-      "Fairy Ring",
-      "Folklore says a ring of mushrooms marks where the fae danced; step around, never through.",
-      art.fairyRing,
     ],
     [
       "Crystal Lotus",

@@ -39,8 +39,9 @@ function crystal(
     ],
     ch,
   );
+  // Shade only this crystal's own right half, never same-colored neighbours.
   return c.where(
-    (x, y) => x > cx && y <= baseY && y >= baseY - height && c.get(x, y) === ch,
+    (x, y) => x > cx && x <= cx + half && y <= baseY && y >= baseY - height && c.get(x, y) === ch,
     shade,
   );
 }
@@ -71,12 +72,12 @@ export const citrineSun = new Canvas(14, 14, "g")
   .art({ g: garden, o: ember, c: citrine });
 
 export const crystalCluster = (() => {
-  const c = new Canvas(14, 14, "g");
-  crystal(c, 3.5, 13, 4, 8, "a", "d");
-  crystal(c, 10, 13, 4, 9, "a", "d");
-  crystal(c, 6.5, 13, 5, 12, "q", "s");
+  const c = new Canvas(15, 14, "g");
+  crystal(c, 7, 12, 5, 12, "q", "s");
+  crystal(c, 3.5, 12, 4, 8, "a", "d");
+  crystal(c, 10.5, 12, 4, 8, "a", "d");
   return c
-    .rect(0, 12, 14, 2, "m")
+    .rect(0, 12, 15, 2, "m")
     .art({ g: garden, a: amethyst, d: amethystDark, q: quartz, s: stone, m: moss });
 })();
 
@@ -162,9 +163,8 @@ export const crystalBall = new Canvas(14, 15, "g")
   .rect(1, 14, 12, 1, "c")
   .art({ g: garden, b: sapphire, q: quartz, a: amethyst, c: citrine });
 
-export const selenite = (() => {
-  const c = new Canvas(16, 10, "g");
-  c.poly(
+export const selenite = new Canvas(16, 10, "g")
+  .poly(
     [
       [1, 6],
       [12, 1],
@@ -172,31 +172,46 @@ export const selenite = (() => {
       [3, 8.5],
     ],
     "q",
-  );
-  return sprinkle(c, "c", 0.05, 41, "g")
-    .star(13.5, 2, 1.8, 0.7, 4, "c")
-    .art({ g: garden, q: quartz, c: citrine });
-})();
+  )
+  .stamp(11, 0, ["..c..", ".ccc.", "ccccc", ".ccc.", "..c.."])
+  .stamp(2, 1, [".c.", "ccc", ".c."])
+  .stamp(12, 6, [".c.", "ccc", ".c."])
+  .art({ g: garden, q: quartz, c: citrine });
 
+/** Eight mushrooms placed symmetrically around x = 7, each a 3-wide cap over a stem. */
 export const fairyRing = (() => {
-  const c = new Canvas(16, 14, "m");
-  for (let k = 0; k < 8; k++) {
-    const a = (k * Math.PI) / 4;
-    const x = 7.5 + Math.cos(a) * 5.5;
-    const y = 7 + Math.sin(a) * 4.5;
-    c.ellipse(x, y - 0.4, 1.4, 0.9, "r").rect(Math.round(x), Math.round(y) + 1, 1, 1, "q");
+  const mushroom = ["rrr", ".q."];
+  const c = new Canvas(15, 14, "m");
+  for (const [x, y] of [
+    [6, 1],
+    [10, 2],
+    [12, 6],
+    [10, 10],
+    [6, 11],
+    [2, 10],
+    [0, 6],
+    [2, 2],
+  ] as const) {
+    c.stamp(x, y, mushroom);
   }
-  return c.disc(7.5, 7, 1.4, "c").art({ m: moss, r: ruby, q: quartz, c: citrine });
+  return c.disc(7, 6.5, 1.4, "c").art({ m: moss, r: ruby, q: quartz, c: citrine });
 })();
 
 export const crystalLotus = (() => {
-  const c = new Canvas(16, 12, "g");
-  crystal(c, 7.5, 10, 3, 9, "r", "w");
-  crystal(c, 4.5, 10, 3, 7, "r", "w");
-  crystal(c, 10.5, 10, 3, 7, "r", "w");
-  crystal(c, 2, 10, 2.4, 5, "a", "a");
-  crystal(c, 13, 10, 2.4, 5, "a", "a");
-  return c.rect(0, 10, 16, 2, "e").art({ g: garden, r: rose, w: quartz, a: amethyst, e: emerald });
+  const c = new Canvas(17, 12, "g");
+  crystal(c, 2.5, 10, 3, 4, "a", "d");
+  crystal(c, 13.5, 10, 3, 4, "a", "d");
+  crystal(c, 5, 10, 3, 6, "r", "w");
+  crystal(c, 11, 10, 3, 6, "r", "w");
+  crystal(c, 8, 10, 4, 9, "r", "w");
+  return c.rect(0, 10, 17, 2, "e").art({
+    g: garden,
+    r: rose,
+    w: quartz,
+    a: amethyst,
+    d: amethystDark,
+    e: emerald,
+  });
 })();
 
 export const obsidianMirror = new Canvas(12, 15, "g")
@@ -207,9 +222,10 @@ export const obsidianMirror = new Canvas(12, 15, "g")
   .art({ g: garden, c: citrine, k: "#3c3a55", s: stone });
 
 export const chakraStones = (() => {
+  // Root (red) at the bottom to crown (violet) at the top.
   const colors = ["r", "o", "c", "e", "b", "i", "a"];
-  const c = new Canvas(10, 22, "g");
-  colors.forEach((ch, k) => c.ellipse(4.5, 19.5 - k * 3, 2.6, 1.3, ch));
+  const c = new Canvas(9, 22, "g");
+  colors.forEach((ch, k) => c.stamp(2, 18 - k * 3, [".xxx.", "xxxxx", ".xxx."]).swap("x", ch));
   return c.art({
     g: garden,
     r: ruby,
@@ -239,9 +255,9 @@ export const crystalCave = (() => {
       "s",
     );
   }
-  crystal(c, 4, 13, 3, 6, "a", "d");
-  crystal(c, 9, 13, 4, 8, "b", "q");
-  crystal(c, 14, 13, 3, 5, "e", "e");
+  crystal(c, 3.5, 13, 3, 6, "a", "d");
+  crystal(c, 8.5, 13, 4, 8, "b", "q");
+  crystal(c, 13.5, 13, 3, 5, "e", "e");
   return c.rect(0, 13, 18, 1, "s").art({
     k: garden,
     s: stone,
@@ -253,48 +269,45 @@ export const crystalCave = (() => {
   });
 })();
 
-export const pendulum = new Canvas(12, 16, "g")
-  .line(5.5, 0, 5.5, 7, "c")
-  .rect(4, 0, 4, 1, "c")
+export const pendulum = new Canvas(11, 16, "g")
+  .rect(3, 0, 5, 1, "c")
+  .line(5, 1, 5, 6, "c")
+  .rect(3, 7, 5, 2, "q")
   .poly(
     [
-      [3, 8],
-      [8, 8],
-      [5.5, 14.5],
+      [3, 9],
+      [7, 9],
+      [5, 14],
     ],
     "a",
   )
-  .rect(3, 7, 5, 2, "q")
   .art({ g: garden, c: citrine, a: amethyst, q: quartz });
 
+/** The finale: a heart banded in every color gathered in the garden, with a quartz glint. */
 export const heartOfTheGarden = (() => {
-  const c = new Canvas(18, 16, "m");
-  sprinkle(c, "e", 0.12, 51, "m");
-  c.poly(
-    [
-      [3, 6],
-      [6, 2],
-      [12, 2],
-      [15, 6],
-      [9, 14],
-    ],
-    "r",
-  )
+  const c = new Canvas(17, 16, "m")
+    .disc(5, 5, 3.8, "h")
+    .disc(11, 5, 3.8, "h")
     .poly(
       [
-        [3, 6],
-        [15, 6],
-        [9, 14],
+        [1.2, 6],
+        [14.8, 6],
+        [8, 14.5],
       ],
-      "a",
-    )
-    .poly(
-      [
-        [6, 2],
-        [9, 6],
-        [12, 2],
-      ],
-      "w",
+      "h",
     );
-  return c.art({ m: moss, e: emerald, r: rose, a: amethyst, w: quartz });
+  const bands = ["r", "c", "e", "b", "a"];
+  for (let y = 0; y < 16; y++) {
+    const band = bands[Math.min(bands.length - 1, Math.max(0, Math.floor((y - 1) / 3)))]!;
+    c.where((x, yy) => yy === y && c.get(x, yy) === "h", band);
+  }
+  return c.stamp(3, 3, ["ww", "w."]).art({
+    m: moss,
+    r: rose,
+    c: citrine,
+    e: emerald,
+    b: sapphire,
+    a: amethyst,
+    w: quartz,
+  });
 })();
