@@ -12,7 +12,8 @@ const violet = "#7a4fd0";
 const ELEMENT = {
   fire: "#e85d3a",
   earth: "#5fa05a",
-  air: "#f2c14e",
+  // Deep amber, so the white glyph stays readable on air medallions.
+  air: "#c98f1a",
   water: "#3a86ff",
 } as const;
 
@@ -66,23 +67,23 @@ const GLYPHS = {
     "..ggg....",
     ".g...g...",
     ".g...g...",
-    "..ggg.g..",
-    "......g..",
-    "......g..",
+    "..g..g...",
+    ".....g...",
+    ".....g..g",
     "......g.g",
     ".......g.",
     ".........",
   ],
   virgo: [
     ".........",
-    "g.g.g.g..",
-    "gg.gg.g..",
+    "g.gg.gg..",
+    "gg.gg.gg.",
     "g..g..g..",
-    "g..g..ggg",
+    "g..g..gg.",
+    "g..g..g.g",
     "g..g..g.g",
     "g..g..gg.",
-    "g..g.gg..",
-    ".........",
+    ".....gg..",
   ],
   libra: [
     ".........",
@@ -97,8 +98,8 @@ const GLYPHS = {
   ],
   scorpio: [
     ".........",
-    "g.g.g....",
-    "gg.gg.g..",
+    "g.gg.gg..",
+    "gg.gg.gg.",
     "g..g..g..",
     "g..g..g..",
     "g..g..g..",
@@ -234,13 +235,19 @@ export const saturn = sprinkle(new Canvas(18, 12, "n"), "s", 0.07, 316, "n")
   .ellipse(8.5, 6, 8.3, 2.4, "r")
   .ellipse(8.5, 6, 6.6, 1.5, "n")
   .disc(8.5, 5.5, 3.8, "p")
+  // The ring's front arc crosses the lower half of the planet.
+  .where((x, y) => {
+    const outer = ((x - 8.5) / 8.3) ** 2 + ((y - 6) / 2.4) ** 2 <= 1;
+    const inner = ((x - 8.5) / 6.6) ** 2 + ((y - 6) / 1.5) ** 2 <= 1;
+    return outer && !inner && y >= 6;
+  }, "r")
   .rect(1, 6, 4, 1, "r")
   .rect(13, 6, 4, 1, "r")
   .art({ n: sky, s: starlight, r: gold, p: "#d4a373" });
 
 export const sunAndMoon = (() => {
   const c = new Canvas(18, 12, "n").star(5, 6, 5.2, 3.4, 10, "o").disc(5, 6, 3.2, "y");
-  c.disc(13, 6, 4.2, "m").disc(14.8, 5, 3.6, "n");
+  c.disc(14, 6, 4.2, "m").disc(15.8, 5, 3.6, "n");
   return sprinkle(c, "s", 0.06, 317, "n").art({
     n: sky,
     o: ELEMENT.fire,
@@ -280,7 +287,7 @@ export const comet = sprinkle(new Canvas(18, 12, "n"), "s", 0.06, 319, "n")
   .disc(13, 3.6, 2, "y")
   .art({ n: sky, s: starlight, t: violet, w: glyphWhite, y: gold });
 
-/** The finale: twelve segments colored by element around a golden sun. */
+/** The finale: twelve segments colored by element around a white hub, Aries at the top. */
 export const zodiacWheel = (() => {
   const order = ["f", "e", "a", "w"];
   const c = new Canvas(18, 18, "n");

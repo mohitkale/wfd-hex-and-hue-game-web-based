@@ -7,7 +7,7 @@ const open = { shuffle: 0.85, attempts: 16, refine: 80 };
 
 const curve: WorldCurve = {
   world: 3,
-  from: 0.22,
+  from: 0.16,
   to: 0.58,
   minSlots: 3,
   chunk: { min: 6, max: 14 },
@@ -28,7 +28,7 @@ export const zodiac: WorldConfig = {
     ],
     [
       "The Big Dipper",
-      "Seven bright stars of the Great Bear point the way to the North Star.",
+      "Seven bright stars of the Great Bear; the two at the edge of the bowl point to the North Star.",
       art.bigDipper,
     ],
     ["The Comet", "Comets were once read as omens; now we simply make a wish.", art.comet],
@@ -46,7 +46,7 @@ export const zodiac: WorldConfig = {
     ],
     [
       "Gemini",
-      "Gemini the Twins is air in conversation: curious, quick and always of two minds.",
+      "Gemini the Twins is air in conversation: curious, quick and often of two minds.",
       art.gemini,
       open,
     ],
