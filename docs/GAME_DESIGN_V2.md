@@ -90,16 +90,97 @@ the portal is always connected to the whole ring.
   that only touch a sealed pocket are not accessible. They become accessible when a neighbouring
   cube is removed and the pocket joins `R` (fixture D).
 
-The full edge-case table and the cost analysis follow in M8.3.
+The edge-case table, algorithm and cost budget are in §4a.
 
 **Targeting.** For a group of colour `c` the **assignable cubes** are the accessible, unreserved cubes
 of colour `c`. The **distance** of a cube is the smallest BFS distance from the portal to any of its
 reachable neighbours (BFS over `R`, expanding neighbours in the fixed order **up, left, right,
 down**). A group's next target is the assignable cube with the smallest distance; ties go to the
 smaller `y`, then the smaller `x`. Its standing cell is its nearest reachable neighbour (ties:
-smaller `y`, then smaller `x`). The walking route is the BFS parent chain from the portal to the
-standing cell. Routes are stored when assigned and stay valid forever because `R` only grows; the
-way back is the same route reversed.
+smaller `y`, then smaller `x`). The walking route is found by **canonical descent**: starting at the
+standing cell, repeatedly step to the neighbour whose distance is one smaller, trying neighbours in
+the order up, left, right, down, until the portal; the route is that path reversed. It depends only
+on the distance map, so any way of computing distances gives the same route. Routes are stored when
+assigned and stay valid forever because `R` only grows; the way back is the same route reversed.
+
+## 4a. Reachability: algorithm, edge cases, cost (M8.3)
+
+### Algorithm
+
+Work on the padded grid `(W+2) × (H+2)` (mosaic plus ring). State kept by the engine:
+
+- `cube[cell]`: colour index or none (board).
+- `dist[cell]`: shortest 4-neighbour walking distance from the portal through open cells, or `∞` if
+  the cell is not in `R`. This is the **canonical distance map**; it is a pure function of which
+  cells are open.
+- For each colour, the set of **accessible cubes** (cubes with at least one neighbour with finite
+  `dist`), and a `reserved` flag per cube.
+
+`dist` is initialised by one BFS from the portal over open cells. It is updated at the end of
+Phase 1 (§7) after pickups. Cells only open, so distances only decrease or go from `∞` to finite:
+
+1. For each cube removed this tick, its cell becomes open. It is adjacent to its familiar's standing
+   cell, so it always has a finite-`dist` neighbour and joins `R`.
+2. Relax: set `dist[c] = 1 + min(dist of open neighbours)` and propagate any decrease outward with a
+   queue (standard incremental BFS). A sealed pocket that touches the new cell is absorbed by the
+   same propagation (its cells go from `∞` to finite).
+3. Every cube neighbouring a cell whose `dist` just became finite is added to its colour's accessible
+   set.
+
+This yields exactly the same `dist` as recomputing a fresh BFS (the engine's tests must assert equality
+after every tick on random boards), so incremental and full implementations agree; the route is
+derived by canonical descent (§4), never from stored parent pointers.
+
+**Choosing a target** for a group of colour `c` scans only the accessible set of `c`: for each
+unreserved cube, `d = min dist` over its neighbours; the choice is the minimum `(d, y, x)`. Its
+standing cell is the neighbour with that `d`, smallest `(y, x)`.
+
+### Cost budget
+
+| Quantity                       | Bound at 40×40 (1,764 padded cells)             | Notes                                                     |
+| ------------------------------ | ----------------------------------------------- | --------------------------------------------------------- |
+| Initial BFS                    | ≤ 1,764 cell visits, once per level start/reset | Also once per solver root.                                |
+| Distance update per pickup     | amortised O(changed cells), worst case 1,764    | Only decreases propagate.                                 |
+| Target selection               | O(accessible cubes of that colour) ≈ perimeter  | Typically ≤ 150; never scans the whole board.             |
+| Route reconstruction           | O(route length) ≤ 1,764                         | Once per assignment.                                      |
+| Per-frame work in the renderer | none                                            | Renderer follows stored routes; no pathfinding per frame. |
+
+Targets to meet (checked as tests/benchmarks in M9.5 and M12.1, not CI-flaky timings): a complete
+settled run of one group over a 40×40 board with 1,000 cubes of its colour allocates no per-tick
+arrays proportional to the board, and the solver can evaluate several thousand settled transitions
+per second on a development laptop.
+
+### Edge cases (each is a test in M9.5; ids are stable)
+
+| Id   | Situation                                                                      | Rule / expected outcome                                                                                                                                 |
+| ---- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-01 | Cube on the mosaic edge                                                        | Accessible at the start: its outer neighbour is a ring cell in `R`.                                                                                     |
+| R-02 | Cube with only cube neighbours                                                 | Not accessible. Cannot be assigned, however close its colour group is.                                                                                  |
+| R-03 | Empty cell inside the picture connected to the ring by a 4-neighbour path      | Open from the start and part of `R`; cubes touching it are accessible.                                                                                  |
+| R-04 | Empty cell enclosed by cubes (sealed pocket), fixture D                        | Not in `R`. Cubes touching only it are not accessible. When a neighbouring cube is removed the pocket joins `R` in the same update, exposing its cubes. |
+| R-05 | Empty cell connected to the ring only diagonally                               | Not connected (4-neighbour moves only): treated as a sealed pocket.                                                                                     |
+| R-06 | Two familiars, same colour, same group                                         | They hold different reservations; each cube has at most one reserver. They may stand on the same cell and overlap; nobody blocks anybody.               |
+| R-07 | Two groups of the same colour, one assignable cube (fixture E)                 | The lower group id reserves in Phase 2; the other finds none and, with no familiar, stalls in Phase 3.                                                  |
+| R-08 | Two pickups in the same tick                                                   | Both cubes are removed in familiar-id order; `dist` is updated once at the end of Phase 1; Phase 2 of that tick already sees both removals.             |
+| R-09 | A cube becomes accessible while a familiar of another group is carrying        | Nothing happens to the carrier (its route and cube are fixed). The cube becomes assignable from the next Phase 2 on.                                    |
+| R-10 | A cube becomes accessible only after two different pickups (needs both)        | Never assignable earlier: access needs a reachable neighbour, and both openings are needed to connect the cell to `R`.                                  |
+| R-11 | Shorter route appears after a reservation                                      | The old route is kept; later assignments use the new distances. A route never becomes invalid because cells never close.                                |
+| R-12 | Standing cell is the portal (route length 0)                                   | Familiar spawns in `pickup`, then goes `pickup → deliver` (§7); two ticks from spawn to delivery.                                                       |
+| R-13 | Group's colour has accessible cubes, all reserved by others                    | Not assignable. If the group has no familiar it stalls; if it has familiars out, it waits for them (they may free nothing, but it stays `working`).     |
+| R-14 | Group has uncommitted capacity but all its colour's remaining cubes are hidden | Stalls and parks with remaining capacity exact (§5). Resumable only when an assignable cube exists.                                                     |
+| R-15 | Capacity runs out before accessible cubes do                                   | Extra accessible cubes stay; they belong to other groups by the §3 invariant. Which ones are taken is decided by nearest-first (fixture C).             |
+| R-16 | Board one cell wide or high                                                    | Every cube touches the ring; all cubes are accessible from the start. The portal column must still be inside `[0, W−1]`.                                |
+| R-17 | Tie in distance between cubes or standing cells                                | Smaller `y`, then smaller `x` (§4). Never insertion order or hash order.                                                                                |
+| R-18 | Group colour with zero cubes left but capacity left                            | Impossible by the §3 invariant unless a cube was lost; the engine asserts it (a bug, not a game state).                                                 |
+| R-19 | Familiar reaches its standing cell and the cube is gone                        | Impossible: only the reserving familiar can remove a reserved cube. The engine asserts it.                                                              |
+| R-20 | Level start has no accessible cube for any front group                         | Invalid level (no legal first action): the level pipeline rejects it.                                                                                   |
+
+### Why no remote or "through other colours" pickup
+
+Eligibility is "has a 4-neighbour in `R`", a property of the board, never a ray or a straight line.
+A familiar must be able to walk to a neighbouring cell, so a cube behind another cube (of any colour)
+is unreachable until the blockers go. Removing an outer cube always opens exactly the cell it
+occupied, which is how interior cubes get exposed.
 
 ## 5. Groups, columns, field and slots
 
