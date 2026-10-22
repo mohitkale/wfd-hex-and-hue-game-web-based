@@ -416,6 +416,9 @@ export class PlayScene extends Phaser.Scene {
         color: theme.text,
       })
       .setOrigin(0.5);
+    // Long names shrink to fit between Back and the speed button (both sides of the centre).
+    const titleRoom = hud.w - 2 * (SPEED_ZONE_CSS + 8) * dpr;
+    if (title.width > titleRoom) title.setScale(titleRoom / title.width);
     const subtitle = this.add
       .text(
         hud.x + hud.w / 2,
@@ -1247,8 +1250,11 @@ export class PlayScene extends Phaser.Scene {
     const px = (v: number) => Math.round(v * dpr * scale);
     // Back and speed are 48 px touch zones, 4 px from the edges.
     // Clear of Back on the left and the (wider) speed button on the right.
-    const side = Math.round((SPEED_ZONE_CSS + 8) * dpr);
-    const width = Math.min(hud.w - 2 * side, px(340));
+    // Clear of Back (48 px zone + margins) on the left and the wider speed button on the right.
+    const leftGap = Math.round(60 * dpr);
+    const rightGap = Math.round((SPEED_ZONE_CSS + 8) * dpr);
+    const width = Math.min(hud.w - leftGap - rightGap, px(340));
+    const centerX = hud.x + leftGap + (hud.w - leftGap - rightGap) / 2;
     const text = this.add
       .text(0, 0, TIPS[id], {
         fontFamily: theme.font,
@@ -1265,7 +1271,7 @@ export class PlayScene extends Phaser.Scene {
     panel.lineStyle(Math.max(1, 1.5 * dpr), theme.glow, 0.7);
     panel.strokeRoundedRect(-width / 2, -height / 2, width, height, px(12));
     this.coach = this.add
-      .container(hud.x + hud.w / 2, hud.y + px(3) + height / 2, [panel, text])
+      .container(centerX, hud.y + px(3) + height / 2, [panel, text])
       .setSize(width, height)
       .setDepth(DEPTH.hud)
       .setAlpha(0)

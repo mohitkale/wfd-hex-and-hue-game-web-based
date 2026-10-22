@@ -14,6 +14,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    // The page's HTML splash (shown while the game downloads) can go now: the game is running.
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("hexhue:ready"));
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
     // Progress loads in the background; a tap during that brief moment just waits for it.
@@ -22,8 +24,6 @@ export class BootScene extends Phaser.Scene {
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
     fadeIn(this);
-    // The page's HTML splash (shown while the game downloads) can go now.
-    if (typeof window !== "undefined") window.dispatchEvent(new Event("hexhue:ready"));
   }
 
   private layout(): void {

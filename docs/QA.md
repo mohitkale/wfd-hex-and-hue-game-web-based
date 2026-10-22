@@ -44,7 +44,8 @@ upright" hint appears there.
 
 Emulated in headless Chrome. Still to do on real hardware before a big announcement: one iPhone
 (Safari, installed to the home screen) and one mid-range Android (Chrome), for touch feel, audio
-unlock, haptics and frame rate.
+unlock, haptics and frame rate, and that pinch / double-tap never zooms the game page (including
+over the consent and update banners).
 
 ## Bug bash
 
