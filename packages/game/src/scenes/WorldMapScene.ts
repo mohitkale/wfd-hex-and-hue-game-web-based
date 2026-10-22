@@ -584,9 +584,11 @@ export class WorldMapScene extends Phaser.Scene {
     }
     const h = px(132);
     // Stars: the same pattern all day (seeded by the date), different tomorrow.
-    let seed = Math.floor(now.getTime() / 86_400_000) * 2654435761;
+    // Keyed by the local date, so the sky changes at the player's midnight.
+    let seed =
+      Math.imul(now.getFullYear() * 400 + now.getMonth() * 32 + now.getDate(), 2654435761) >>> 0;
     const rand = () => {
-      seed = (seed * 1103515245 + 12345) >>> 0;
+      seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
       return seed / 2 ** 32;
     };
     const dots = this.add.blitter(0, 0, this.dotTexture(px(1.5)));

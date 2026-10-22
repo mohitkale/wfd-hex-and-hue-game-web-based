@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { isReducedMotion } from "../a11y";
 import { getAudio } from "../audio";
 import { theme } from "../theme";
 
@@ -46,7 +47,8 @@ export class Button extends Phaser.GameObjects.Container {
     let pressed = false;
     const release = () => {
       pressed = false;
-      scene.tweens.add({ targets: this, scale: 1, duration: 120, ease: "Back.easeOut" });
+      if (isReducedMotion(scene)) this.setScale(1);
+      else scene.tweens.add({ targets: this, scale: 1, duration: 120, ease: "Back.easeOut" });
     };
     this.on("pointerdown", () => {
       pressed = true;

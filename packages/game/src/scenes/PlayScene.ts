@@ -53,7 +53,7 @@ import {
   type Point,
   type Speed,
 } from "../motion";
-import { hexToNumber, luminance, theme } from "../theme";
+import { hexToNumber, inkFor, theme } from "../theme";
 import { revealOrder, revealedCount } from "../reveal";
 import { drawBoardChrome } from "../view/BoardChrome";
 import { BoosterBar } from "../view/BoosterBar";
@@ -497,10 +497,11 @@ export class PlayScene extends Phaser.Scene {
     const w = source.kind === "column" ? s.columns[source.index]?.[0] : s.slots[source.index];
     const view = w ? this.wisps.get(w.id) : undefined;
     const amplitude = 6 * this.layout.dpr;
-    if (view) {
-      if (!this.calm) view.shake(amplitude);
+    if (view && !this.calm) {
+      view.shake(amplitude);
       return;
     }
+    // Empty zone, or reduced motion: a still outline around the zone says "nothing to launch".
     const zone =
       source.kind === "column"
         ? this.layout.columns[source.index]
@@ -915,9 +916,15 @@ export class PlayScene extends Phaser.Scene {
       const target = next.get(w.id);
       if (!target || this.wisps.has(w.id)) continue;
       const symbol = this.colorblind ? w.color : null;
-      const view = new WispView(this, w.id, palette[w.color]!, w.charge, 1, symbol).setDepth(
-        DEPTH.wisps,
-      );
+      const view = new WispView(
+        this,
+        w.id,
+        palette[w.color]!,
+        w.charge,
+        1,
+        symbol,
+        9 * dpr,
+      ).setDepth(DEPTH.wisps);
       this.wisps.set(w.id, view);
       this.snap(w.id, view, target);
       if (!snapNew && target.kind === "rest") {
@@ -1383,7 +1390,7 @@ export class PlayScene extends Phaser.Scene {
           this.add
             .image(startX + i * (2 * r + gap), y, symbolTexture(this, c))
             .setDisplaySize(r * 1.1, r * 1.1)
-            .setTint(luminance(this.built.level.palette[c]!) > 0.4 ? 0x1a0f33 : 0xffffff)
+            .setTint(hexToNumber(inkFor(this.built.level.palette[c]!)))
             .setDepth(DEPTH.overlay),
         )
       : [];

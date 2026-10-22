@@ -25,7 +25,10 @@ export function mergeSaves(base: SaveData, mine: SaveData, theirs: SaveData): Sa
     ...theirs,
     levels: Object.fromEntries(Object.entries(levels)),
     skipped: [...new Set([...theirs.skipped, ...mine.skipped])],
-    tips: [...new Set([...theirs.tips, ...mine.tips])],
+    // A union, unless this tab deliberately cleared tips ("Replay the tutorial"): then its list.
+    tips: base.tips.some((t) => !mine.tips.includes(t))
+      ? mine.tips
+      : [...new Set([...theirs.tips, ...mine.tips])],
     coins: delta(base.coins, mine.coins, theirs.coins),
     boosters,
     speedTurns: delta(base.speedTurns, mine.speedTurns, theirs.speedTurns),

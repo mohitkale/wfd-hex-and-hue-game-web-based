@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { isReducedMotion } from "../a11y";
 import { PRICES, paymentFor } from "../economy";
 import type { Rect } from "../layout";
 import type { BoosterKind, SaveData } from "../save/schema";
@@ -120,6 +121,7 @@ export class BoosterBar {
 
   /** Pulses the coin counter (after earning or spending). */
   pulseCoins(): void {
+    if (isReducedMotion(this.scene)) return;
     this.scene.tweens.add({ targets: this.coins, scale: 1.2, duration: 120, yoyo: true });
   }
 

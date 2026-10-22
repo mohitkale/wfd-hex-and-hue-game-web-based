@@ -1,6 +1,9 @@
 import Phaser from "phaser";
 import { theme } from "../theme";
-import { sliderValue } from "./slider";
+import { sliderGesture, sliderValue } from "./slider";
+
+/** True while the page is being scrolled: a release then ends the scroll, not a press. */
+export type Cancelled = () => boolean;
 
 /**
  * Settings controls drawn in Phaser: a switch, a slider and a segmented choice. All are thumb
@@ -18,6 +21,7 @@ export class Toggle extends Phaser.GameObjects.Container {
     private readonly dpr: number,
     private value: boolean,
     onChange: (value: boolean) => void,
+    cancelled: Cancelled = () => false,
   ) {
     super(scene, x, y);
     const w = 52 * dpr;
@@ -31,7 +35,7 @@ export class Toggle extends Phaser.GameObjects.Container {
     this.on("pointerdown", () => (pressed = true))
       .on("pointerout", () => (pressed = false))
       .on("pointerup", () => {
-        if (!pressed) return;
+        if (!pressed || cancelled()) return;
         pressed = false;
         this.set(!this.value);
         onChange(this.value);
@@ -81,21 +85,31 @@ export class Slider extends Phaser.GameObjects.Container {
       .setOrigin(0, 0)
       .setInteractive({ useHandCursor: true });
     this.add(zone);
-    let dragging = false;
+    // One pointer at a time; a press becomes a drag only once it moves sideways (a vertical move
+    // scrolls the page instead), and a release without moving is a tap on the track.
+    let active = -1;
+    let gesture: ReturnType<typeof sliderGesture> = "pending";
+    let startX = 0;
+    let startY = 0;
     const at = (p: Phaser.Input.Pointer) => sliderValue(p.worldX, this.x, this.width_);
     zone.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      dragging = true;
-      this.set(at(p));
-      onChange(this.value, false);
+      active = p.id;
+      gesture = "pending";
+      startX = p.x;
+      startY = p.y;
     });
     const move = (p: Phaser.Input.Pointer) => {
-      if (!dragging || !p.isDown) return;
+      if (p.id !== active || !p.isDown) return;
+      if (gesture === "pending") gesture = sliderGesture(p.x - startX, p.y - startY, 8 * dpr);
+      if (gesture !== "drag") return;
       this.set(at(p));
       onChange(this.value, false);
     };
-    const up = () => {
-      if (!dragging) return;
-      dragging = false;
+    const up = (p: Phaser.Input.Pointer) => {
+      if (p.id !== active) return;
+      active = -1;
+      if (gesture === "scroll") return;
+      this.set(at(p));
       onChange(this.value, true);
     };
     scene.input.on("pointermove", move);
@@ -140,6 +154,7 @@ export class Segmented extends Phaser.GameObjects.Container {
     private readonly options: readonly { label: string; value: string }[],
     private selected: string,
     onChange: (value: string) => void,
+    cancelled: Cancelled = () => false,
   ) {
     super(scene, x, y);
     const h = 40 * dpr;
@@ -162,7 +177,7 @@ export class Segmented extends Phaser.GameObjects.Container {
         .on("pointerdown", () => (pressed = true))
         .on("pointerout", () => (pressed = false))
         .on("pointerup", () => {
-          if (!pressed) return;
+          if (!pressed || cancelled()) return;
           pressed = false;
           this.selected = o.value;
           this.draw();

@@ -61,7 +61,9 @@ describe("moon phase", () => {
     expect(moonPhase(new Date(Date.UTC(1990, 5, 1)))).toBeGreaterThanOrEqual(0);
   });
 
-  it("names the eight phases", () => {
+  it("names the eight phases; quarter, new and full names only near their moment", () => {
+    expect(phaseName(0.3)).toBe("Waxing Gibbous"); // ~34% past new: not "First Quarter"
+    expect(phaseName(0.26)).toBe("First Quarter");
     expect([0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 0.98].map(phaseName)).toEqual([
       "New Moon",
       "Waxing Crescent",

@@ -46,6 +46,9 @@ export class SettingsScene extends Phaser.Scene {
   private layout(): void {
     for (const o of this.objects) o.destroy();
     this.objects = [];
+    // A slider destroyed mid-drag (resize) never sends the release that re-enables scrolling.
+    this.scroller.enabled = true;
+    const scrolling = () => this.scroller.dragging;
     const { width, height } = this.scale.gameSize;
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     const insets = (this.registry.get("insets") as { top: number; bottom: number } | undefined) ?? {
@@ -77,6 +80,7 @@ export class SettingsScene extends Phaser.Scene {
         .setInteractive(),
     );
     const touch = px(48);
+    let backPressed = false;
     push(
       this.add
         .zone(left - px(16), insets.top + (px(56) - touch) / 2, touch, touch)
@@ -84,7 +88,9 @@ export class SettingsScene extends Phaser.Scene {
         .setScrollFactor(0)
         .setDepth(11)
         .setInteractive({ useHandCursor: true })
-        .on("pointerup", () => go(this, "levels")),
+        .on("pointerdown", () => (backPressed = true))
+        .on("pointerout", () => (backPressed = false))
+        .on("pointerup", () => backPressed && go(this, "levels")),
     );
     push(
       this.add
@@ -123,8 +129,11 @@ export class SettingsScene extends Phaser.Scene {
     ) => {
       push(text(left, y, label, 16));
       if (note) push(text(left, y + px(20), note, 12, theme.textDim));
-      push(new Toggle(this, right - px(26), y + (note ? px(8) : 0), dpr, value, onChange));
+      const toggle = push(
+        new Toggle(this, right - px(26), y + (note ? px(8) : 0), dpr, value, onChange, scrolling),
+      );
       y += note ? px(64) : px(52);
+      return toggle;
     };
     const sliderRow = (value: number, onChange: (v: number, done: boolean) => void) => {
       const slide = (v: number, done: boolean) => {
@@ -137,7 +146,7 @@ export class SettingsScene extends Phaser.Scene {
     };
 
     section("Sound");
-    toggleRow("Sound effects", s?.sound ?? true, (v) => {
+    const soundToggle = toggleRow("Sound effects", s?.sound ?? true, (v) => {
       this.change((st) => (st.sound = v));
       if (v) getAudio(this).play("ui");
     });
@@ -146,16 +155,21 @@ export class SettingsScene extends Phaser.Scene {
         st.sfxVolume = v;
         if (v > 0) st.sound = true;
       });
+      // Raising the volume turns sound on: keep the switch in step.
+      if (v > 0) soundToggle.set(true);
       // A sample at the new level when the finger lifts.
       if (done) getAudio(this).play("collect", { chargeLeft: 3 });
     });
-    toggleRow("Music", s?.music ?? true, (v) => this.change((st) => (st.music = v)));
-    sliderRow(s?.musicVolume ?? 0.5, (v) =>
+    const musicToggle = toggleRow("Music", s?.music ?? true, (v) =>
+      this.change((st) => (st.music = v)),
+    );
+    sliderRow(s?.musicVolume ?? 0.5, (v) => {
       this.change((st) => {
         st.musicVolume = v;
         if (v > 0) st.music = true;
-      }),
-    );
+      });
+      if (v > 0) musicToggle.set(true);
+    });
 
     y += px(8);
     section("Comfort & accessibility");
@@ -202,6 +216,7 @@ export class SettingsScene extends Phaser.Scene {
         ],
         s?.reducedMotion ?? "system",
         (v) => this.change((st) => (st.reducedMotion = v as Settings["reducedMotion"])),
+        scrolling,
       ),
     );
     y += px(56);

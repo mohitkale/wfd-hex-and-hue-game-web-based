@@ -154,6 +154,9 @@ describe("mergeSaves", () => {
     ).tips;
     expect(withVeteran).toContain("hint");
     expect(withVeteran).toContain("relaunch");
+    // "Replay the tutorial" clears this tab's tips: the stored ones must not come back.
+    const seen = { ...defaultSave(), tips: ["collect", "portal", "hint"] };
+    expect(mergeSaves(seen, { ...seen, tips: [] }, seen).tips).toEqual([]);
   });
 
   it("keeps their settings unless this tab changed them", () => {

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { isReducedMotion } from "../a11y";
 import { trackFor } from "@hexhue/core";
 import { cellCenter, type Layout } from "../layout";
 import { theme } from "../theme";
@@ -86,15 +87,18 @@ export function drawBoardChrome(
     points.push(new Phaser.Math.Vector2(Math.cos(a) * rr, Math.sin(a) * rr));
   }
   star.fillPoints(points, true);
-  scene.tweens.add({ targets: star, angle: 360, duration: 12000, repeat: -1 });
-  scene.tweens.add({
-    targets: halo,
-    alpha: 0.25,
-    duration: 1800,
-    yoyo: true,
-    repeat: -1,
-    ease: "Sine.easeInOut",
-  });
+  // Reduced motion: a still portal.
+  if (!isReducedMotion(scene)) {
+    scene.tweens.add({ targets: star, angle: 360, duration: 12000, repeat: -1 });
+    scene.tweens.add({
+      targets: halo,
+      alpha: 0.25,
+      duration: 1800,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
   objects.push(halo, star);
   return objects;
 }

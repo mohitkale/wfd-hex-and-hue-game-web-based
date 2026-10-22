@@ -32,9 +32,19 @@ const NAMES = [
 
 export type PhaseName = (typeof NAMES)[number];
 
-/** The traditional name: each of the 8 phases is centered on its exact moment. */
+/** New, quarter and full moon names apply within a day of the exact moment. */
+const PRINCIPAL_WINDOW = 1 / SYNODIC_DAYS;
+
+/**
+ * The traditional name. New, first quarter, full and last quarter are moments: their names
+ * apply within a day of them, and the crescent / gibbous names cover the days between.
+ */
 export function phaseName(phase: number): PhaseName {
-  return NAMES[Math.round(phase * 8) % 8]!;
+  const p = ((phase % 1) + 1) % 1;
+  for (let k = 0; k <= 4; k++) {
+    if (Math.abs(p - k / 4) <= PRINCIPAL_WINDOW) return NAMES[(k * 2) % 8]!;
+  }
+  return NAMES[Math.floor(p * 4) * 2 + 1]!;
 }
 
 /**

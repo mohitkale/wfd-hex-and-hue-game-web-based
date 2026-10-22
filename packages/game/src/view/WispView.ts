@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { hexToNumber, luminance, theme } from "../theme";
+import { hexToNumber, inkFor, theme } from "../theme";
 import { TEX, symbolTexture } from "./textures";
 
 /**
@@ -22,6 +22,8 @@ export class WispView extends Phaser.GameObjects.Container {
     private radius: number,
     /** Palette index whose symbol to show, or `null` (colorblind symbols off). */
     symbol: number | null = null,
+    /** Below this radius (device px) the badge would be illegible: hidden (tiles carry it). */
+    private readonly minBadgeRadius = 0,
   ) {
     super(scene, 0, 0);
     const color = hexToNumber(colorHex);
@@ -31,7 +33,7 @@ export class WispView extends Phaser.GameObjects.Container {
       .text(0, 0, "", {
         fontFamily: theme.font,
         fontStyle: "bold",
-        color: luminance(colorHex) > 0.45 ? "#1a0f33" : "#ffffff",
+        color: inkFor(colorHex),
       })
       .setOrigin(0.5);
     // Pulsing ring shown while the wisp waits to launch (tapped while the entry was busy).
@@ -69,7 +71,8 @@ export class WispView extends Phaser.GameObjects.Container {
     this.ring.setStrokeStyle(Math.max(1.5, radius * 0.16), 0xf6d97a, 1);
     this.label.setFontSize(Math.round(radius * (String(this.label.text).length > 1 ? 0.95 : 1.1)));
     if (this.badge) {
-      const r = Math.max(5, radius * 0.5);
+      this.badge.setVisible(radius >= this.minBadgeRadius);
+      const r = radius * 0.5;
       this.badge.setPosition(radius * 0.74, -radius * 0.74);
       const [disc, icon] = this.badge.list as [Phaser.GameObjects.Arc, Phaser.GameObjects.Image];
       disc.setRadius(r).setStrokeStyle(Math.max(1, r * 0.14), 0xffffff, 0.9);
@@ -95,8 +98,15 @@ export class WispView extends Phaser.GameObjects.Container {
    * children, not the container, so the wisp's real position (used for launch flights) is untouched.
    */
   shake(amplitude: number): void {
-    const parts = [this.glow, this.ring, this.core, this.label];
-    if (this.badge) parts.push(this.badge as never);
+    const parts: Phaser.GameObjects.Components.Transform[] = [
+      this.glow,
+      this.ring,
+      this.core,
+      this.label,
+    ];
+    if (this.badge) parts.push(this.badge);
+    // Offsets from each part's resting x (the badge rests at the wisp's shoulder, not 0).
+    const base = parts.map((p) => p.x);
     this.scene.tweens.addCounter({
       from: 0,
       to: 1,
@@ -104,10 +114,10 @@ export class WispView extends Phaser.GameObjects.Container {
       onUpdate: (tween) => {
         const t = tween.getValue() ?? 1;
         const dx = amplitude * Math.sin(t * Math.PI * 5) * (1 - t);
-        for (const p of parts) p.x = dx;
+        parts.forEach((p, i) => (p.x = base[i]! + dx));
       },
       onComplete: () => {
-        for (const p of parts) p.x = 0;
+        parts.forEach((p, i) => (p.x = base[i]!));
       },
     });
   }

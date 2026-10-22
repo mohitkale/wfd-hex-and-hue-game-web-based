@@ -88,8 +88,10 @@ export function paintSymbol(
   size: number,
 ): void {
   const k = size / 2;
-  for (const part of symbolFor(index)) {
-    ctx.beginPath();
+  const parts = symbolFor(index);
+  // One path for all parts, so overlapping bars (plus, cross) fill once, not twice.
+  ctx.beginPath();
+  for (const part of parts) {
     if (part.kind === "circle") {
       ctx.arc(cx, cy, part.r * k, 0, Math.PI * 2);
       if (part.hole) {
@@ -102,8 +104,9 @@ export function paintSymbol(
       );
       ctx.closePath();
     }
-    ctx.fill("evenodd");
   }
+  // Holes (the ring) need even-odd; crossing bars need nonzero so their overlap stays filled.
+  ctx.fill(parts.some((p) => p.kind === "circle" && p.hole) ? "evenodd" : "nonzero");
 }
 
 export type MotionSetting = "system" | "on" | "off";

@@ -13,6 +13,17 @@ import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
 import { theme } from "./theme";
 
+/** MediaQueryList change listeners (Safari before 14 only has the old addListener API). */
+function listen(q: MediaQueryList | null, fn: () => void): void {
+  if (q?.addEventListener) q.addEventListener("change", fn);
+  else q?.addListener?.(fn);
+}
+
+function unlisten(q: MediaQueryList | null, fn: () => void): void {
+  if (q?.removeEventListener) q.removeEventListener("change", fn);
+  else q?.removeListener?.(fn);
+}
+
 /** Reads the CSS safe-area insets (notch, home indicator) in device pixels. */
 function readInsets(dpr: number): Insets {
   const probe = document.createElement("div");
@@ -77,7 +88,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     for (const g of gestures) window.removeEventListener(g, unlock, { capture: true });
     document.removeEventListener("visibilitychange", onVisibility);
     unsubscribe();
-    motionQuery?.removeEventListener("change", applyMotion);
+    unlisten(motionQuery, applyMotion);
     audio.dispose();
   });
   // Reduced motion: the player's setting, or the OS preference on "system". Scenes read the
@@ -87,7 +98,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   const applyMotion = () =>
     game.registry.set("reducedMotion", reducedMotion(motionSetting, !!motionQuery?.matches));
   applyMotion();
-  motionQuery?.addEventListener("change", applyMotion);
+  listen(motionQuery, applyMotion);
   void loadSave(game).then((save) => {
     audio.configure(audioSettings(save.data.settings));
     motionSetting = save.data.settings.reducedMotion;
@@ -150,17 +161,17 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   let dprQuery: MediaQueryList | null = null;
   let watchedRatio = 0;
   const watchDpr = () => {
-    dprQuery?.removeEventListener("change", onResize);
+    unlisten(dprQuery, onResize);
     watchedRatio = window.devicePixelRatio;
     dprQuery = window.matchMedia?.(`(resolution: ${watchedRatio}dppx)`) ?? null;
-    dprQuery?.addEventListener("change", onResize);
+    listen(dprQuery, onResize);
   };
   watchDpr();
   // Dev-only handle for debugging and browser-driven checks.
   if (import.meta.env?.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
   game.events.once(Phaser.Core.Events.DESTROY, () => {
     window.removeEventListener("resize", onResize);
-    dprQuery?.removeEventListener("change", onResize);
+    unlisten(dprQuery, onResize);
   });
   return game;
 }
