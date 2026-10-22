@@ -3,6 +3,7 @@ import type { Insets } from "./layout";
 import { BootScene } from "./scenes/BootScene";
 import { WorldMapScene } from "./scenes/WorldMapScene";
 import { PlayScene } from "./scenes/PlayScene";
+import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { theme } from "./theme";
 
@@ -52,6 +53,10 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
   void loadSave(game);
+  game.registry.set(
+    "rewards",
+    createRewards({ PUBLIC_REWARDS: import.meta.env?.PUBLIC_REWARDS, DEV: import.meta.env?.DEV }),
+  );
 
   // Coalesce bursts (address-bar show/hide, drag-resize, rotation) into one resize per frame and
   // skip no-op ones.
