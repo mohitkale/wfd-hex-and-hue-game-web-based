@@ -1,14 +1,19 @@
 import type { Art } from "@hexhue/core";
+import { theme } from "../../packages/game/src/theme";
 import { contrast, distance, parseHex, type Rgb } from "./color";
 
-/** The play board's panel color (theme.panel): every fragment color must read against it. */
-export const PANEL: Rgb = [0x0f, 0x08, 0x24];
+/** The play board's panel color (from the game theme): every fragment must read against it. */
+export const PANEL: Rgb = [(theme.panel >> 16) & 255, (theme.panel >> 8) & 255, theme.panel & 255];
 /** Fragments must stand out from the dark panel (a collected cell). */
 export const MIN_PANEL_CONTRAST = 1.6;
 /** Two colors in one artwork must be clearly different: players match wisps to fragments by color. */
 export const MIN_COLOR_DISTANCE = 90;
 
-/** Readability problems with an artwork's palette; empty means it is fine to ship. */
+/**
+ * Readability problems with an artwork's palette; empty means it is fine to ship. A baseline, not
+ * an accessibility guarantee: redmean distance ignores color-vision deficiency, which the
+ * colorblind symbol mode (GAME_DESIGN §6, M6.5) covers.
+ */
 export function artProblems(art: Pick<Art, "palette">): string[] {
   const problems: string[] = [];
   const colors = art.palette.map(parseHex);

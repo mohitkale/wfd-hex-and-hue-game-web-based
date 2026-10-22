@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY, parseAsciiArt } from "@hexhue/core";
-import { artProblems } from "./check";
+import { EMPTY, createRng, parseAsciiArt } from "@hexhue/core";
+import { theme } from "../../packages/game/src/theme";
+import { PANEL, artProblems } from "./check";
 import { contrast, distance, parseHex } from "./color";
-import { detectBlock, quantize, toAsciiSource } from "./quantize";
+import { MAX_IMPORT_COLORS, detectBlock, quantize, toAsciiSource } from "./quantize";
 
 /** Builds an RGBA buffer from rows of single-char color keys, each scaled to `block` px. */
 function image(rows: string[], colors: Record<string, number[]>, block = 1) {
@@ -49,6 +50,40 @@ describe("detectBlock / quantize", () => {
     expect(merged.cells[0]).not.toBe(merged.cells[3]);
   });
 
+  it("ignores a partial margin at the right/bottom edge when detecting the block", () => {
+    const { rgba, w, h } = image(["rg", "gr"], C, 8);
+    // Add a 2 px transparent margin on the right.
+    const W = w + 2;
+    const padded = new Uint8Array(W * h * 4);
+    for (let y = 0; y < h; y++) padded.set(rgba.subarray(y * w * 4, (y + 1) * w * 4), y * W * 4);
+    expect(detectBlock(padded, W, h)).toBe(8);
+  });
+
+  it("treats all fully transparent pixels as identical", () => {
+    const { rgba, w, h } = image(["r.", ".r"], C, 4);
+    // Junk RGB under transparency, different per pixel.
+    for (let i = 0; i < rgba.length; i += 4) if (rgba[i + 3] === 0) rgba[i] = i % 251;
+    expect(detectBlock(rgba, w, h)).toBe(4);
+  });
+
+  it("rejects impossible options and photo-like input", () => {
+    const { rgba, w, h } = image(["rg", "gr"], C, 2);
+    expect(() => quantize(rgba, w, h, { maxColors: 0 })).toThrow("maxColors");
+    expect(() => quantize(rgba, w, h, { maxColors: MAX_IMPORT_COLORS + 1 })).toThrow("maxColors");
+    expect(() => quantize(rgba, w, h, { block: 9 })).toThrow("does not fit");
+    // 48×48 of noise: thousands of colors, bucketed, still far too many to be pixel art.
+    const rng = createRng(1);
+    const noise = new Uint8Array(48 * 48 * 4).map((_, i) => (i % 4 === 3 ? 255 : rng.int(0, 255)));
+    const started = performance.now();
+    expect(() => quantize(noise, 48, 48, { block: 1 })).toThrow("photo");
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
+  it("can reduce to a single color", () => {
+    const { rgba, w, h } = image(["rgR"], C);
+    expect(quantize(rgba, w, h, { maxColors: 1 }).palette).toHaveLength(1);
+  });
+
   it("round-trips through the ASCII source format", () => {
     const { rgba, w, h } = image(["rg.", ".gr"], C, 2);
     const art = quantize(rgba, w, h);
@@ -62,6 +97,10 @@ describe("detectBlock / quantize", () => {
 });
 
 describe("artProblems", () => {
+  it("measures against the game's real board panel color", () => {
+    expect((PANEL[0] << 16) | (PANEL[1] << 8) | PANEL[2]).toBe(theme.panel);
+  });
+
   it("flags colors too dark for the board and pairs too similar to tell apart", () => {
     expect(artProblems({ palette: ["#f6d97a", "#4b3c9e"] })).toEqual([]);
     expect(artProblems({ palette: ["#140c30"] })[0]).toMatch("too dark");

@@ -9,7 +9,8 @@ import { fileURLToPath } from "node:url";
 import type { BuiltWorld } from "@hexhue/core";
 import { worlds } from "../../content/worlds";
 import { OUTPUT_DIR } from "../levels/format";
-import { artProblems } from "./check";
+import { PANEL, artProblems } from "./check";
+import { toHex } from "./color";
 
 const built = worlds.map(
   (w) => JSON.parse(readFileSync(new URL(`${w.id}.json`, OUTPUT_DIR), "utf8")) as BuiltWorld,
@@ -49,13 +50,14 @@ const cards = built
   })
   .join("\n");
 
+const panel = toHex(PANEL);
 const html = `<!doctype html><meta charset="utf-8"><title>Hex & Hue art preview</title>
 <style>
 body{background:#140b2e;color:#f5efff;font:14px system-ui;margin:24px}
 .grid{display:flex;flex-wrap:wrap;gap:20px}
-figure{margin:0;background:#0f0824;padding:12px;border-radius:12px;width:200px}
+figure{margin:0;background:${panel};padding:12px;border-radius:12px;width:200px}
 figcaption{margin-top:8px;line-height:1.5}
-small,i{color:#b9a9e6}.warn{color:#ff8fa3}.curve{background:#0f0824;border-radius:8px}
+small,i{color:#b9a9e6}.warn{color:#ff8fa3}.curve{background:${panel};border-radius:8px}
 </style><h1>Hex & Hue art preview</h1>${cards}`;
 
 const out = new URL("../../dist/", import.meta.url);
