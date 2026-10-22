@@ -7,12 +7,13 @@ import type Phaser from "phaser";
 export class DragScroll {
   /** True once the current gesture has moved far enough to be a scroll, not a tap. */
   dragging = false;
+  /** Set false while a modal (e.g. a Spellbook page) is open: the content underneath stays put. */
+  enabled = true;
   private max = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
     dpr: number,
-    private readonly onScroll: (y: number) => void = () => {},
   ) {
     let startY = 0;
     let startScroll = 0;
@@ -29,14 +30,14 @@ export class DragScroll {
       if (p.id === active) active = -1;
     });
     input.on("pointermove", (p: Phaser.Input.Pointer) => {
-      if (!p.isDown || p.id !== active) return;
+      if (!p.isDown || p.id !== active || !this.enabled) return;
       const dy = p.y - startY;
       if (Math.abs(dy) > 10 * dpr) this.dragging = true;
       if (this.dragging) this.scrollTo(startScroll - dy);
     });
-    input.on("wheel", (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) =>
-      this.scrollTo(scene.cameras.main.scrollY + dy * dpr),
-    );
+    input.on("wheel", (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+      if (this.enabled) this.scrollTo(scene.cameras.main.scrollY + dy * dpr);
+    });
   }
 
   /** Content height beyond the viewport. */
@@ -46,8 +47,6 @@ export class DragScroll {
   }
 
   scrollTo(y: number): void {
-    const clamped = Math.max(0, Math.min(this.max, y));
-    this.scene.cameras.main.setScroll(0, clamped);
-    this.onScroll(clamped);
+    this.scene.cameras.main.setScroll(0, Math.max(0, Math.min(this.max, y)));
   }
 }

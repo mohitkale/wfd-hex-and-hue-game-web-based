@@ -47,7 +47,7 @@ export class WorldMapScene extends Phaser.Scene {
     this.layout();
     // Open on the level to play next.
     const { height } = this.scale.gameSize;
-    this.scrollTo(this.focusY !== null ? this.focusY - height * 0.45 : 0);
+    this.scroller.scrollTo(this.focusY !== null ? this.focusY - height * 0.45 : 0);
   }
 
   private save(): Pick<SaveData, "levels" | "skipped"> {
@@ -198,7 +198,7 @@ export class WorldMapScene extends Phaser.Scene {
         fontSize: `${px(14)}px`,
         color: theme.text,
         backgroundColor: "#2a1650",
-        padding: { x: px(12), y: px(12) },
+        padding: { x: px(12), y: px(16) },
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -351,9 +351,5 @@ export class WorldMapScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(20);
     this.tweens.add({ targets: this.toast, alpha: 0, delay: 1600, duration: 400 });
-  }
-
-  private scrollTo(y: number): void {
-    this.scroller.scrollTo(y);
   }
 }

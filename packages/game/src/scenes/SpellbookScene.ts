@@ -9,6 +9,10 @@ import { artTexture } from "../view/artThumb";
 import { Button } from "../view/Button";
 import { DragScroll } from "../view/DragScroll";
 
+/** Cell size (device px) of card thumbnails and page art textures; both are scaled up to fit. */
+const THUMB_CELL = 4;
+const PAGE_CELL = 12;
+
 /**
  * The Spellbook: every mosaic the player has completed, as a collectible page with its lore.
  * Uncollected ones show as silhouettes — a promise, not a lock. World progress sits on each
@@ -17,6 +21,9 @@ import { DragScroll } from "../view/DragScroll";
 export class SpellbookScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private page: Phaser.GameObjects.GameObject[] = [];
+  /** The level whose page is open (re-opened after a relayout), and its art texture. */
+  private openLevel: BuiltLevel | null = null;
+  private pageTexture: string | null = null;
   private scroller!: DragScroll;
   private readonly haptics = new Haptics();
 
@@ -27,20 +34,26 @@ export class SpellbookScene extends Phaser.Scene {
   create(): void {
     this.objects = [];
     this.page = [];
+    this.openLevel = null;
+    this.pageTexture = null;
     this.cameras.main.setBackgroundColor(theme.night);
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     this.haptics.enabled = getSave(this)?.data.settings.haptics ?? true;
     this.scroller = new DragScroll(this, dpr);
     this.scale.on("resize", this.layout, this);
-    this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
+    this.events.once("shutdown", () => {
+      this.scale.off("resize", this.layout, this);
+      this.closePage();
+    });
     this.layout();
   }
 
   private layout(): void {
     this.tweens.killAll();
-    for (const o of [...this.objects, ...this.page]) o.destroy();
+    const reopen = this.openLevel;
+    this.closePage();
+    for (const o of this.objects) o.destroy();
     this.objects = [];
-    this.page = [];
     const { width, height } = this.scale.gameSize;
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     const insets = (this.registry.get("insets") as { top: number; bottom: number } | undefined) ?? {
@@ -99,12 +112,12 @@ export class SpellbookScene extends Phaser.Scene {
 
       world.levels.forEach((built, i) => {
         const x = left + px(16) + (i % cols) * (cardW + gap);
-        const cy = y + Math.floor(i / cols) * (cardW + px(30));
+        const cy = y + Math.floor(i / cols) * (cardW + px(36));
         this.objects.push(
           ...this.card(x, cy, cardW, thumb, built, isCompleted(save, built.level.id), dpr),
         );
       });
-      y += Math.ceil(world.levels.length / cols) * (cardW + px(30)) + px(20);
+      y += Math.ceil(world.levels.length / cols) * (cardW + px(36)) + px(20);
     });
     this.scroller.setMax(y + insets.bottom + px(16) - height);
 
@@ -157,6 +170,7 @@ export class SpellbookScene extends Phaser.Scene {
         .setScrollFactor(0)
         .setDepth(11),
     );
+    if (reopen) this.openPage(reopen);
   }
 
   private card(
@@ -172,9 +186,11 @@ export class SpellbookScene extends Phaser.Scene {
     const bg = this.add.graphics();
     bg.fillStyle(collected ? theme.dusk : 0x1a1236, 1);
     bg.fillRoundedRect(x, y, w, w, 12 * dpr);
-    const cell = Math.max(1, Math.floor(thumb / Math.max(level.width, level.height)));
+    // Small shared textures (4 px cells), scaled up crisply to fit the card.
+    const scale = thumb / (Math.max(level.width, level.height) * THUMB_CELL);
     const img = this.add
-      .image(x + w / 2, y + w / 2, artTexture(this, level, cell, !collected))
+      .image(x + w / 2, y + w / 2, artTexture(this, level, THUMB_CELL, !collected))
+      .setScale(scale)
       .setAlpha(collected ? 1 : 0.7);
     const caption = this.add
       .text(x + w / 2, y + w + 4 * dpr, collected ? level.name : "? ? ?", {
@@ -207,29 +223,43 @@ export class SpellbookScene extends Phaser.Scene {
 
   /** A full page for one collected mosaic: large art, stars and its lore. */
   private openPage(built: BuiltLevel): void {
-    for (const o of this.page) o.destroy();
+    this.closePage();
+    this.openLevel = built;
+    this.scroller.enabled = false;
     const { width, height } = this.scale.gameSize;
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
+    const insets = (this.registry.get("insets") as { top: number; bottom: number } | undefined) ?? {
+      top: 0,
+      bottom: 0,
+    };
     const px = (v: number) => Math.round(v * dpr);
     const w = Math.min(width - px(32), px(400));
     const level = built.level;
     const stars = getSave(this)?.data.levels[level.id]?.stars ?? 0;
-    const cell = Math.max(2, Math.floor((w - px(48)) / Math.max(level.width, level.height)));
+    // A modest texture scaled up crisply; removed again when the page closes.
+    this.pageTexture = artTexture(this, level, PAGE_CELL);
+    const artSize = Math.min(w - px(48), height * 0.45);
+    const artScale = artSize / (Math.max(level.width, level.height) * PAGE_CELL);
+    const artH = level.height * PAGE_CELL * artScale;
     const cx = width / 2;
-    const top = Math.max(px(40), (height - (level.height * cell + px(260))) / 2);
+    const top = Math.max(insets.top + px(24), (height - (artH + px(260))) / 2);
 
+    let dimPressed = false;
     const dim = this.add
       .rectangle(0, 0, width, height, 0x07040f, 0.8)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(20)
-      .setInteractive();
+      .setInteractive()
+      .on("pointerdown", () => (dimPressed = true))
+      .on("pointerup", () => dimPressed && this.closePage());
     const panel = this.add.graphics().setScrollFactor(0).setDepth(20);
     const art = this.add
-      .image(cx, top + px(24) + (level.height * cell) / 2, artTexture(this, level, cell))
+      .image(cx, top + px(24) + artH / 2, this.pageTexture)
+      .setScale(artScale)
       .setScrollFactor(0)
       .setDepth(21);
-    let ty = top + px(36) + level.height * cell;
+    let ty = top + px(36) + artH;
     const text = (
       value: string,
       size: number,
@@ -261,18 +291,33 @@ export class SpellbookScene extends Phaser.Scene {
       dpr,
       onPress: () => this.closePage(),
     });
-    close.setScrollFactor(0).setDepth(21);
+    close.setScrollFactor(0).setDepth(22);
     const bottom = ty + px(36);
     panel.fillStyle(theme.panel, 0.98);
     panel.fillRoundedRect(cx - w / 2, top, w, bottom - top, px(20));
     panel.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.35);
     panel.strokeRoundedRect(cx - w / 2, top, w, bottom - top, px(20));
-    dim.on("pointerup", () => this.closePage());
-    this.page = [dim, panel, art, ...parts, close];
+    // Swallows taps on the page itself so only taps outside it (or Close) dismiss it.
+    const swallow = this.add
+      .zone(cx - w / 2, top, w, bottom - top)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(21)
+      .setInteractive();
+    this.page = [dim, panel, art, ...parts, swallow, close];
   }
 
   private closePage(): void {
-    for (const o of this.page) o.destroy();
+    for (const o of this.page) {
+      this.tweens.killTweensOf(o);
+      o.destroy();
+    }
     this.page = [];
+    this.openLevel = null;
+    if (this.pageTexture && this.textures.exists(this.pageTexture)) {
+      this.textures.remove(this.pageTexture);
+    }
+    this.pageTexture = null;
+    if (this.scroller) this.scroller.enabled = true;
   }
 }
