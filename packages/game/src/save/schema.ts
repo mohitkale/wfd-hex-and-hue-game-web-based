@@ -21,6 +21,8 @@ export interface SaveData {
   version: typeof SAVE_VERSION;
   /** Keyed by level id (e.g. "moonlit-04"), so reordering content never scrambles progress. */
   levels: Record<string, LevelProgress>;
+  /** Levels skipped after repeated losses; they unlock the path but stay uncompleted. */
+  skipped: string[];
   coins: number;
   boosters: Record<BoosterKind, number>;
   /** How many times 2× speed has been unlocked; drives the free / ad alternation. */
@@ -36,6 +38,7 @@ export function defaultSave(): SaveData {
   return {
     version: SAVE_VERSION,
     levels: {},
+    skipped: [],
     coins: 100,
     boosters: { undo: 2, shuffle: 2, extraSlot: 2, wand: 2 },
     speedTurns: 0,
@@ -111,6 +114,9 @@ export function migrate(raw: unknown): SaveData {
   return {
     version: SAVE_VERSION,
     levels,
+    skipped: Array.isArray(data.skipped)
+      ? [...new Set(data.skipped.filter((id): id is string => typeof id === "string"))]
+      : [],
     coins: count(data.coins, fresh.coins),
     boosters,
     speedTurns: count(data.speedTurns, 0),

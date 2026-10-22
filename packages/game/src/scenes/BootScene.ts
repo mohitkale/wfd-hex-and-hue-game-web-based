@@ -3,7 +3,7 @@ import { whenSaveReady } from "../save";
 import { theme } from "../theme";
 import { ensureTextures, TEX } from "../view/textures";
 
-/** Title screen. Tap anywhere to open the level select. */
+/** Title screen. Tap anywhere to open the world map. */
 export class BootScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
 
