@@ -19,6 +19,7 @@ function playByHints(state: SimState): { state: SimState; misses: number } {
 }
 
 describe("idle hints", () => {
+  // Hundreds of real solver runs: ~3 s alone, longer when the whole suite runs in parallel.
   it("lead every shipped level to a win within the hint budget", () => {
     for (const world of worlds) {
       for (const built of world.levels) {
@@ -27,7 +28,7 @@ describe("idle hints", () => {
         expect(state.status, built.level.id).toBe("won");
       }
     }
-  });
+  }, 30_000);
 
   it("give no hint while wisps move, after the game ends, or from a dead end", () => {
     const level = worlds[0]!.levels[0]!.level;
