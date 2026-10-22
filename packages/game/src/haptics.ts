@@ -25,7 +25,11 @@ export class Haptics {
   constructor(
     private readonly vibrate: ((pattern: number[]) => unknown) | null = typeof navigator !==
       "undefined" && typeof navigator.vibrate === "function"
-      ? (p) => navigator.vibrate(p)
+      ? (p) => {
+          // Before the first user gesture Chrome rejects (and logs) every call: skip them.
+          if (navigator.userActivation?.hasBeenActive === false) return;
+          navigator.vibrate(p);
+        }
       : null,
     private readonly now: () => number = () => performance.now(),
   ) {}

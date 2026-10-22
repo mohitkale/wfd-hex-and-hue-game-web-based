@@ -5,6 +5,7 @@ import { SpellbookScene } from "./scenes/SpellbookScene";
 import { WorldMapScene } from "./scenes/WorldMapScene";
 import { PlayScene } from "./scenes/PlayScene";
 import { AudioEngine, audioSettings } from "./audio";
+import { renderDpr } from "./display";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
@@ -30,12 +31,16 @@ function readInsets(dpr: number): Insets {
 }
 
 /**
- * Mounts the game into `parent`, filling it. The canvas is rendered at device resolution (capped
- * at 3×) and shown at CSS size, so pixels and text stay crisp on high-DPI phones. Scenes work in
- * device pixels and read `dpr` and safe-area `insets` from the registry.
+ * Mounts the game into `parent`, filling it. The canvas is rendered at device resolution (see
+ * `renderDpr`: capped at 3×, and lowered on huge desktop windows) and shown at CSS size, so pixels
+ * and text stay crisp on high-DPI phones. Scenes work in device pixels and read `dpr` and
+ * safe-area `insets` from the registry; when the ratio changes (window moved to another screen,
+ * browser zoom, a much bigger window), the game re-renders at the new one.
  */
 export function mountGame(parent: HTMLElement): Phaser.Game {
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const currentDpr = () =>
+    renderDpr(window.devicePixelRatio, parent.clientWidth, parent.clientHeight);
+  let dpr = currentDpr();
   const size = () => ({
     w: Math.max(1, Math.round(parent.clientWidth * dpr)),
     h: Math.max(1, Math.round(parent.clientHeight * dpr)),
@@ -91,6 +96,22 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     if (pending) return;
     pending = requestAnimationFrame(() => {
       pending = 0;
+      const nextDpr = currentDpr();
+      if (nextDpr !== dpr) {
+        dpr = nextDpr;
+        game.registry.set("dpr", dpr);
+        game.registry.set("insets", readInsets(dpr));
+        game.scale.setZoom(1 / dpr);
+        const s = size();
+        game.scale.resize(s.w, s.h);
+        // Menus size everything (scrolling included) at create time: rebuild them. The play
+        // scene re-lays itself out from the registry on resize, keeping the board in progress.
+        for (const scene of game.scene.getScenes(true)) {
+          if (scene.scene.key !== "play") scene.scene.restart();
+        }
+        watchDpr();
+        return;
+      }
       const next = size();
       const insets = readInsets(dpr);
       const prev = game.registry.get("insets") as Insets;
@@ -101,10 +122,20 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     });
   };
   window.addEventListener("resize", onResize);
+  // A device-ratio change without a resize (window dragged to another screen, browser zoom on
+  // some platforms) fires this media query instead; re-armed for each new ratio.
+  let dprQuery: MediaQueryList | null = null;
+  const watchDpr = () => {
+    dprQuery?.removeEventListener("change", onResize);
+    dprQuery = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`) ?? null;
+    dprQuery?.addEventListener("change", onResize);
+  };
+  watchDpr();
   // Dev-only handle for debugging and browser-driven checks.
   if (import.meta.env?.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
-  game.events.once(Phaser.Core.Events.DESTROY, () =>
-    window.removeEventListener("resize", onResize),
-  );
+  game.events.once(Phaser.Core.Events.DESTROY, () => {
+    window.removeEventListener("resize", onResize);
+    dprQuery?.removeEventListener("change", onResize);
+  });
   return game;
 }

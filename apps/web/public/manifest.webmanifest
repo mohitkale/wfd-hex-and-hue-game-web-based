@@ -1,0 +1,24 @@
+{
+  "name": "Hex & Hue: Magic Pixel Puzzle",
+  "short_name": "Hex & Hue",
+  "description": "A free magical color-sorting pixel puzzle. A Little Magic in Every Color.",
+  "id": "/play/",
+  "start_url": "/play/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#140b2e",
+  "theme_color": "#140b2e",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -26,10 +26,16 @@ const {
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>{title}</title>
   </head>
   <body>
     <slot />
+    <script>
+      import { setupPwa } from "../pwa/client";
+      setupPwa();
+    </script>
   </body>
 </html>
 
@@ -46,6 +52,40 @@ const {
     --glow: #f6d97a;
     --mist: #c9b8ff;
     --text: #f5efff;
+  }
+  /* PWA update banner (pwa/client.ts): top center, clear of the thumb-zone controls. */
+  .hh-toast {
+    position: fixed;
+    z-index: 100;
+    top: max(12px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 32px);
+    padding: 8px 8px 8px 16px;
+    border: 1px solid rgb(246 217 122 / 0.6);
+    border-radius: 999px;
+    background: var(--dusk);
+    color: var(--text);
+    font-size: 14px;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.4);
+  }
+  .hh-toast button {
+    min-height: 36px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--mist);
+    font: inherit;
+    cursor: pointer;
+  }
+  .hh-toast button.hh-toast-primary {
+    background: var(--glow);
+    color: var(--night);
+    font-weight: 700;
   }
   html,
   body {
