@@ -23,6 +23,31 @@ describe("Canvas", () => {
     expect(() => c.set(-1, 99, "x")).not.toThrow();
   });
 
+  it("fills symmetric polygons symmetrically (edge cells included on both sides)", () => {
+    const tri = new Canvas(7, 4).poly(
+      [
+        [0, 3],
+        [3, 0],
+        [6, 3],
+      ],
+      "t",
+    );
+    expect(tri.rows()).toEqual(["...t...", "..ttt..", ".ttttt.", "ttttttt"]);
+    for (const row of new Canvas(16, 14)
+      .poly(
+        [
+          [1, 6],
+          [7.5, 2],
+          [14, 6],
+          [7.5, 10],
+        ],
+        "b",
+      )
+      .rows()) {
+      expect(row).toBe([...row].reverse().join(""));
+    }
+  });
+
   it("stamps with transparency, swaps, mirrors and exports parseable art", () => {
     const c = new Canvas(4, 2, "n").stamp(0, 0, ["ab", ".b"]).swap("b", "c").mirrorX();
     expect(c.rows()).toEqual(["acca", "nccn"]);

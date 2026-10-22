@@ -13,7 +13,7 @@ const curve: WorldCurve = {
   chunk: { min: 4, max: 10 },
 };
 
-/** World 1: moon magic. Gentle start, introduces slots and buried wisps. */
+/** World 1: moon magic. Gentle start; introduces buried wisps, with slot pressure late. */
 export const moonlit: WorldConfig = {
   id: "moonlit",
   name: "Moonlit Beginnings",
@@ -45,7 +45,7 @@ export const moonlit: WorldConfig = {
     ],
     [
       "Full Moon Rising",
-      "The full moon is a time to release what no longer serves you.",
+      "The full moon lights every corner: see clearly, then let go.",
       art.fullMoonRising,
     ],
     [
@@ -57,8 +57,8 @@ export const moonlit: WorldConfig = {
     [
       "Crescent and Star",
       "Moon and star together: guidance by night and hope until morning.",
+      // Deliberate breather after Phases of the Moon: a calm, open board before the curve climbs.
       art.crescentAndStar,
-      open,
     ],
     ["Shooting Star", "A falling star is the sky's way of saying: now, ask.", art.shootingStar],
     [
@@ -66,7 +66,12 @@ export const moonlit: WorldConfig = {
       "Moonflowers open only after dusk, saving their beauty for the night.",
       art.moonflower,
     ],
-    ["Witch's Hat", "Every hat has its stories; this one has seen many moons.", art.witchsHat],
+    [
+      "Witch's Hat",
+      "Every hat has its stories; this one has seen many moons.",
+      art.witchsHat,
+      open,
+    ],
     [
       "Bubbling Cauldron",
       "Stir clockwise to call things in, widdershins to send them away.",
@@ -78,7 +83,6 @@ export const moonlit: WorldConfig = {
       "The Triple Moon",
       "Maiden, Mother and Crone: waxing, full and waning, the circle of every season.",
       art.tripleMoon,
-      { columns: 4 },
     ],
     [
       "Moonlit Lake",
@@ -93,9 +97,8 @@ export const moonlit: WorldConfig = {
     ],
     [
       "Lantern Festival",
-      "Many small lights make one great glow.",
+      "At lantern festivals across Asia, many small lights make one great glow.",
       art.lanternFestival,
-      { columns: 4 },
     ],
     [
       "Bat Across the Moon",
@@ -104,7 +107,7 @@ export const moonlit: WorldConfig = {
     ],
     [
       "The Moon Gate",
-      "Step through the round gate and leave the ordinary world behind.",
+      "In Chinese gardens the round moon gate frames a new view; step through and leave the ordinary behind.",
       art.moonGate,
     ],
     ["Blood Moon", "A blood moon marks endings that make room for beginnings.", art.bloodMoon],

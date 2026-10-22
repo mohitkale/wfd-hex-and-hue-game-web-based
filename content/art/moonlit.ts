@@ -127,9 +127,9 @@ export const fullMoonRising = new Canvas(14, 14, "n")
   .art({ n: night, y: moon, w: "#fff6d8", h: violet });
 
 export const crescentAndStar = new Canvas(14, 14, "n")
-  .disc(6, 6.5, 5.2, "y")
-  .disc(8.4, 5.6, 4.4, "n")
-  .star(9.8, 6.8, 3, 1.25, 5, "s")
+  .disc(5.5, 6.5, 5.2, "y")
+  .disc(8, 6.5, 4.4, "n")
+  .stamp(8, 4, ["..s..", ".sss.", "sssss", ".sss.", ".s.s."])
   .art({ n: night, y: moon, s: starlight });
 
 export const shootingStar = sprinkle(new Canvas(16, 12, "n"), "d", 0.06, 9, "n")
@@ -159,19 +159,20 @@ export const moonflower = (() => {
     .art({ n: night, w: "#fff6d8", y: moon, g: leaf });
 })();
 
-export const witchsHat = new Canvas(14, 14, "n")
-  .disc(10, 3.5, 2.6, "y")
-  .poly(
-    [
-      [6.5, 0.5],
-      [10, 10],
-      [3, 10],
-    ],
-    "p",
-  )
-  .rect(3, 8, 8, 2, "b")
-  .rect(6, 8, 2, 2, "y")
-  .ellipse(6.5, 10.8, 6.2, 1.4, "p")
+export const witchsHat = new Canvas(16, 14, "n")
+  .disc(12.5, 3, 2.4, "y")
+  .stamp(0, 3, [
+    "......p.....",
+    ".....ppp....",
+    ".....ppp....",
+    "....pppp....",
+    "....ppppp...",
+    "...pppppp...",
+    "...bbbyybb..",
+    "...bbbyybb..",
+    ".pppppppppp.",
+    "pppppppppppp",
+  ])
   .art({ n: night, y: moon, p: violet, b: rose });
 
 export const bubblingCauldron = new Canvas(14, 14, "n")
@@ -193,13 +194,14 @@ export const bubblingCauldron = new Canvas(14, 14, "n")
   .art({ n: night, g: leaf, k: "#8a8aa3", o: ember });
 
 /** The Triple Moon: waxing crescent, full moon, waning crescent. */
-export const tripleMoon = new Canvas(26, 10, "n")
-  .disc(4, 4.5, 4, "m")
-  .disc(1.6, 4.5, 3.7, "n")
-  .disc(21, 4.5, 4, "m")
-  .disc(23.4, 4.5, 3.7, "n")
-  .disc(12.5, 4.5, 3.7, "m")
-  .disc(12.5, 4.5, 1.3, "s")
+/** The Triple Moon: waxing crescent, full moon, waning crescent. */
+export const tripleMoon = new Canvas(23, 10, "n")
+  .disc(3.5, 4.5, 3.6, "m")
+  .disc(1.4, 4.5, 3.3, "n")
+  .disc(19.5, 4.5, 3.6, "m")
+  .disc(21.6, 4.5, 3.3, "n")
+  .disc(11.5, 4.5, 3.2, "m")
+  .disc(11.5, 4.5, 1.1, "s")
   .art({ n: night, m: silver, s: starlight });
 
 export const moonlitLake = new Canvas(16, 14, "n")
@@ -222,9 +224,8 @@ export const moonlitLake = new Canvas(16, 14, "n")
 export const lunaMoth = new Canvas(16, 14, "n")
   .ellipse(4.5, 5, 3.6, 3.4, "w")
   .ellipse(5, 10, 2.4, 3, "w")
+  .disc(4.5, 5, 1.2, "y")
   .mirrorX()
-  .disc(4.6, 5, 1.2, "y")
-  .disc(11.4, 5, 1.2, "y")
   .rect(7, 2, 2, 11, "b")
   .line(7, 2, 5, 0, "b")
   .line(8, 2, 10, 0, "b")
@@ -233,14 +234,14 @@ export const lunaMoth = new Canvas(16, 14, "n")
 export const lanternFestival = (() => {
   const lantern = [".s.", "ooo", "oyo", "oyo", "ooo", ".s."];
   const c = new Canvas(18, 11, "n").line(0, 1, 17, 1, "s");
-  for (const [x, y] of [
-    [2, 2],
-    [7, 3],
-    [13, 2],
-  ] as const) {
-    c.stamp(x, y, lantern);
-  }
-  return sprinkle(c, "y", 0.05, 17, "n").art({ n: night, s: starlight, o: rose, y: moon });
+  for (const x of [2, 7.5, 13]) c.stamp(Math.round(x), 2, lantern);
+  return sprinkle(c, "w", 0.05, 17, "n").art({
+    n: night,
+    s: starlight,
+    o: rose,
+    y: moon,
+    w: "#fff6d8",
+  });
 })();
 
 export const batAcrossTheMoon = new Canvas(16, 14, "n")

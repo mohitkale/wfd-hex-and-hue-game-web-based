@@ -54,9 +54,24 @@ export class Canvas {
     }, ch);
   }
 
-  /** Filled polygon (even-odd rule) through cell-space points. */
+  /**
+   * Filled polygon (even-odd rule) through cell-space points. Cells whose center lies exactly on
+   * an edge count as inside on every side, so symmetric shapes stay symmetric.
+   */
   poly(points: [number, number][], ch: string): this {
+    const onEdge = (x: number, y: number) =>
+      points.some(([xi, yi], i) => {
+        const [xj, yj] = points[(i + 1) % points.length]!;
+        const cross = (xj - xi) * (y - yi) - (yj - yi) * (x - xi);
+        const within =
+          x >= Math.min(xi, xj) - 1e-9 &&
+          x <= Math.max(xi, xj) + 1e-9 &&
+          y >= Math.min(yi, yj) - 1e-9 &&
+          y <= Math.max(yi, yj) + 1e-9;
+        return within && Math.abs(cross) < 1e-9;
+      });
     return this.where((x, y) => {
+      if (onEdge(x, y)) return true;
       let inside = false;
       for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
         const [xi, yi] = points[i]!;
@@ -78,9 +93,9 @@ export class Canvas {
     return this.poly(pts, ch);
   }
 
-  /** Line of cells from (x0, y0) to (x1, y1). */
+  /** Line of cells from (x0, y0) to (x1, y1), both ends included. */
   line(x0: number, y0: number, x1: number, y1: number, ch: string): this {
-    const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+    const steps = Math.max(Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))), 1);
     for (let i = 0; i <= steps; i++) {
       this.set(x0 + ((x1 - x0) * i) / steps, y0 + ((y1 - y0) * i) / steps, ch);
     }

@@ -34,7 +34,8 @@ export function curveOptions(
       columns: index === 0 ? 2 : 3,
       slots: 5,
       trackCap: 5,
-      chunk: curve.chunk,
+      // Fewer, fuller wisps: openers should be short.
+      chunk: { min: Math.max(6, curve.chunk.max), max: curve.chunk.max * 2 },
       charges: "reach",
       shuffle: [0, 0.2, 0.35][index]!,
       ...overrides,
