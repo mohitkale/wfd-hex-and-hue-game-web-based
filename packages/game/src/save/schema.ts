@@ -15,6 +15,10 @@ export interface Settings {
   haptics: boolean;
   sound: boolean;
   music: boolean;
+  /** 0..1 */
+  sfxVolume: number;
+  /** 0..1 */
+  musicVolume: number;
 }
 
 export interface SaveData {
@@ -42,7 +46,7 @@ export function defaultSave(): SaveData {
     coins: 100,
     boosters: { undo: 2, shuffle: 2, extraSlot: 2, wand: 2 },
     speedTurns: 0,
-    settings: { haptics: true, sound: true, music: true },
+    settings: { haptics: true, sound: true, music: true, sfxVolume: 0.8, musicVolume: 0.5 },
     stats: { plays: 0, wins: 0, losses: 0 },
     lastPlayed: null,
   };
@@ -54,6 +58,8 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 const count = (v: unknown, fallback: number): number =>
   typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.floor(v)) : fallback;
 const flag = (v: unknown, fallback: boolean): boolean => (typeof v === "boolean" ? v : fallback);
+const unit = (v: unknown, fallback: number): number =>
+  typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback;
 
 /**
  * Upgrades older save shapes step by step. Each entry takes data at version `n` and returns it at
@@ -124,6 +130,8 @@ export function migrate(raw: unknown): SaveData {
       haptics: flag(settings.haptics, true),
       sound: flag(settings.sound, true),
       music: flag(settings.music, true),
+      sfxVolume: unit(settings.sfxVolume, fresh.settings.sfxVolume),
+      musicVolume: unit(settings.musicVolume, fresh.settings.musicVolume),
     },
     stats: {
       plays: count(stats.plays, 0),

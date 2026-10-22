@@ -11,6 +11,7 @@ import {
   type TrackWisp,
 } from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
+import { getAudio } from "../audio";
 import { PRICES, pay, paymentFor, winCoins } from "../economy";
 import { Haptics } from "../haptics";
 import { flatLevels } from "../progress";
@@ -380,6 +381,7 @@ export class PlayScene extends Phaser.Scene {
     }
     this.session.tap(source);
     this.haptics.play("tap");
+    getAudio(this).play("tap");
     const view = this.wisps.get(id);
     if (view) {
       // Squish: immediate acknowledgement, even if the launch has to wait for the entry.
@@ -404,6 +406,7 @@ export class PlayScene extends Phaser.Scene {
    */
   private rejectTap(source: LaunchSource): void {
     this.haptics.play("invalid");
+    getAudio(this).play("invalid");
     const s = this.session.state;
     const w = source.kind === "column" ? s.columns[source.index]?.[0] : s.slots[source.index];
     const view = w ? this.wisps.get(w.id) : undefined;
@@ -574,6 +577,7 @@ export class PlayScene extends Phaser.Scene {
     switch (e.type) {
       case "wand": {
         this.haptics.play("portal");
+        getAudio(this).play("booster");
         e.cells.forEach((cell, i) => {
           this.mosaic?.clearCell(cell);
           if (i % 3 === 0 && this.mosaic) this.sparkle(this.mosaic.cellCenter(cell));
@@ -583,16 +587,22 @@ export class PlayScene extends Phaser.Scene {
         break;
       }
       case "slotAdded":
+        getAudio(this).play("booster");
         // Slot count changed: the layout (slot row) must be rebuilt.
         this.lastLayoutKey = "";
         this.relayout();
         if (e.revivedWispId !== null) this.closeCard();
         break;
       case "shuffled":
+        getAudio(this).play("booster");
         this.refreshTargets();
+        break;
+      case "launched":
+        getAudio(this).play("launch");
         break;
       case "collected": {
         this.haptics.play("collect");
+        getAudio(this).play("collect", { chargeLeft: e.chargeLeft });
         this.mosaic?.clearCell(e.cell);
         const view = this.wisps.get(e.wispId);
         if (view) {
@@ -603,13 +613,16 @@ export class PlayScene extends Phaser.Scene {
       }
       case "portal":
         this.haptics.play("portal");
+        getAudio(this).play("portal");
         this.departToPortal(e.wispId);
         break;
       case "parked":
         this.haptics.play("park");
+        getAudio(this).play("park");
         break;
       case "won":
         this.haptics.play("win");
+        getAudio(this).play("win");
         this.recordWin();
         // Let the last wisp reach the portal, then bloom the artwork back in.
         this.revealPending = true;
@@ -625,6 +638,7 @@ export class PlayScene extends Phaser.Scene {
         break;
       case "lost":
         this.haptics.play("lose");
+        getAudio(this).play("lose");
         getSave(this)?.update((d) => d.stats.losses++);
         this.lossStreaks().set(
           this.built.level.id,
@@ -907,6 +921,7 @@ export class PlayScene extends Phaser.Scene {
     }
     if (payment.kind === "short") {
       this.haptics.play("invalid");
+      getAudio(this).play("invalid");
       this.toast(`Need ${payment.missing} more ◉ — clear mosaics to earn coins`);
       this.offerCoinsAd();
       return;
@@ -936,7 +951,10 @@ export class PlayScene extends Phaser.Scene {
     }
     save.update((d) => pay(d, kind, payment));
     this.haptics.play("tap");
-    if (payment.kind === "coins") this.boosterBar?.pulseCoins();
+    if (payment.kind === "coins") {
+      this.boosterBar?.pulseCoins();
+      getAudio(this).play("coin");
+    }
   }
 
   /** Wand: pick one of the colors that currently has exposed fragments. */
@@ -1142,6 +1160,7 @@ export class PlayScene extends Phaser.Scene {
       text(this.built.level.name, 24, theme.text, { fontStyle: "bold" });
       text(this.built.lore, 15, theme.textDim, { fontStyle: "italic" });
       if (this.firstClear) text("✦ Added to your Spellbook", 13, "#c9b8ff");
+      if (animate && this.earned > 0) this.time.delayedCall(250, () => getAudio(this).play("coin"));
       if (this.earned > 0) {
         text(`+${this.earned} ◉`, 18, "#f6d97a", { fontStyle: "bold" });
         if (this.doubled) {

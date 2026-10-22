@@ -4,8 +4,10 @@ import { BootScene } from "./scenes/BootScene";
 import { SpellbookScene } from "./scenes/SpellbookScene";
 import { WorldMapScene } from "./scenes/WorldMapScene";
 import { PlayScene } from "./scenes/PlayScene";
+import { AudioEngine, audioSettings } from "./audio";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
+import { defaultSave } from "./save/schema";
 import { theme } from "./theme";
 
 /** Reads the CSS safe-area insets (notch, home indicator) in device pixels. */
@@ -48,12 +50,35 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     height: h,
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr },
     input: { activePointers: 2 },
+    // All sound comes from our own Web Audio engine; Phaser's would be a second, unused context.
+    audio: { noAudio: true },
     disableContextMenu: true,
     scene: [BootScene, WorldMapScene, SpellbookScene, PlayScene],
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
-  void loadSave(game);
+  // Audio stays silent until the first tap or key (browser rule), then follows the saved settings.
+  const audio = new AudioEngine(audioSettings(defaultSave().settings));
+  game.registry.set("audio", audio);
+  // Several gesture types, because browsers differ on which ones may start audio (iOS prefers
+  // touchend / pointerup).
+  const unlock = () => audio.unlock();
+  const gestures = ["pointerdown", "pointerup", "touchend", "keydown"] as const;
+  for (const g of gestures) window.addEventListener(g, unlock, { capture: true });
+  const onVisibility = () => audio.setHidden(document.visibilityState === "hidden");
+  document.addEventListener("visibilitychange", onVisibility);
+  let unsubscribe = () => {};
+  game.events.once(Phaser.Core.Events.DESTROY, () => {
+    for (const g of gestures) window.removeEventListener(g, unlock, { capture: true });
+    document.removeEventListener("visibilitychange", onVisibility);
+    unsubscribe();
+    audio.dispose();
+  });
+  void loadSave(game).then((save) => {
+    audio.configure(audioSettings(save.data.settings));
+    const off = save.subscribe((d) => audio.configure(audioSettings(d.settings)));
+    unsubscribe = () => void off();
+  });
   game.registry.set(
     "rewards",
     createRewards({ PUBLIC_REWARDS: import.meta.env?.PUBLIC_REWARDS, DEV: import.meta.env?.DEV }),

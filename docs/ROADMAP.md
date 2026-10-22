@@ -49,7 +49,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 ## M6 — Polish & native feel
 
-- [ ] **M6.1** Audio: original procedural SFX (WebAudio) + ambient music loop, mute/volume settings, unlock on first tap.
+- [x] **M6.1** Audio: original procedural SFX (WebAudio) + ambient music loop, mute/volume settings, unlock on first tap.
 - [ ] **M6.2** Juice: particles, screen transitions, combo sparkle, win celebration, idle hints.
 - [ ] **M6.3** Onboarding: interactive first-level tutorial, contextual tips for slots/boosters.
 - [ ] **M6.4** PWA: manifest, icons, offline caching, install prompt, update toast; performance budget check.

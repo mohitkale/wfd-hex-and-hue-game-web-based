@@ -49,9 +49,21 @@ describe("migrate", () => {
       "crystal-03": { stars: 2, wins: 1 },
     });
     expect(m.boosters).toEqual({ undo: 5, shuffle: 2, extraSlot: 2, wand: 0 });
-    expect(m.settings).toEqual({ haptics: false, sound: true, music: true });
+    expect(m.settings).toEqual({
+      haptics: false,
+      sound: true,
+      music: true,
+      sfxVolume: 0.8,
+      musicVolume: 0.5,
+    });
     expect(m.stats).toEqual({ plays: 0, wins: 3, losses: 0 });
     expect(m.lastPlayed).toBeNull();
+  });
+
+  it("clamps volumes to 0..1 and defaults missing ones", () => {
+    const m = migrate({ version: SAVE_VERSION, settings: { sfxVolume: 3, musicVolume: "loud" } });
+    expect(m.settings.sfxVolume).toBe(1);
+    expect(m.settings.musicVolume).toBe(0.5);
   });
 
   it("treats odd versions as unversioned instead of wiping the save", () => {
@@ -105,9 +117,12 @@ describe("mergeSaves", () => {
 
   it("keeps their settings unless this tab changed them", () => {
     const base = defaultSave();
-    const theirs = { ...defaultSave(), settings: { haptics: false, sound: true, music: false } };
+    const theirs = {
+      ...defaultSave(),
+      settings: { ...defaultSave().settings, haptics: false, music: false },
+    };
     expect(mergeSaves(base, defaultSave(), theirs).settings).toEqual(theirs.settings);
-    const mine = { ...defaultSave(), settings: { haptics: true, sound: false, music: true } };
+    const mine = { ...defaultSave(), settings: { ...defaultSave().settings, sound: false } };
     expect(mergeSaves(base, mine, theirs).settings).toEqual(mine.settings);
   });
 });
