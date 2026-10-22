@@ -1,7 +1,14 @@
 import Phaser from "phaser";
 import { Haptics } from "../haptics";
 import { worlds } from "../levels";
-import { isCompleted, isPassed, isUnlocked, nextLevel, worldProgress } from "../progress";
+import {
+  gatingLevel,
+  isCompleted,
+  isPassed,
+  isUnlocked,
+  nextLevel,
+  worldProgress,
+} from "../progress";
 import { getSave } from "../save";
 import type { SaveData } from "../save/schema";
 import { theme } from "../theme";
@@ -49,6 +56,8 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   private layout(): void {
+    // Kill looping halo tweens before their targets go away.
+    this.tweens.killAll();
     for (const o of this.objects) o.destroy();
     this.objects = [];
     const { width, height } = this.scale.gameSize;
@@ -122,6 +131,8 @@ export class WorldMapScene extends Phaser.Scene {
         const data: PlayData = { world: w, level: i };
         const isNext = next?.world === w && next.level === i;
         if (isNext) this.focusY = ny;
+        else if (!next && w === worlds.length - 1 && i === world.levels.length - 1)
+          this.focusY = ny;
         this.objects.push(
           ...this.node(x, ny, px(26), i + 1, built.level.name, data, {
             unlocked: isUnlocked(worlds, save, w, i),
@@ -139,12 +150,27 @@ export class WorldMapScene extends Phaser.Scene {
     this.maxScroll = Math.max(0, y + insets.bottom + px(24) - height);
 
     // Sticky top bar with the title and total stars.
+    // Interactive so taps on the bar never reach a node scrolled underneath it.
     const bar = this.add
       .rectangle(0, 0, width, barH, theme.night, 0.94)
       .setOrigin(0, 0)
       .setScrollFactor(0)
-      .setDepth(10);
+      .setDepth(10)
+      .setInteractive();
     const total = worlds.reduce((n, w) => n + worldProgress(w, save).stars, 0);
+    if (!next) {
+      // Everything passed: celebrate at the end of the path.
+      this.objects.push(
+        this.add
+          .text(cx, y - px(4), "All mosaics complete ✦", {
+            fontFamily: theme.font,
+            fontStyle: "bold",
+            fontSize: `${px(16)}px`,
+            color: "#f6d97a",
+          })
+          .setOrigin(0.5, 1),
+      );
+    }
     const title = this.add
       .text(left + px(20), insets.top + px(28), "Hex & Hue", {
         fontFamily: theme.font,
@@ -237,7 +263,7 @@ export class WorldMapScene extends Phaser.Scene {
       .text(
         state.captionLeft ? x - r - 10 * dpr : x + r + 10 * dpr,
         y,
-        isNext ? `${name}\nPlay ›` : skipped ? `${name}\n(skipped)` : name,
+        isNext ? `${name}\nPlay ›` : skipped ? `${name}\nTry again ›` : name,
         {
           fontFamily: theme.font,
           fontSize: `${Math.round(12 * dpr)}px`,
@@ -263,7 +289,9 @@ export class WorldMapScene extends Phaser.Scene {
           duration: 260,
           ease: "Bounce.easeOut",
         });
-        this.showToast("Clear the glowing level to open this one");
+        const gate = gatingLevel(worlds, data);
+        const gateName = gate ? worlds[gate.world]!.levels[gate.level]!.level.name : "";
+        this.showToast(`Finish “${gateName}” to open this one`);
         return;
       }
       this.haptics.play("tap");
@@ -292,9 +320,10 @@ export class WorldMapScene extends Phaser.Scene {
   private showToast(message: string): void {
     const { width, height } = this.scale.gameSize;
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
+    const bottom = (this.registry.get("insets") as { bottom: number } | undefined)?.bottom ?? 0;
     this.toast?.destroy();
     this.toast = this.add
-      .text(width / 2, height - 80 * dpr, message, {
+      .text(width / 2, height - bottom - 80 * dpr, message, {
         fontFamily: theme.font,
         fontSize: `${Math.round(14 * dpr)}px`,
         color: theme.text,

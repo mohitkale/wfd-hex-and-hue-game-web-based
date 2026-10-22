@@ -60,6 +60,14 @@ describe("migrate", () => {
     expect(migrate({ version: SAVE_VERSION + 5, coins: 9 }).coins).toBe(9);
   });
 
+  it("reads skipped levels: missing → empty, junk filtered, duplicates removed", () => {
+    expect(migrate({ version: SAVE_VERSION }).skipped).toEqual([]);
+    expect(migrate({ version: SAVE_VERSION, skipped: ["a", 3, "b", "a", null] }).skipped).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
   it("keeps a level id of __proto__ as a plain key", () => {
     const m = migrate(JSON.parse('{"levels":{"__proto__":{"stars":2,"wins":1}}}'));
     expect(Object.getPrototypeOf(m.levels)).toBe(Object.prototype);
@@ -86,6 +94,13 @@ describe("mergeSaves", () => {
       b: { stars: 3, wins: 1 },
       c: { stars: 1, wins: 1 },
     });
+  });
+
+  it("unions skipped levels without duplicates", () => {
+    const base = defaultSave();
+    const mine = { ...defaultSave(), skipped: ["a", "b"] };
+    const theirs = { ...defaultSave(), skipped: ["b", "c"] };
+    expect(mergeSaves(base, mine, theirs).skipped.sort()).toEqual(["a", "b", "c"]);
   });
 
   it("keeps their settings unless this tab changed them", () => {

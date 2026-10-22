@@ -15,7 +15,7 @@ export function flatLevels(worlds: readonly BuiltWorld[]): LevelRef[] {
 }
 
 export const isCompleted = (save: Pick<SaveData, "levels">, id: string): boolean =>
-  id in save.levels;
+  Object.hasOwn(save.levels, id);
 
 /** Completed or skipped: either way the path continues past it. */
 export const isPassed = (save: Pick<SaveData, "levels" | "skipped">, id: string): boolean =>
@@ -37,19 +37,25 @@ export function isUnlocked(
   return isPassed(save, all[i - 1]!.id);
 }
 
-/** The level the player should play next: the first unlocked one not yet completed. */
+/**
+ * The frontier: the first level not yet passed (completed or skipped). This is where the map
+ * focuses and what glows; skipped levels behind it stay replayable without nagging.
+ */
 export function nextLevel(
   worlds: readonly BuiltWorld[],
   save: Pick<SaveData, "levels" | "skipped">,
 ): LevelRef | null {
+  return flatLevels(worlds).find((r) => !isPassed(save, r.id)) ?? null;
+}
+
+/** The level whose completion (or skip) opens `ref`; `null` for the very first level. */
+export function gatingLevel(
+  worlds: readonly BuiltWorld[],
+  ref: Omit<LevelRef, "id">,
+): LevelRef | null {
   const all = flatLevels(worlds);
-  for (let i = 0; i < all.length; i++) {
-    const ref = all[i]!;
-    const unlocked = i === 0 || isPassed(save, all[i - 1]!.id);
-    if (!unlocked) return null;
-    if (!isCompleted(save, ref.id)) return ref;
-  }
-  return null;
+  const i = all.findIndex((r) => r.world === ref.world && r.level === ref.level);
+  return i > 0 ? all[i - 1]! : null;
 }
 
 export interface WorldProgress {
@@ -63,7 +69,7 @@ export function worldProgress(world: BuiltWorld, save: Pick<SaveData, "levels">)
   let stars = 0;
   let completed = 0;
   for (const b of world.levels) {
-    const p = save.levels[b.level.id];
+    const p = Object.hasOwn(save.levels, b.level.id) ? save.levels[b.level.id] : undefined;
     if (p) {
       stars += p.stars;
       completed++;

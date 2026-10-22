@@ -845,17 +845,27 @@ export class PlayScene extends Phaser.Scene {
       }
     }
     let height = by + px(24) + px(22);
-    if (kind === "lose" && (this.lossStreaks().get(this.built.level.id) ?? 0) >= SKIP_AFTER) {
+    const beaten = Object.hasOwn(getSave(this)?.data.levels ?? {}, this.built.level.id);
+    if (
+      kind === "lose" &&
+      !beaten &&
+      (this.lossStreaks().get(this.built.level.id) ?? 0) >= SKIP_AFTER
+    ) {
+      // Like Button: only a press that starts and ends on the link counts, so a finger lifting
+      // off the board as the card appears can't skip by accident.
+      let pressed = false;
       const skip = this.add
         .text(0, height + px(4), "Skip this level for now ›", {
           fontFamily: theme.font,
           fontSize: font(14),
           color: theme.textDim,
-          padding: { x: px(12), y: px(10) },
+          padding: { x: px(16), y: px(16) },
         })
         .setOrigin(0.5, 0)
         .setInteractive({ useHandCursor: true })
-        .on("pointerup", () => this.skipLevel());
+        .on("pointerdown", () => (pressed = true))
+        .on("pointerout", () => (pressed = false))
+        .on("pointerup", () => pressed && this.skipLevel());
       parts.push(skip);
       height += skip.height + px(8);
     }
