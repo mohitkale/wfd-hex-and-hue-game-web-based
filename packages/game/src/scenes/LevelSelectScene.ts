@@ -12,6 +12,9 @@ import type { PlayData } from "./PlayScene";
 export class LevelSelectScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private readonly haptics = new Haptics();
+  private maxScroll = 0;
+  /** True once the current touch has moved far enough to be a scroll, not a tap. */
+  private dragging = false;
 
   constructor() {
     super("levels");
@@ -19,8 +22,11 @@ export class LevelSelectScene extends Phaser.Scene {
 
   create(): void {
     this.objects = [];
+    this.dragging = false;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
+    this.setupScrolling();
+    this.cameras.main.setScroll(0, (this.registry.get("levelsScroll") as number | undefined) ?? 0);
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
@@ -72,6 +78,46 @@ export class LevelSelectScene extends Phaser.Scene {
       });
       y += Math.ceil(world.levels.length / cols) * (tile + px(30)) + px(16);
     });
+    const { height } = this.scale.gameSize;
+    const bottomInset =
+      (this.registry.get("insets") as { bottom: number } | undefined)?.bottom ?? 0;
+    this.maxScroll = Math.max(0, y + bottomInset + px(24) - height);
+    this.scrollTo(this.cameras.main.scrollY);
+  }
+
+  /** Drag (touch or mouse) and wheel scrolling of the level list. */
+  private setupScrolling(): void {
+    const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
+    let startY = 0;
+    let startScroll = 0;
+    // Only the first finger scrolls; a second touch mid-drag is ignored instead of jumping.
+    let activePointer = -1;
+    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      if (activePointer !== -1 && activePointer !== p.id) return;
+      activePointer = p.id;
+      startY = p.y;
+      startScroll = this.cameras.main.scrollY;
+      this.dragging = false;
+    });
+    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
+      if (p.id === activePointer) activePointer = -1;
+    });
+    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+      if (!p.isDown || p.id !== activePointer) return;
+      const dy = p.y - startY;
+      if (Math.abs(dy) > 10 * dpr) this.dragging = true;
+      if (this.dragging) this.scrollTo(startScroll - dy);
+    });
+    this.input.on("wheel", (_p: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) =>
+      this.scrollTo(this.cameras.main.scrollY + dy * dpr),
+    );
+  }
+
+  private scrollTo(y: number): void {
+    const clamped = Math.max(0, Math.min(this.maxScroll, y));
+    this.cameras.main.setScroll(0, clamped);
+    // Remembered so returning from a level lands where the player left the list.
+    this.registry.set("levelsScroll", clamped);
   }
 
   private levelTile(
@@ -108,13 +154,20 @@ export class LevelSelectScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     // Only a press that started on this tile opens it (a future scrolling map must not misfire).
     let pressed = false;
-    disc.on("pointerdown", () => {
-      pressed = true;
-      this.tweens.add({ targets: [disc, label], scale: 0.9, duration: 80, yoyo: true });
-      this.haptics.play("tap");
-    });
+    disc.on("pointerdown", () => (pressed = true));
     disc.on("pointerout", () => (pressed = false));
-    disc.on("pointerup", () => pressed && this.scene.start("play", data));
+    // Feedback waits for a confirmed tap, so a scroll that starts on a tile doesn't buzz.
+    disc.on("pointerup", () => {
+      if (!pressed || this.dragging) return;
+      this.haptics.play("tap");
+      this.tweens.add({
+        targets: [disc, label],
+        scale: 0.9,
+        duration: 70,
+        yoyo: true,
+        onComplete: () => this.scene.start("play", data),
+      });
+    });
     return [halo, disc, label, caption];
   }
 }
