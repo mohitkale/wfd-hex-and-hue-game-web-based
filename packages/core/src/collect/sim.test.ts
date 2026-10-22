@@ -243,7 +243,9 @@ describe("edge-case boards", () => {
     apply(s, select(0));
     apply(s, select(1));
     const log: Record<number, CollectEvent[]> = {};
-    while (s.status === "playing" && !isSettled(s)) log[s.tick + 1] = tick(s);
+    for (let i = 0; i < 5_000 && s.status === "playing" && !isSettled(s); i++) {
+      log[s.tick + 1] = tick(s);
+    }
     expect(types(log[1]!)).toEqual([
       "familiarSpawned",
       "cubeReserved",
@@ -362,7 +364,8 @@ describe("rules of play", () => {
     apply(b, select(2));
     const evA = runUntilSettled(a);
     const evB: CollectEvent[] = [];
-    while (!isSettled(b)) evB.push(...step(b));
+    for (let i = 0; i < 5_000 && !isSettled(b); i++) evB.push(...step(b));
+    expect(isSettled(b)).toBe(true);
     expect(evA).toEqual(evB);
     expect(a).toEqual(b);
   });

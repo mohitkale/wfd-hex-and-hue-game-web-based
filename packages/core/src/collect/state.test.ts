@@ -242,7 +242,7 @@ describe("edge cases the engine must handle", () => {
     const s = createCollectState(level);
     apply(s, select(0));
     const spawnTicks: number[] = [];
-    while (!isSettled(s)) {
+    for (let i = 0; i < 5_000 && !isSettled(s); i++) {
       const ev = step(s);
       if (ev.some((e) => e.type === "familiarSpawned")) spawnTicks.push(s.tick);
     }
