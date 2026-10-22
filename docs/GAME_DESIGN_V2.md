@@ -205,9 +205,10 @@ y2:  X X X X
 `Y` at `(2,1)` is **not** accessible. Removing `(1,0)` (an X touching the top ring) joins the pocket
 to `R`, and `Y` becomes accessible in that update.
 
-**Board R-08** (`3×1`, `P = (1,1)`, `squad = 1`): columns `[P:1]` (id 0), `[Q:1]` (id 1), cubes
-`P` at `(0,0)` and `Q` at `(2,0)`. Both groups are selected at tick 0. Tick 1: each spawns its
-familiar (targets `(0,0)` via `(0,1)`, and `(2,0)` via `(2,1)`). Tick 2: both move. Tick 3: both
+**Board R-08** (`3×1`, `P = (1,1)`, `squad = 1`): columns `[P:1]` (id 0), `[Q:1]` (id 1), board
+`P . Q` (cubes `P` at `(0,0)` and `Q` at `(2,0)`, `(1,0)` empty). Both groups are selected at tick 0.
+Tick 1: each spawns its familiar; both target cubes are reached from the same standing cell `(1,0)`
+(distance 1, the smaller index among equal-distance neighbours), so both routes are `P → (1,0)`. Tick 2: both move. Tick 3: both
 pick up in the same Phase 1 (familiar 0 first); `dist` updates once. Tick 4: both carry. Tick 5:
 both deliver; the level is won when the second delivery lands.
 
