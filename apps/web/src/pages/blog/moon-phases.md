@@ -30,7 +30,7 @@ point where a plan meets real life.
 ## Waxing Gibbous
 
 Almost full. A time to refine and adjust: you can see the shape of the result, but it still needs
-care. If you have ever had three slots full and one wisp left to place, you know the feeling.
+care. If you have ever had all but one slot full and a wisp still to place, you know the feeling.
 
 ## Full Moon
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUDGETS, checkBudgets, type BuiltFile } from "./budget";
+import { BUDGETS, checkBudgets, scriptLeaks, type BuiltFile } from "./budget";
 
 const file = (path: string, gzip: number, bytes = gzip * 3): BuiltFile => ({ path, gzip, bytes });
 
@@ -33,5 +33,18 @@ describe("performance budget", () => {
   it("keeps the hint worker out of the play JS total", () => {
     const [js] = checkBudgets([file("_astro/hint.worker-x.js", 500_000)]);
     expect(js!.value).toBe(0);
+  });
+});
+
+describe("script leaks", () => {
+  it("only the play page may load a script bundle", () => {
+    const bundle = '<script type="module" src="/_astro/play.abc.js"></script>';
+    expect(
+      scriptLeaks([
+        { path: "play/index.html", html: bundle },
+        { path: "index.html", html: '<script type="module">setupPwa()</script>' },
+        { path: "blog/x/index.html", html: bundle },
+      ]),
+    ).toEqual(["blog/x/index.html"]);
   });
 });

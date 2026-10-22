@@ -48,7 +48,26 @@ export function gallery(): GalleryWorld[] {
 /** URL of a mosaic's artwork image (generated at build time by pages/art/[id].png.ts). */
 export const artUrl = (id: string) => `/art/${id}.png`;
 
+/** Used when no site URL is configured (local builds); see astro.config.mjs. */
+export const PLACEHOLDER_SITE = "https://hexandhue.example";
+
 /** Absolute URL for `path` on the configured site (canonical links, share cards). */
 export function absolute(path: string, site: URL | undefined): string {
-  return new URL(path, site ?? "https://hexandhue.example").toString();
+  return new URL(path, site ?? PLACEHOLDER_SITE).toString();
+}
+
+/** A mosaic's 1200×630 share card (pages/og/[id].png.ts), for posts that feature it. */
+export const ogCardUrl = (id: string) => `/og/${id}.png`;
+
+/**
+ * Sitemap paths from page module paths ("./faq.astro", "./blog/index.astro"…): dynamic routes and
+ * the 404 page left out, every page in its canonical directory form ("/faq/").
+ */
+export function sitemapPaths(files: readonly string[]): string[] {
+  return files
+    .map((f) => f.replace(/^\.\//, "/").replace(/\.(astro|md)$/, ""))
+    .filter((p) => !p.includes("[") && !p.endsWith("/404"))
+    .map((p) => (p.endsWith("/index") ? p.slice(0, -"index".length) : p))
+    .map((p) => (p.endsWith("/") ? p : `${p}/`))
+    .sort();
 }

@@ -4,10 +4,10 @@ import { artUrl } from "../../lib/site";
 
 interface Post {
   url: string;
-  frontmatter: { title: string; description: string; date: string; art?: string };
+  frontmatter: { title: string; description: string; date: string | Date; art?: string };
 }
 const posts = Object.values(import.meta.glob<Post>("./*.md", { eager: true })).sort(
-  (a, b) => Date.parse(b.frontmatter.date) - Date.parse(a.frontmatter.date),
+  (a, b) => new Date(b.frontmatter.date).getTime() - new Date(a.frontmatter.date).getTime(),
 );
 ---
 

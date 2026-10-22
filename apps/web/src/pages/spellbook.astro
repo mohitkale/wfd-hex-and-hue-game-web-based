@@ -9,7 +9,7 @@ const jsonLd = {
   "@type": "CollectionPage",
   name: "The Hex & Hue Spellbook",
   description: `All ${total} mosaics of ${SITE.name}, with their lore.`,
-  url: absolute("/spellbook", Astro.site),
+  url: absolute(Astro.url.pathname, Astro.site),
 };
 ---
 
@@ -54,7 +54,7 @@ const jsonLd = {
     </section>
   ))}
   <p class="play-more">
-    Fill your own Spellbook: <a href="/play">play Hex &amp; Hue</a>, free.
+    Fill your own Spellbook: <a href="/play/">play Hex &amp; Hue</a>, free.
   </p>
 </Page>
 

@@ -1,12 +1,13 @@
 ---
 import Page from "./Page.astro";
-import { SITE, absolute, artUrl } from "../lib/site";
+import { SITE, absolute, artUrl, ogCardUrl } from "../lib/site";
 
 interface Props {
   frontmatter: {
     title: string;
     description: string;
-    date: string;
+    /** YAML gives unquoted dates as Date objects. */
+    date: string | Date;
     /** A mosaic id whose artwork illustrates the post. */
     art?: string;
   };
@@ -22,7 +23,7 @@ const jsonLd = {
   author: { "@type": "Organization", name: SITE.name },
   publisher: { "@type": "Organization", name: SITE.name },
   url: absolute(Astro.url.pathname, Astro.site),
-  ...(frontmatter.art ? { image: absolute(artUrl(frontmatter.art), Astro.site) } : {}),
+  ...(frontmatter.art ? { image: absolute(ogCardUrl(frontmatter.art), Astro.site) } : {}),
 };
 ---
 
@@ -30,12 +31,13 @@ const jsonLd = {
   title={`${frontmatter.title}: Hex & Hue`}
   description={frontmatter.description}
   type="article"
-  image={frontmatter.art ? artUrl(frontmatter.art) : undefined}
+  image={frontmatter.art ? ogCardUrl(frontmatter.art) : undefined}
+  imageAlt={`${frontmatter.title}: a Hex & Hue pixel mosaic`}
   jsonLd={jsonLd}
 >
   <article class="prose">
     <p class="meta">
-      <a href="/blog">Blog</a> ·
+      <a href="/blog/">Blog</a> ·
       <time datetime={published.toISOString()}>
         {published.toLocaleDateString("en", { dateStyle: "long", timeZone: "UTC" })}
       </time>
@@ -46,7 +48,7 @@ const jsonLd = {
     )}
     <slot />
     <p class="cta-line">
-      <a href="/play">Play Hex &amp; Hue</a>, free, and collect the mosaics yourself.
+      <a href="/play/">Play Hex &amp; Hue</a>, free, and collect the mosaics yourself.
     </p>
   </article>
 </Page>

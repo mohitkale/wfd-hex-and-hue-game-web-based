@@ -1,7 +1,7 @@
 /**
  * Performance budget for the production build (GAME_DESIGN §6: first playable frame < 2 s on 4G).
- * Sizes are gzip bytes, what a phone actually downloads, except `total`, which is raw bytes
- * precached for offline play.
+ * Sizes are gzip bytes (what a phone actually downloads), except `bytes` budgets: the raw size
+ * of the deploy.
  */
 export interface BuiltFile {
   /** Path relative to the build root, "/"-separated. */
@@ -54,7 +54,7 @@ export const BUDGETS: Budget[] = [
     max: 5 * KB,
   },
   {
-    label: "whole build (offline cache)",
+    label: "whole build (deploy size)",
     match: () => true,
     measure: "bytes",
     per: "total",
@@ -92,4 +92,14 @@ export function checkBudgets(files: readonly BuiltFile[], budgets = BUDGETS): Bu
       ...(worst ? { file: worst.path } : {}),
     };
   });
+}
+
+/**
+ * Content pages must stay free of script bundles (the game's Phaser bundle above all): only the
+ * play page may load one. Returns the pages that break this. Inline scripts are fine.
+ */
+export function scriptLeaks(pages: readonly { path: string; html: string }[]): string[] {
+  return pages
+    .filter((p) => p.path !== "play/index.html" && /<script[^>]*\ssrc="\/_astro\//.test(p.html))
+    .map((p) => p.path);
 }

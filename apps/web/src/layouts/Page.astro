@@ -7,20 +7,22 @@ interface Props {
   image?: string | undefined;
   type?: "website" | "article" | undefined;
   jsonLd?: object | undefined;
+  imageAlt?: string | undefined;
+  noindex?: boolean | undefined;
 }
 const props = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, "") || "/";
 const footerLinks = [
-  { href: "/play", label: "Play" },
-  { href: "/spellbook", label: "Spellbook" },
-  { href: "/blog", label: "Blog" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/privacy", label: "Privacy" },
+  { href: "/play/", label: "Play" },
+  { href: "/spellbook/", label: "Spellbook" },
+  { href: "/blog/", label: "Blog" },
+  { href: "/faq/", label: "FAQ" },
+  { href: "/privacy/", label: "Privacy" },
 ];
 const nav = [
-  { href: "/spellbook", label: "Spellbook" },
-  { href: "/blog", label: "Blog" },
-  { href: "/faq", label: "FAQ" },
+  { href: "/spellbook/", label: "Spellbook" },
+  { href: "/blog/", label: "Blog" },
+  { href: "/faq/", label: "FAQ" },
 ];
 ---
 
@@ -35,7 +37,7 @@ const nav = [
           {n.label}
         </a>
       ))}
-      <a class="nav-play" href="/play">
+      <a class="nav-play" href="/play/">
         Play
       </a>
     </nav>
@@ -161,8 +163,14 @@ const nav = [
     padding: 0;
   }
   .site-footer .links a {
-    display: inline-block;
-    padding: 8px 0;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* Jump links and deep links land below the sticky header. */
+  :target,
+  section[id] {
+    scroll-margin-top: 80px;
   }
   @media (max-width: 420px) {
     .brand {

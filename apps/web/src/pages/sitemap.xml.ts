@@ -1,14 +1,8 @@
 import type { APIRoute } from "astro";
-import { absolute } from "../lib/site";
+import { absolute, sitemapPaths } from "../lib/site";
 
 /** Every content page (the game, the gallery, the blog), discovered from the pages directory. */
-const pages = Object.keys(import.meta.glob("./**/*.{astro,md}"))
-  .map((f) => f.replace(/^\.\//, "/").replace(/\.(astro|md)$/, ""))
-  .filter((p) => !p.includes("[") && !p.endsWith("/404"))
-  .map((p) => (p.endsWith("/index") ? p.slice(0, -"index".length) : p))
-  // Pages build as directories (/faq/index.html): list them the way their canonical links do.
-  .map((p) => (p.endsWith("/") ? p : `${p}/`))
-  .sort();
+const pages = sitemapPaths(Object.keys(import.meta.glob("./**/*.{astro,md}")));
 
 export const GET: APIRoute = ({ site }) => {
   const urls = pages.map((p) => `  <url><loc>${absolute(p, site)}</loc></url>`).join("\n");

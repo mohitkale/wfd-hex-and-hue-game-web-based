@@ -6,7 +6,7 @@ const worlds = gallery();
 const blurbs: Record<string, string> = {
   moonlit: "Crescents, candles and starlit spells: a gentle start under the moon.",
   crystal: "Amethyst, quartz and pendulums, with layered colors to untangle.",
-  zodiac: "All twelve signs and the constellations, with tighter slots for seasoned witches.",
+  zodiac: "All twelve signs and the constellations, for seasoned witches.",
 };
 const strip = [
   worlds[0]!.items[0]!,
@@ -30,7 +30,7 @@ const jsonLd = {
 };
 ---
 
-<Page title={`${SITE.fullName}: a free cozy witchy puzzle`} jsonLd={jsonLd}>
+<Page title={`${SITE.fullName}, free in your browser`} jsonLd={jsonLd}>
   <section class="hero">
     <div class="moon" aria-hidden="true"></div>
     <h1>Hex &amp; Hue</h1>
@@ -40,10 +40,10 @@ const jsonLd = {
       moon, crystal and zodiac art. A cozy color-sorting puzzle you can play anywhere, for free.
     </p>
     <div class="ctas">
-      <a class="cta" href="/play">
+      <a class="cta" href="/play/">
         Play now, free
       </a>
-      <a class="cta secondary" href="/spellbook">
+      <a class="cta secondary" href="/spellbook/">
         Browse the Spellbook
       </a>
     </div>
@@ -61,7 +61,7 @@ const jsonLd = {
     <ol class="steps">
       <li>
         <strong>Tap a column</strong>
-        <span>Its front wisp flies around the board, gathering power from the mosaic.</span>
+        <span>Its front wisp flies around the board, collecting fragments as it goes.</span>
       </li>
       <li>
         <strong>Match the colors</strong>
@@ -129,7 +129,7 @@ const jsonLd = {
 
   <section class="final">
     <p>Ready for a little magic?</p>
-    <a class="cta" href="/play">
+    <a class="cta" href="/play/">
       Start playing
     </a>
   </section>
