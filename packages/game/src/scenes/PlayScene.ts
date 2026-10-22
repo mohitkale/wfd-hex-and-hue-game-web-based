@@ -18,6 +18,7 @@ import { Haptics } from "../haptics";
 import { IDLE_HINT_MS } from "../hint";
 import { getHinter } from "../hinter";
 import { ComboTracker, confettiColors, isComboMilestone } from "../juice";
+import { TIPS, hintDelayMs, tipFor, tutorialDone, type TipTrigger } from "../tips";
 import { flatLevels } from "../progress";
 import {
   AD_COINS,
@@ -151,6 +152,9 @@ export class PlayScene extends Phaser.Scene {
   private hintView: Phaser.GameObjects.Image | null = null;
   /** One reused "Combo ×n" label (a new Text per combo would mean a texture upload each time). */
   private comboLabel: Phaser.GameObjects.Text | null = null;
+  /** The onboarding tip on screen, if any (kept as text so a relayout can redraw it). */
+  private coachTip: string | null = null;
+  private coach: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super("play");
@@ -200,6 +204,8 @@ export class PlayScene extends Phaser.Scene {
     this.hintMove = null;
     this.hintView = null;
     this.comboLabel = null;
+    this.coachTip = null;
+    this.coach = null;
     this.runId++;
     const save = getSave(this);
     const unsubscribeSave = save?.subscribe((d) => this.boosterBar?.update(d));
@@ -233,6 +239,7 @@ export class PlayScene extends Phaser.Scene {
     });
     this.relayout();
     fadeIn(this);
+    this.showTip({ type: "start" });
   }
 
   override update(_time: number, delta: number): void {
@@ -329,6 +336,7 @@ export class PlayScene extends Phaser.Scene {
         .setVisible(false),
     );
     this.refreshTargets(true);
+    if (this.coachTip) this.drawCoach(this.coachTip, false);
     // Views keep their identity across relayouts; snap them to their new spots.
     for (const [id, view] of this.wisps) this.snap(id, view);
     if (this.overlayKind) this.showCard(this.overlayKind, false);
@@ -646,6 +654,7 @@ export class PlayScene extends Phaser.Scene {
         break;
       case "launched":
         getAudio(this).play("launch");
+        this.showTip({ type: "launched", fromSlot: e.from.kind === "slot" });
         break;
       case "collected": {
         this.haptics.play("collect");
@@ -660,6 +669,7 @@ export class PlayScene extends Phaser.Scene {
           const at = this.mosaic.cellCenter(e.cell);
           this.burst?.setParticleTint(hexToNumber(this.built.level.palette[e.color]!));
           this.burst?.explode(5, at.x, at.y);
+          this.showTip({ type: "collected" });
           const chain = this.combo.hit(e.wispId, this.session.state.step);
           if (isComboMilestone(chain)) this.showCombo(chain, view ?? at);
         }
@@ -672,12 +682,18 @@ export class PlayScene extends Phaser.Scene {
         this.burst?.setParticleTint(theme.glow);
         this.burst?.explode(10, x, y);
         this.combo.end(e.wispId);
+        this.showTip({ type: "portal" });
         this.departToPortal(e.wispId);
         break;
       }
       case "parked":
         this.haptics.play("park");
         this.combo.end(e.wispId);
+        this.showTip({
+          type: "parked",
+          freeSlots: this.session.state.slots.filter((w) => w === null).length,
+          slots: this.session.state.slots.length,
+        });
         getAudio(this).play("park");
         break;
       case "won":
@@ -697,6 +713,7 @@ export class PlayScene extends Phaser.Scene {
         });
         break;
       case "lost":
+        this.hideCoach();
         this.haptics.play("lose");
         getAudio(this).play("lose");
         getSave(this)?.update((d) => d.stats.losses++);
@@ -713,7 +730,10 @@ export class PlayScene extends Phaser.Scene {
         this.assists = e.type === "undone" ? this.assists + 1 : 0;
         this.combo.reset();
         this.clearHint();
-        if (e.type === "restarted") getSave(this)?.update((d) => d.stats.plays++);
+        if (e.type === "restarted") {
+          getSave(this)?.update((d) => d.stats.plays++);
+          this.showTip({ type: "restarted", afterLoss: this.overlayKind === "lose" });
+        }
         if (e.type === "undone" && e.reverted !== "tap") {
           // Undoing a booster gives it back (as stock), so nothing paid is lost.
           const kind = e.reverted;
@@ -1029,7 +1049,9 @@ export class PlayScene extends Phaser.Scene {
       });
     }
     this.idleMs += delta;
-    if (this.idleMs >= IDLE_HINT_MS && this.hintMove && !this.hintView) this.showHint();
+    const save = getSave(this)?.data;
+    const delay = hintDelayMs(save ? tutorialDone(save) : true, IDLE_HINT_MS);
+    if (this.idleMs >= delay && this.hintMove && !this.hintView) this.showHint();
   }
 
   private showHint(): void {
@@ -1053,6 +1075,77 @@ export class PlayScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
     });
     this.hintView = glow;
+    this.showTip({ type: "hint" });
+  }
+
+  /** Shows the onboarding tip for this moment, if there is one the player hasn't seen yet. */
+  private showTip(trigger: TipTrigger): void {
+    const save = getSave(this);
+    if (!save) return;
+    const id = tipFor(trigger, save.data.tips, tutorialDone(save.data));
+    if (!id) return;
+    save.update((d) => {
+      if (!d.tips.includes(id)) d.tips.push(id);
+    });
+    this.drawCoach(TIPS[id]);
+  }
+
+  /**
+   * A coach banner just above the boosters (where toasts appear). It never blocks play: the board
+   * keeps running, a tap on the banner dismisses it, and it fades by itself.
+   */
+  private drawCoach(message: string, animate = true): void {
+    this.hideCoach();
+    this.coachTip = message;
+    const { boosters, dpr, frame } = this.layout;
+    const px = (v: number) => Math.round(v * dpr);
+    const width = Math.min(frame.w - px(24), px(360));
+    const text = this.add
+      .text(0, 0, message, {
+        fontFamily: theme.font,
+        fontSize: `${px(14)}px`,
+        color: theme.text,
+        align: "center",
+        lineSpacing: px(2),
+        wordWrap: { width: width - px(32) },
+      })
+      .setOrigin(0.5);
+    const height = text.height + px(22);
+    const panel = this.add.graphics();
+    panel.fillStyle(theme.dusk, 0.96);
+    panel.fillRoundedRect(-width / 2, -height / 2, width, height, px(14));
+    panel.lineStyle(Math.max(1, 1.5 * dpr), theme.glow, 0.7);
+    panel.strokeRoundedRect(-width / 2, -height / 2, width, height, px(14));
+    const y = boosters.y - px(10) - height / 2;
+    const coach = this.add
+      .container(frame.x + frame.w / 2, y, [panel, text])
+      .setSize(width, height)
+      .setDepth(DEPTH.hud)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerup", () => this.hideCoach());
+    this.coach = coach;
+    if (animate) {
+      coach.setAlpha(0).setY(y + px(12));
+      this.tweens.add({ targets: coach, alpha: 1, y, duration: 220, ease: "Quad.easeOut" });
+    }
+    // Long enough to read (about 60 ms a character), then it fades away.
+    this.tweens.add({
+      targets: coach,
+      alpha: 0,
+      delay: Math.max(4500, message.length * 60),
+      duration: 400,
+      onComplete: () => {
+        if (this.coach === coach) this.hideCoach();
+      },
+    });
+  }
+
+  private hideCoach(): void {
+    this.coachTip = null;
+    if (!this.coach) return;
+    this.tweens.killTweensOf(this.coach);
+    this.coach.destroy();
+    this.coach = null;
   }
 
   /** The board changed or the player acted: forget the hint and restart the idle timer. */
@@ -1219,6 +1312,7 @@ export class PlayScene extends Phaser.Scene {
 
   private toast(message: string): void {
     const { boosters, dpr, frame } = this.layout;
+    this.hideCoach(); // same spot on screen
     this.toastText?.destroy();
     this.toastText = this.add
       .text(frame.x + frame.w / 2, boosters.y - 8 * dpr, message, {

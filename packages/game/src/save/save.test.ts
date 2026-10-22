@@ -80,6 +80,13 @@ describe("migrate", () => {
     ]);
   });
 
+  it("v1 → v2: players who already won a level skip the tutorial tips; new ones see them", () => {
+    const veteran = migrate({ version: 1, levels: { "moonlit-01": { stars: 3, wins: 1 } } });
+    expect(veteran.tips).toEqual(["launch", "collect", "portal", "park", "relaunch"]);
+    expect(migrate({ version: 1, coins: 5 }).tips).toEqual([]);
+    expect(migrate({ version: SAVE_VERSION, tips: ["a", 1, "a"] }).tips).toEqual(["a"]);
+  });
+
   it("keeps a level id of __proto__ as a plain key", () => {
     const m = migrate(JSON.parse('{"levels":{"__proto__":{"stars":2,"wins":1}}}'));
     expect(Object.getPrototypeOf(m.levels)).toBe(Object.prototype);
@@ -113,6 +120,12 @@ describe("mergeSaves", () => {
     const mine = { ...defaultSave(), skipped: ["a", "b"] };
     const theirs = { ...defaultSave(), skipped: ["b", "c"] };
     expect(mergeSaves(base, mine, theirs).skipped.sort()).toEqual(["a", "b", "c"]);
+    const tipsMerged = mergeSaves(
+      defaultSave(),
+      { ...defaultSave(), tips: ["launch"] },
+      { ...defaultSave(), tips: ["collect"] },
+    ).tips;
+    expect(tipsMerged.sort()).toEqual(["collect", "launch"]);
   });
 
   it("keeps their settings unless this tab changed them", () => {

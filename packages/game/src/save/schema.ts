@@ -1,5 +1,5 @@
 /** Current save format. Bump and add a step to `MIGRATIONS` whenever the shape changes. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export const BOOSTERS = ["undo", "shuffle", "extraSlot", "wand"] as const;
 export type BoosterKind = (typeof BOOSTERS)[number];
@@ -35,6 +35,8 @@ export interface SaveData {
   stats: { plays: number; wins: number; losses: number };
   /** Where the player last was, for "continue". */
   lastPlayed: { world: number; level: number } | null;
+  /** Onboarding tips already shown (see tips.ts); each appears once. */
+  tips: string[];
 }
 
 /** A brand-new player: some coins and two of each booster so they can try everything. */
@@ -49,6 +51,7 @@ export function defaultSave(): SaveData {
     settings: { haptics: true, sound: true, music: true, sfxVolume: 0.8, musicVolume: 0.5 },
     stats: { plays: 0, wins: 0, losses: 0 },
     lastPlayed: null,
+    tips: [],
   };
 }
 
@@ -67,6 +70,15 @@ const unit = (v: unknown, fallback: number): number =>
  */
 const MIGRATIONS: Record<number, (data: Record<string, unknown>) => Record<string, unknown>> = {
   0: (data) => ({ ...data, version: 1 }),
+  // v2 adds onboarding tips. Players who already won a level know the basics: skip the tutorial.
+  1: (data) => ({
+    ...data,
+    version: 2,
+    tips:
+      isObject(data.levels) && Object.keys(data.levels).length > 0
+        ? ["launch", "collect", "portal", "park", "relaunch"]
+        : [],
+  }),
 };
 
 /**
@@ -142,5 +154,8 @@ export function migrate(raw: unknown): SaveData {
       last && typeof last.world === "number" && typeof last.level === "number"
         ? { world: count(last.world, 0), level: count(last.level, 0) }
         : null,
+    tips: Array.isArray(data.tips)
+      ? [...new Set(data.tips.filter((id): id is string => typeof id === "string"))]
+      : [],
   };
 }
