@@ -12,6 +12,9 @@ import type { PlayData } from "./PlayScene";
 export class LevelSelectScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private readonly haptics = new Haptics();
+  private maxScroll = 0;
+  /** True once the current touch has moved far enough to be a scroll, not a tap. */
+  private dragging = false;
 
   constructor() {
     super("levels");
@@ -19,8 +22,10 @@ export class LevelSelectScene extends Phaser.Scene {
 
   create(): void {
     this.objects = [];
+    this.dragging = false;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
+    this.setupScrolling();
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
@@ -72,6 +77,36 @@ export class LevelSelectScene extends Phaser.Scene {
       });
       y += Math.ceil(world.levels.length / cols) * (tile + px(30)) + px(16);
     });
+    const { height } = this.scale.gameSize;
+    const bottomInset =
+      (this.registry.get("insets") as { bottom: number } | undefined)?.bottom ?? 0;
+    this.maxScroll = Math.max(0, y + bottomInset + px(24) - height);
+    this.scrollTo(this.cameras.main.scrollY);
+  }
+
+  /** Drag (touch or mouse) and wheel scrolling of the level list. */
+  private setupScrolling(): void {
+    const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
+    let startY = 0;
+    let startScroll = 0;
+    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      startY = p.y;
+      startScroll = this.cameras.main.scrollY;
+      this.dragging = false;
+    });
+    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+      if (!p.isDown) return;
+      const dy = p.y - startY;
+      if (Math.abs(dy) > 10 * dpr) this.dragging = true;
+      if (this.dragging) this.scrollTo(startScroll - dy);
+    });
+    this.input.on("wheel", (_p: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) =>
+      this.scrollTo(this.cameras.main.scrollY + dy * dpr),
+    );
+  }
+
+  private scrollTo(y: number): void {
+    this.cameras.main.setScroll(0, Math.max(0, Math.min(this.maxScroll, y)));
   }
 
   private levelTile(
@@ -114,7 +149,7 @@ export class LevelSelectScene extends Phaser.Scene {
       this.haptics.play("tap");
     });
     disc.on("pointerout", () => (pressed = false));
-    disc.on("pointerup", () => pressed && this.scene.start("play", data));
+    disc.on("pointerup", () => pressed && !this.dragging && this.scene.start("play", data));
     return [halo, disc, label, caption];
   }
 }
