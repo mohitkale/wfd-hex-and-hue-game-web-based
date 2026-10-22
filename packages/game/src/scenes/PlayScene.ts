@@ -14,6 +14,16 @@ import { computeLayout, type Insets, type Layout } from "../layout";
 import { PRICES, pay, paymentFor, winCoins } from "../economy";
 import { Haptics } from "../haptics";
 import { flatLevels } from "../progress";
+import {
+  AD_COINS,
+  getRewards,
+  safeShow,
+  speedButton,
+  speedOffer,
+  unlockSpeed,
+  type AdResult,
+  type Placement,
+} from "../rewards";
 import { getSave, starsFor, type BoosterKind } from "../save";
 import { keyToSource } from "../keys";
 import { levelAt, worlds } from "../levels";
@@ -102,6 +112,15 @@ export class PlayScene extends Phaser.Scene {
   private toastText: Phaser.GameObjects.Text | null = null;
   /** Coins earned by the last win, shown on the win card. */
   private earned = 0;
+  /** 2× has been unlocked for this level (GAME_DESIGN §3: it lasts the rest of the level). */
+  private speedUnlocked = false;
+  /** An ad turn came up empty this level: 1× until the next level (whose 2× is then free). */
+  private speedDeclined = false;
+  /** This win's coins were already doubled by an ad (survives card rebuilds on resize). */
+  private doubled = false;
+  private adOffer: Phaser.GameObjects.Text | null = null;
+  /** Bumped every run; async ad results from an earlier run are ignored. */
+  private runId = 0;
 
   constructor() {
     super("play");
@@ -138,6 +157,11 @@ export class PlayScene extends Phaser.Scene {
     this.wandPicker = [];
     this.toastText = null;
     this.earned = 0;
+    this.speedUnlocked = false;
+    this.speedDeclined = false;
+    this.doubled = false;
+    this.adOffer = null;
+    this.runId++;
     const save = getSave(this);
     const unsubscribeSave = save?.subscribe((d) => this.boosterBar?.update(d));
     this.haptics.enabled = save?.data.settings.haptics ?? true;
@@ -219,6 +243,8 @@ export class PlayScene extends Phaser.Scene {
     for (const o of [...this.chrome, ...this.hud, ...this.zones, ...this.moreLabels]) o.destroy();
     this.boosterBar?.destroy();
     this.closeWandPicker();
+    this.adOffer?.destroy();
+    this.adOffer = null;
     this.mosaic?.destroy();
     this.chrome = drawBoardChrome(
       this,
@@ -421,14 +447,122 @@ export class PlayScene extends Phaser.Scene {
     return g;
   }
 
-  private toggleSpeed(): void {
-    // The free/ad alternation for 2× arrives with the rewards interface (M5.4).
-    this.speed = this.speed === 1 ? 2 : 1;
+  /**
+   * Once 2× is unlocked for this level, the button toggles freely. Before that, a tap unlocks it:
+   * free on alternate turns, otherwise by an optional rewarded ad (see rewards/speed.ts).
+   */
+  private async toggleSpeed(): Promise<void> {
+    const save = getSave(this);
+    const turns = save?.data.speedTurns ?? 0;
+    const button = speedButton(this.speedState());
+    if (button.action === "toggle") {
+      this.speed = this.speed === 1 ? 2 : 1;
+      this.updateSpeedLabel();
+      return;
+    }
+    if (button.action === "explain") {
+      this.toast("No ad right now — 2× is free next level");
+      return;
+    }
+    const run = this.runId;
+    const ad = speedOffer(turns) === "ad" && getRewards(this).isAvailable("speed2x");
+    if (ad) this.pauseForAd();
+    const outcome = await unlockSpeed(turns, getRewards(this));
+    if (ad) this.resumeAfterAd();
+    if (run !== this.runId) return; // the level was left or restarted meanwhile
+    save?.update((d) => (d.speedTurns = outcome.turns));
+    if (outcome.granted) {
+      this.speedUnlocked = true;
+      this.speed = 2;
+      this.haptics.play("tap");
+    } else if (outcome.message) {
+      // No ad this time: 1× for the rest of this level, as promised; the next level's 2× is free.
+      this.speedDeclined = true;
+      this.toast(outcome.message);
+    }
     this.updateSpeedLabel();
   }
 
+  private speedState() {
+    return {
+      unlocked: this.speedUnlocked,
+      declined: this.speedDeclined,
+      speed: this.speed,
+      turns: getSave(this)?.data.speedTurns ?? 0,
+      adAvailable: getRewards(this).isAvailable("speed2x"),
+    };
+  }
+
   private updateSpeedLabel(): void {
-    this.speedLabel?.setText(`${this.speed}×`).setColor(this.speed === 2 ? "#f6d97a" : theme.text);
+    const { label } = speedButton(this.speedState());
+    this.speedLabel
+      ?.setText(label)
+      .setColor(this.speedUnlocked && this.speed === 2 ? "#f6d97a" : theme.text);
+  }
+
+  // ── Rewarded ads (always optional) ──────────────────────────────────────
+
+  /** Freeze the board while an ad is on screen. */
+  private pauseForAd(): void {
+    this.scene.pause();
+  }
+
+  private resumeAfterAd(): void {
+    if (this.sys.isPaused()) this.scene.resume();
+  }
+
+  private async watchAd(placement: Placement): Promise<AdResult> {
+    const rewards = getRewards(this);
+    if (!rewards.isAvailable(placement)) return "unavailable";
+    this.pauseForAd();
+    try {
+      return await safeShow(rewards, placement);
+    } finally {
+      this.resumeAfterAd();
+    }
+  }
+
+  /** When coins are short: a small, dismissible "watch an ad for coins" offer (if ads exist). */
+  private offerCoinsAd(): void {
+    if (!getRewards(this).isAvailable("coins")) return;
+    const { boosters, dpr, frame } = this.layout;
+    this.adOffer?.destroy();
+    let pressed = false;
+    const offer = this.add
+      .text(frame.x + frame.w / 2, boosters.y - 44 * dpr, `▶ Watch an ad for +${AD_COINS} ◉`, {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${Math.round(14 * dpr)}px`,
+        color: "#1a0f33",
+        backgroundColor: "#f6d97a",
+        padding: { x: Math.round(14 * dpr), y: Math.round(12 * dpr) },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH.hud)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => (pressed = true))
+      .on("pointerout", () => (pressed = false))
+      .on("pointerup", async () => {
+        if (!pressed) return;
+        offer.destroy();
+        this.adOffer = null;
+        const run = this.runId;
+        const result = await this.watchAd("coins");
+        if (run !== this.runId) return;
+        if (result === "rewarded") {
+          getSave(this)?.update((d) => (d.coins += AD_COINS));
+          this.boosterBar?.pulseCoins();
+          this.toast(`+${AD_COINS} ◉ — thank you for supporting Hex & Hue`);
+        }
+      });
+    this.adOffer = offer;
+    this.tweens.add({
+      targets: offer,
+      alpha: 0,
+      delay: 5000,
+      duration: 400,
+      onComplete: () => offer.destroy(),
+    });
   }
 
   // ── Engine events ───────────────────────────────────────────────────────
@@ -770,6 +904,7 @@ export class PlayScene extends Phaser.Scene {
     if (payment.kind === "short") {
       this.haptics.play("invalid");
       this.toast(`Need ${payment.missing} more ◉ — clear mosaics to earn coins`);
+      this.offerCoinsAd();
       return;
     }
     // Count the assist first: a booster can win the level synchronously (Wand), and the win
@@ -862,6 +997,35 @@ export class PlayScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(DEPTH.hud);
     this.tweens.add({ targets: this.toastText, alpha: 0, delay: 1800, duration: 400 });
+  }
+
+  private canReviveByAd(): boolean {
+    const save = getSave(this)?.data;
+    return (
+      !!save &&
+      paymentFor(save, "extraSlot").kind === "short" &&
+      getRewards(this).isAvailable("revive")
+    );
+  }
+
+  private reviveLabel(): string {
+    return this.canReviveByAd() ? "+1 Slot ▶ ad" : this.boosterLabel("extraSlot", "+1 Slot");
+  }
+
+  /** Revive from the lose card: from stock or coins, or (if both are short) an optional ad. */
+  private async revive(): Promise<void> {
+    if (!this.canReviveByAd()) return this.useBooster("extraSlot");
+    const run = this.runId;
+    const result = await this.watchAd("revive");
+    if (run !== this.runId) return;
+    if (result === "unavailable") {
+      this.toast("No ad right now — Retry is free");
+      return;
+    }
+    if (result !== "rewarded") return;
+    this.assists++;
+    // extraSlot only refuses on a won level, which can't be the case on the lose card.
+    if (!this.session.extraSlot()) this.assists--;
   }
 
   /** "Revive +1 slot (2)" / "+1 Slot ◉40" for the lose card. */
@@ -973,7 +1137,37 @@ export class PlayScene extends Phaser.Scene {
       text("✦  Mosaic complete  ✦", 14, "#f6d97a", { fontStyle: "bold" });
       text(this.built.level.name, 24, theme.text, { fontStyle: "bold" });
       text(this.built.lore, 15, theme.textDim, { fontStyle: "italic" });
-      if (this.earned > 0) text(`+${this.earned} ◉`, 18, "#f6d97a", { fontStyle: "bold" });
+      if (this.earned > 0) {
+        text(`+${this.earned} ◉`, 18, "#f6d97a", { fontStyle: "bold" });
+        if (this.doubled) {
+          text("Doubled ✦", 14, "#c9b8ff");
+        } else if (getRewards(this).isAvailable("doubleCoins")) {
+          // Optional: one ad doubles this win's coins.
+          let pressed = false;
+          const link = text(`▶ Watch an ad to double`, 14, theme.text, {
+            padding: { x: px(14), y: px(10) },
+          });
+          link
+            .setInteractive({ useHandCursor: true })
+            .on("pointerdown", () => (pressed = true))
+            .on("pointerout", () => (pressed = false))
+            .on("pointerup", async () => {
+              if (!pressed || !link.input?.enabled || this.doubled) return;
+              link.disableInteractive();
+              const run = this.runId;
+              const result = await this.watchAd("doubleCoins");
+              if (run !== this.runId) return;
+              if (result === "rewarded" && !this.doubled) {
+                this.doubled = true;
+                const bonus = this.earned;
+                getSave(this)?.update((d) => (d.coins += bonus));
+                this.earned += bonus;
+              }
+              // Re-render from scene state (the card may have been rebuilt during the ad).
+              if (this.overlayKind === "win") this.showCard("win", false);
+            });
+        }
+      }
     } else {
       text("The slots are full", 22, theme.text, { fontStyle: "bold" });
       text(
@@ -1010,9 +1204,9 @@ export class PlayScene extends Phaser.Scene {
           primary: true,
           onPress: () => this.session.restart(),
         }),
-        new Button(this, right, by, half, this.boosterLabel("extraSlot", "+1 Slot"), {
+        new Button(this, right, by, half, this.reviveLabel(), {
           dpr,
-          onPress: () => this.useBooster("extraSlot"),
+          onPress: () => void this.revive(),
         }),
       );
     }
