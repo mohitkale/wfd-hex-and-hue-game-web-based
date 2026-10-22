@@ -52,7 +52,7 @@ remaining cubes, you lose.
 | Squad           | The most familiars one group has out at once (`squad`).                                                                             |
 | Assignable cube | An accessible, unreserved cube of a group's colour.                                                                                 |
 | Reserved        | A cube a familiar has been sent to fetch (until it is picked up). No other familiar may target it.                                  |
-| Tick            | One discrete simulation step (§7). Every familiar performs exactly one action per tick.                                             |
+| Tick            | One discrete simulation step (§7). A familiar that exists at the start of a tick performs one action in Phase 1.                    |
 | Settled         | No familiar exists **and** no group is `working`. Every opened group is then completed or waiting.                                  |
 
 Familiars are the actors; the collectors are original creatures (M10.1). See §17 for the content rule.
@@ -66,7 +66,8 @@ A level is: `width`, `height`, `palette`, `cells` (palette index or `EMPTY`, row
   rules the solver uses. They are not device or speed settings and the renderer must never change
   them (they influence which cubes a capacity-bound group takes, §14 fixture C).
 - Every colour's total group capacity equals its cube count, so nothing is over- or under-collected.
-- At least one group exists; `K ≥ 1`; `squad ≥ 1`; `spawnGap ≥ 1`; `fieldCap ≥ 1`.
+- At least one group exists; `1 ≤ K ≤ 8`; `squad ≥ 1`; `spawnGap ≥ 1`; `fieldCap ≥ 1`.
+- **Group ids** are `0..n−1` in level order: `columns[0]` front to back, then `columns[1]` front to back, and so on. Every rule that says "ascending group id" uses this numbering.
 - The level has a **settled-sequential solution** (§10), stored with it and verified by the solver.
 - `portalX` must be in `[0, W−1]`; the portal is `(portalX, H)`, a ring cell, never a mosaic cell.
 
@@ -161,8 +162,7 @@ A familiar spawned or assigned with a route of length 0 starts in `pickup`. Remo
 are applied in familiar-id order, but `R` is recomputed once at the end of the phase, so two pickups
 in one tick never expose a cube to each other's decisions that tick.
 
-**Phase 2 — dispatch.** For each `working` group in ascending group id (a stable id given at level
-creation):
+**Phase 2 — dispatch.** For each `working` group in ascending group id (group id, §3):
 
 1. Each `idle` familiar of the group, in id order: if the group has uncommitted capacity and an
    assignable cube, it takes the next target (§4), reserves it and becomes `toCube` (or `pickup` for
@@ -174,12 +174,14 @@ creation):
 Familiar ids come from one global counter in the state, increasing by one per spawn and never
 reused; the counter is part of the serialised state.
 
-**Phase 3 — resolve.** For each `working` group in ascending group id:
+**Phase 3 — resolve.** Two passes over the `working` groups, each in ascending group id:
 
-- `delivered = capacity` → `completed`; it leaves the field.
-- Otherwise, if the group has no familiar and no assignable cube → it **stalls**: it moves to the
-  lowest free slot and becomes `waiting`. If **no slot is free the game is lost** (reason
-  `slotsFull`); the step ends immediately and the state is frozen.
+1. **Complete:** `delivered = capacity` → `completed`; it leaves the field. (Completing never frees a
+   slot.)
+2. **Stall:** a group with no familiar and no assignable cube **stalls**, also called _parking_: it
+   moves to the lowest free slot and becomes `waiting`. If **no slot is free the game is lost**
+   (reason `slotsFull`); the pass stops there and the state is frozen (groups after it in this pass
+   are left as they were).
 
 **Phase 4 — status.** If total delivered equals the number of cubes the level started with: **won**.
 Otherwise, if the state is settled (no familiar, no `working` group) and no legal action exists
@@ -195,10 +197,12 @@ never decided by animation, frame rate or timing. Win is tested first.
   the group ran dry".
 - **Lost, `deadlock`:** settled, cubes remain, and no legal action exists: no queued front and no
   waiting group has an assignable cube. Nothing can ever change again.
-- Every legal action delivers at least one cube eventually (a legal action needs an assignable cube,
-  and capacity ≥ 1), and the delivered total only grows, so every game ends.
-- The game does not declare a loss early for positions that are merely doomed but still have legal
-  moves; an optional "doomed" hint (M14) may use the solver.
+- From a **settled** state every legal action delivers at least one cube (it needs an assignable cube
+  and nothing else is working), and the delivered total only grows, so settled play always ends. In
+  concurrent play a legal action can park without delivering (fixture E); the game still cannot run
+  on by itself, because ticks only run while familiars or working groups exist, and each is finite.
+- Apart from `slotsFull` (§16 Q1), the game does not declare a loss early for positions that are
+  merely doomed but still have legal moves; an optional "doomed" hint (M14) may use the solver.
 
 Undo and boosters can recover from a loss (M14.4). Retry is always free and instant.
 
@@ -209,7 +213,7 @@ familiars share the open space and never block each other (they may overlap). Be
 rules fix every ordering, the result of a given **action log** (a list of `(tick, action)`) is
 unique. Speed (1× or 2×) changes only how many ticks are shown per second; the same log gives the
 same outcome at either speed (a human tapping at the same _visual_ moment at different speeds taps at
-different ticks, which is a different log).
+different ticks, which is a different log). Actions logged at the same tick apply in log order.
 
 Whether a group needs a manual resume depends on timing in concurrent play: if another group's pickup
 exposes a cube for a group that already stalled, that group is `waiting` and must be resumed; if it
@@ -227,7 +231,7 @@ model; branches that end in a loss are pruned.
 - A level is valid iff the settled-sequential model has a winning line, stored with the level.
 - A winning line in this model is always playable in the real game (just wait between taps).
 - Solver state identity at a settled state: for each column its group count; the set (unordered) of
-  waiting groups with their remaining capacity; which cubes remain. Tick, route data and spawn timers
+  waiting groups as (colour, remaining capacity) pairs; which cubes remain. Tick, route data and spawn timers
   carry no information at a settled state (there are no familiars and no working groups; timers are
   reset on select/resume); slot numbers do not matter in settled play.
 - Because the outcome of running groups to settled is a deterministic function of the board and the
@@ -375,17 +379,17 @@ selecting two groups of one colour against a single reachable cube is a poor cho
 
 ## 15. Parameters and their defaults
 
-| Parameter  | Default                         | Notes                                                            |
-| ---------- | ------------------------------- | ---------------------------------------------------------------- |
-| `K`        | 5                               | Holding slots, 1–8. The extra-slot booster adds one for a level. |
-| `fieldCap` | 3                               | Groups working at once, 1–6.                                     |
-| `squad`    | 3                               | Familiars per group at once, 1–6. Level constant.                |
-| `spawnGap` | 2 ticks                         | Between spawns of one group. Level constant.                     |
-| Pickup     | 1 tick                          | Fixed.                                                           |
-| Deliver    | 1 tick                          | Fixed.                                                           |
-| Tick rate  | tuned in M10 (≈ 8–12 / s at 1×) | Presentation only; 2× doubles it.                                |
-| `portalX`  | `⌊(W−1)/2⌋`                     | Level may override.                                              |
-| Max board  | 40×40 (+ 1-cell ring)           | Sized from mobile tests in M11.2.                                |
+| Parameter  | Default                         | Notes                                                                         |
+| ---------- | ------------------------------- | ----------------------------------------------------------------------------- |
+| `K`        | 5                               | Holding slots, 1–8. The extra-slot booster adds one for a level (so up to 9). |
+| `fieldCap` | 3                               | Groups working at once, 1–6. Level constant.                                  |
+| `squad`    | 3                               | Familiars per group at once, 1–6. Level constant.                             |
+| `spawnGap` | 2 ticks                         | Between spawns of one group. Level constant.                                  |
+| Pickup     | 1 tick                          | Fixed.                                                                        |
+| Deliver    | 1 tick                          | Fixed.                                                                        |
+| Tick rate  | tuned in M10 (≈ 8–12 / s at 1×) | Presentation only; 2× doubles it.                                             |
+| `portalX`  | `⌊(W−1)/2⌋`                     | Level may override.                                                           |
+| Max board  | 40×40 (+ 1-cell ring)           | Sized from mobile tests in M11.2.                                             |
 
 ## 16. Open questions
 
