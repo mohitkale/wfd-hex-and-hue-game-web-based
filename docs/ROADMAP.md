@@ -95,7 +95,7 @@ approval. If the user does not approve, their feedback becomes new tasks in that
 
 _Replace the perimeter-track concept with a clearly specified, strategic pick-up-and-deliver collection puzzle that is implementable, deterministic and testable._
 
-- [ ] **M8.1** Audit existing gameplay — Explain, with reproducible evidence, why the v1 track mechanic allows repetitive play and why its difficulty score does not measure meaningful decisions.
+- [x] **M8.1** Audit existing gameplay — Explain, with reproducible evidence, why the v1 track mechanic allows repetitive play and why its difficulty score does not measure meaningful decisions.
 - [ ] **M8.2** Design the new core gameplay (GAME_DESIGN_V2) — Write `docs/GAME_DESIGN_V2.md`, precise enough for an independent implementation and solver. _Needs M8.1._
 - [ ] **M8.3** Define reachability and blocked cubes — Specify the spatial collection system: which cubes a collector can physically reach and how outer cubes expose inner ones. _Needs M8.2._
 - [ ] **M8.4** Define strategic difficulty — Set measurable requirements for easy, medium and hard levels and for the anti-triviality tests. _Needs M8.2, M8.3._
