@@ -1,4 +1,4 @@
-import { type Consent, readConsent } from "./consent";
+import { ANON_ID_KEY, type Consent, readConsent } from "./consent";
 import type { AnalyticsProvider, EventName, EventProps } from "./types";
 
 /** No analytics (the default, and whenever no provider key is configured). */
@@ -7,8 +7,6 @@ export class NoneAnalytics implements AnalyticsProvider {
   track(): void {}
   flush(): void {}
 }
-
-export const ANON_ID_KEY = "hexhue:anon-id";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -46,6 +44,8 @@ const safeStorage = (): StorageLike | null => {
 export class PostHogAnalytics implements AnalyticsProvider {
   readonly name = "posthog";
   private queue: { event: string; properties: Record<string, unknown>; timestamp: string }[] = [];
+  /** The id when storage can't keep it (still unique per player, for this visit). */
+  private memoryId: string | null = null;
   private readonly o: Required<Omit<PostHogOptions, "storage">> & { storage: StorageLike | null };
 
   constructor(options: PostHogOptions) {
@@ -76,19 +76,27 @@ export class PostHogAnalytics implements AnalyticsProvider {
     }
     this.queue.push({
       event,
-      properties: { ...props, distinct_id: this.anonymousId(), $lib: "hexhue-web" },
+      properties: {
+        ...props,
+        distinct_id: this.anonymousId(),
+        $lib: "hexhue-web",
+        // No location lookup from the request IP, and no person profiles: just counted events.
+        $geoip_disable: true,
+        $process_person_profile: false,
+      },
       timestamp: new Date(this.o.now()).toISOString(),
     });
     if (this.queue.length >= this.o.maxBatch) this.flush();
   }
 
   flush(beacon = false): void {
-    if (this.queue.length === 0) return;
     if (this.o.consent() !== "granted") return this.forget();
+    if (this.queue.length === 0) return;
     const body = JSON.stringify({ api_key: this.o.apiKey, batch: this.queue });
     this.queue = [];
     const url = `${this.o.host}/batch/`;
-    // On page hide, a beacon survives the unload; otherwise a keepalive fetch. Failures are
+    // On page hide, a beacon survives the unload; otherwise a keepalive fetch. Both send the JSON
+    // as text/plain (no CORS preflight), which PostHog's capture endpoints accept. Failures are
     // dropped: analytics must never affect play.
     if (beacon && this.o.beacon(url, body)) return;
     void this.o.fetch(url, { method: "POST", body, keepalive: true });
@@ -97,6 +105,7 @@ export class PostHogAnalytics implements AnalyticsProvider {
   /** Consent withdrawn (or never given): drop queued events and the anonymous id. */
   private forget(): void {
     this.queue = [];
+    this.memoryId = null;
     try {
       this.o.storage?.removeItem(ANON_ID_KEY);
     } catch {
@@ -108,12 +117,16 @@ export class PostHogAnalytics implements AnalyticsProvider {
     try {
       const stored = this.o.storage?.getItem(ANON_ID_KEY);
       if (stored) return stored;
-      const id = this.o.randomId();
-      this.o.storage?.setItem(ANON_ID_KEY, id);
-      return id;
     } catch {
-      return "anonymous";
+      // fall through to a new id
     }
+    this.memoryId ??= this.o.randomId();
+    try {
+      this.o.storage?.setItem(ANON_ID_KEY, this.memoryId);
+    } catch {
+      // Storage blocked: keep the id in memory for this visit.
+    }
+    return this.memoryId;
   }
 }
 

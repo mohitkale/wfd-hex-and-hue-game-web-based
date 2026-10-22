@@ -151,7 +151,23 @@ const imageUrl = absolute(image, Astro.site);
     bottom: calc(env(safe-area-inset-bottom) + 12px);
   }
   .hh-consent[data-position="top"] {
-    top: calc(env(safe-area-inset-top) + 12px);
+    /* Between the game's Back and 2× buttons (52 px each side), over the level title only. */
+    top: calc(env(safe-area-inset-top) + 4px);
+    width: min(420px, calc(100vw - 128px));
+    padding: 4px 6px 4px 12px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    font-size: 13px;
+  }
+  .hh-consent[data-position="top"] p {
+    flex: 1 1 auto;
+  }
+  .hh-consent[data-position="top"] button {
+    padding: 0 12px;
+  }
+  /* The update banner steps down when the consent strip is showing. */
+  body:has(.hh-consent[data-position="top"]) .hh-toast {
+    top: calc(env(safe-area-inset-top) + 64px);
   }
   .hh-consent p {
     flex: 1 1 260px;

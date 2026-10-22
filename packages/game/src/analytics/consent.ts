@@ -6,12 +6,15 @@
 export type Consent = "unknown" | "granted" | "denied";
 
 export const CONSENT_KEY = "hexhue:analytics-consent";
-/** Fired on `window` whenever consent changes (the game's provider listens). */
+/** The random anonymous id, created only once consent is given (see providers.ts). */
+export const ANON_ID_KEY = "hexhue:anon-id";
+/** Fired on `window` whenever consent changes in this window (banner, settings, game). */
 export const CONSENT_EVENT = "hexhue:consent";
 
 interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 interface NavigatorLike {
@@ -53,8 +56,10 @@ export function writeConsent(
 ): void {
   try {
     storage?.setItem(CONSENT_KEY, consent);
+    // Saying no (or changing your mind) deletes the anonymous id at once.
+    if (consent === "denied") storage?.removeItem(ANON_ID_KEY);
   } catch {
-    // Blocked storage: the choice holds for this visit only.
+    // Blocked storage: the choice can't be remembered, so consent stays "unknown" (nothing sent).
   }
   if (typeof window !== "undefined") window.dispatchEvent(new Event(CONSENT_EVENT));
 }

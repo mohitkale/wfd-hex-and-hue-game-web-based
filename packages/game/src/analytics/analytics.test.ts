@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { CONSENT_KEY, privacySignal, readConsent, writeConsent, type Consent } from "./consent";
 import {
   ANON_ID_KEY,
-  NoneAnalytics,
-  PostHogAnalytics,
-  createAnalytics,
-  type PostHogOptions,
-} from "./providers";
+  CONSENT_KEY,
+  privacySignal,
+  readConsent,
+  writeConsent,
+  type Consent,
+} from "./consent";
+import { NoneAnalytics, PostHogAnalytics, createAnalytics, type PostHogOptions } from "./providers";
 import { track } from "./index";
 
 function memoryStorage() {
@@ -71,7 +72,13 @@ describe("PostHog over HTTP", () => {
   it("batches events with an anonymous id and sends them to /batch/", () => {
     const t = posthog("granted");
     t.ph.track("level_start", { level: "moonlit-01", replay: false });
-    t.ph.track("level_win", { level: "moonlit-01", stars: 3, assists: 0, seconds: 41 });
+    t.ph.track("level_win", {
+      level: "moonlit-01",
+      stars: 3,
+      assists: 0,
+      seconds: 41,
+      recovered: false,
+    });
     expect(t.fetch).not.toHaveBeenCalled();
     t.ph.track("level_start", { level: "moonlit-02", replay: false }); // 3rd: batch full
     expect(t.fetch).toHaveBeenCalledOnce();
@@ -82,7 +89,14 @@ describe("PostHog over HTTP", () => {
     expect(body.batch).toHaveLength(3);
     expect(body.batch[1]).toMatchObject({
       event: "level_win",
-      properties: { level: "moonlit-01", stars: 3, distinct_id: "anon-1" },
+      properties: {
+        level: "moonlit-01",
+        stars: 3,
+        distinct_id: "anon-1",
+        $lib: "hexhue-web",
+        $geoip_disable: true,
+        $process_person_profile: false,
+      },
       timestamp: "2026-10-22T00:00:00.000Z",
     });
     expect(t.storage.map.get(ANON_ID_KEY)).toBe("anon-1");
@@ -103,6 +117,58 @@ describe("PostHog over HTTP", () => {
     t.ph.flush();
     expect(t.fetch).not.toHaveBeenCalled();
     expect(t.storage.map.has(ANON_ID_KEY)).toBe(false);
+  });
+});
+
+describe("consent withdrawal and ids", () => {
+  it("saying no deletes the anonymous id at once, even with nothing queued", () => {
+    const t = posthog("granted");
+    t.ph.track("app_open", { standalone: false });
+    t.ph.flush();
+    expect(t.storage.map.has(ANON_ID_KEY)).toBe(true);
+    t.setConsent("denied");
+    t.ph.flush(); // empty queue: still forgets
+    expect(t.storage.map.has(ANON_ID_KEY)).toBe(false);
+
+    const s = memoryStorage();
+    s.setItem(ANON_ID_KEY, "x");
+    writeConsent("denied", s);
+    expect(s.map.has(ANON_ID_KEY)).toBe(false);
+  });
+
+  it("falls back to fetch when the beacon is refused", () => {
+    const t = posthog("granted", { beacon: () => false });
+    t.ph.track("app_open", { standalone: false });
+    t.ph.flush(true);
+    expect(t.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps one id per player across visits, and a unique one when storage is blocked", () => {
+    const shared = memoryStorage();
+    let n = 0;
+    const make = (storage: NonNullable<PostHogOptions["storage"]>) =>
+      posthog("granted", { storage, randomId: () => `id-${++n}`, maxBatch: 1 });
+    const a = make(shared);
+    a.ph.track("app_open", { standalone: false });
+    const b = make(shared);
+    b.ph.track("app_open", { standalone: false });
+    const id = (t: ReturnType<typeof make>) =>
+      JSON.parse(t.fetch.mock.calls[0]![1].body).batch[0].properties.distinct_id;
+    expect(id(a)).toBe("id-1");
+    expect(id(b)).toBe("id-1");
+
+    const blocked = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {},
+    };
+    const c = make(blocked);
+    c.ph.track("app_open", { standalone: false });
+    expect(id(c)).toBe("id-2");
   });
 });
 

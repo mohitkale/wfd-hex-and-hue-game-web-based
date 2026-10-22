@@ -150,8 +150,10 @@ export class PlayScene extends Phaser.Scene {
   private adOffer: Phaser.GameObjects.Text | null = null;
   /** Bumped every run; async ad results from an earlier run are ignored. */
   private runId = 0;
-  /** When this attempt began (scene time), for level durations in analytics. */
-  private attemptStart = 0;
+  /** Active play time of this attempt (frames while playing: no ads, menus or hidden tab). */
+  private attemptMs = 0;
+  /** This attempt already reported a loss (then continued by revive or undo). */
+  private attemptLost = false;
   /** Fragment bursts and portal rings; rebuilt with the layout (sizes follow the cell). */
   private burst: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private confetti: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -267,6 +269,8 @@ export class PlayScene extends Phaser.Scene {
     // Leaving (fading out): the board freezes, so nothing can win, lose or launch behind the fade.
     if (isLeaving(this)) return;
     const s = this.session.state;
+    // Capped, so a long frame after a stall or resume doesn't count as play.
+    if (s.status === "playing") this.attemptMs += Math.min(delta, 250);
     if (s.status === "playing" && (s.track.length > 0 || this.session.pending.length > 0)) {
       const { steps, acc } = accumulate(this.acc, delta, this.speed);
       this.acc = acc;
@@ -383,7 +387,16 @@ export class PlayScene extends Phaser.Scene {
       .zone(hud.x + 4 * dpr, hud.y + (hud.h - touch) / 2, touch, touch)
       .setOrigin(0, 0)
       .setInteractive({ useHandCursor: true })
-      .on("pointerup", () => go(this, "levels"));
+      .on("pointerup", () => {
+        // Leaving mid-attempt is where players stop: worth knowing.
+        if (this.session.state.status === "playing") {
+          track(this, "level_quit", {
+            level: this.built.level.id,
+            seconds: this.attemptSeconds(),
+          });
+        }
+        go(this, "levels");
+      });
     const back = this.add
       .text(backZone.x + touch / 2, hud.y + hud.h / 2, "‹", {
         fontFamily: theme.font,
@@ -570,7 +583,7 @@ export class PlayScene extends Phaser.Scene {
     if (ad) {
       track(this, "ad_result", {
         placement: "speed2x",
-        result: outcome.granted ? "rewarded" : "not_rewarded",
+        result: outcome.granted ? "rewarded" : "dismissed",
       });
     }
     if (run !== this.runId) return; // the level was left or restarted meanwhile
@@ -772,6 +785,7 @@ export class PlayScene extends Phaser.Scene {
         this.haptics.play("lose");
         getAudio(this).play("lose");
         getSave(this)?.update((d) => d.stats.losses++);
+        this.attemptLost = true;
         track(this, "level_lose", {
           level: this.built.level.id,
           seconds: this.attemptSeconds(),
@@ -1316,19 +1330,21 @@ export class PlayScene extends Phaser.Scene {
       stars,
       assists: this.assists,
       seconds: this.attemptSeconds(),
+      recovered: this.attemptLost,
     });
   }
 
   /** A new attempt at this level (scene start or Retry). */
   private startAttempt(): void {
-    this.attemptStart = this.time.now;
+    this.attemptMs = 0;
+    this.attemptLost = false;
     const level = this.built.level.id;
     const replay = Object.hasOwn(getSave(this)?.data.levels ?? {}, level);
     track(this, "level_start", { level, replay });
   }
 
   private attemptSeconds(): number {
-    return Math.round((this.time.now - this.attemptStart) / 1000);
+    return Math.round(this.attemptMs / 1000);
   }
 
   // ── Boosters ────────────────────────────────────────────────────────────

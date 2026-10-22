@@ -35,7 +35,11 @@ import Page from "../layouts/Page.astro";
         They are tied to a random id created on your device when you agree, never to your name,
         email or account (there is none). No cookies are used.
       </li>
-      <li>They are sent to our analytics service (PostHog) and used only to improve the game.</li>
+      <li>
+        They are sent to our analytics service (PostHog) and used only to improve the game. Like any
+        web request, PostHog sees your IP address when they arrive; we ask it not to look up your
+        location from it and not to build a profile of you.
+      </li>
       <li>
         Nothing is collected until you agree. If your browser sends a "do not track" or Global
         Privacy Control signal, nothing is collected and we don't ask.

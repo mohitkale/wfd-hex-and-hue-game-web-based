@@ -2,6 +2,7 @@ import { NoneAnalytics } from "./providers";
 import type { AnalyticsProvider, EventName, EventProps } from "./types";
 
 export {
+  ANON_ID_KEY,
   CONSENT_EVENT,
   CONSENT_KEY,
   privacySignal,
@@ -10,6 +11,15 @@ export {
   type Consent,
 } from "./consent";
 export { NoneAnalytics, PostHogAnalytics, createAnalytics, type AnalyticsEnv } from "./providers";
+
+/** Sends queued events; never throws. */
+export function safeFlush(provider: AnalyticsProvider, beacon = false): void {
+  try {
+    provider.flush(beacon);
+  } catch {
+    // ignore
+  }
+}
 export type { AnalyticsProvider, EventName, EventProps } from "./types";
 
 const none = new NoneAnalytics();
