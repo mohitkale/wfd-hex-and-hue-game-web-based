@@ -80,11 +80,15 @@ describe("migrate", () => {
     ]);
   });
 
-  it("v1 → v2: players who already won a level skip the tutorial tips; new ones see them", () => {
+  it("saves from before tips: players who already won a level skip the tutorial tips", () => {
     const veteran = migrate({ version: 1, levels: { "moonlit-01": { stars: 3, wins: 1 } } });
     expect(veteran.tips).toEqual(["launch", "collect", "portal", "park", "relaunch"]);
     expect(migrate({ version: 1, coins: 5 }).tips).toEqual([]);
     expect(migrate({ version: SAVE_VERSION, tips: ["a", 1, "a"] }).tips).toEqual(["a"]);
+    // An explicit list wins, even an empty one.
+    expect(migrate({ version: 1, levels: { x: { stars: 1, wins: 1 } }, tips: [] }).tips).toEqual(
+      [],
+    );
   });
 
   it("keeps a level id of __proto__ as a plain key", () => {
@@ -126,6 +130,15 @@ describe("mergeSaves", () => {
       { ...defaultSave(), tips: ["collect"] },
     ).tips;
     expect(tipsMerged.sort()).toEqual(["collect", "launch"]);
+    // Another tab wrote a save from before tips existed (a veteran): its tutorial marks merge in.
+    const raw = { version: 1, levels: { "moonlit-01": { stars: 2, wins: 1 } } };
+    const withVeteran = mergeSaves(
+      defaultSave(),
+      { ...defaultSave(), tips: ["hint"] },
+      migrate(raw),
+    ).tips;
+    expect(withVeteran).toContain("hint");
+    expect(withVeteran).toContain("relaunch");
   });
 
   it("keeps their settings unless this tab changed them", () => {

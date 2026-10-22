@@ -18,7 +18,16 @@ import { Haptics } from "../haptics";
 import { IDLE_HINT_MS } from "../hint";
 import { getHinter } from "../hinter";
 import { ComboTracker, confettiColors, isComboMilestone } from "../juice";
-import { TIPS, hintDelayMs, tipFor, tutorialDone, type TipTrigger } from "../tips";
+import {
+  TIPS,
+  TipQueue,
+  hintDelayMs,
+  tipFor,
+  tipLifetimeMs,
+  tutorialDone,
+  type TipId,
+  type TipTrigger,
+} from "../tips";
 import { flatLevels } from "../progress";
 import {
   AD_COINS,
@@ -152,9 +161,11 @@ export class PlayScene extends Phaser.Scene {
   private hintView: Phaser.GameObjects.Image | null = null;
   /** One reused "Combo ×n" label (a new Text per combo would mean a texture upload each time). */
   private comboLabel: Phaser.GameObjects.Text | null = null;
-  /** The onboarding tip on screen, if any (kept as text so a relayout can redraw it). */
-  private coachTip: string | null = null;
+  /** Onboarding tips waiting or on screen; the banner shows `tips.current`. */
+  private tips = new TipQueue();
   private coach: Phaser.GameObjects.Container | null = null;
+  /** Cached `tutorialDone` (refreshed when tips are saved), read by the idle-hint loop. */
+  private tutorialFinished = true;
 
   constructor() {
     super("play");
@@ -204,10 +215,11 @@ export class PlayScene extends Phaser.Scene {
     this.hintMove = null;
     this.hintView = null;
     this.comboLabel = null;
-    this.coachTip = null;
+    this.tips = new TipQueue();
     this.coach = null;
     this.runId++;
     const save = getSave(this);
+    this.tutorialFinished = save ? tutorialDone(save.data) : true;
     const unsubscribeSave = save?.subscribe((d) => this.boosterBar?.update(d));
     this.haptics.enabled = save?.data.settings.haptics ?? true;
     save?.update((d) => {
@@ -262,6 +274,7 @@ export class PlayScene extends Phaser.Scene {
     this.mosaic?.flush();
     this.moveWisps(delta);
     this.updateHint(delta);
+    this.updateCoach(delta);
   }
 
   // ── Layout ──────────────────────────────────────────────────────────────
@@ -336,7 +349,7 @@ export class PlayScene extends Phaser.Scene {
         .setVisible(false),
     );
     this.refreshTargets(true);
-    if (this.coachTip) this.drawCoach(this.coachTip, false);
+    if (this.tips.current) this.drawCoach(this.tips.current);
     // Views keep their identity across relayouts; snap them to their new spots.
     for (const [id, view] of this.wisps) this.snap(id, view);
     if (this.overlayKind) this.showCard(this.overlayKind, false);
@@ -697,6 +710,8 @@ export class PlayScene extends Phaser.Scene {
         getAudio(this).play("park");
         break;
       case "won":
+        // The tip on screen (usually the tutorial's last) stays until the result card.
+        this.tips.clear(true);
         this.haptics.play("win");
         getAudio(this).play("win");
         this.recordWin();
@@ -713,6 +728,7 @@ export class PlayScene extends Phaser.Scene {
         });
         break;
       case "lost":
+        this.tips.clear();
         this.hideCoach();
         this.haptics.play("lose");
         getAudio(this).play("lose");
@@ -730,10 +746,7 @@ export class PlayScene extends Phaser.Scene {
         this.assists = e.type === "undone" ? this.assists + 1 : 0;
         this.combo.reset();
         this.clearHint();
-        if (e.type === "restarted") {
-          getSave(this)?.update((d) => d.stats.plays++);
-          this.showTip({ type: "restarted", afterLoss: this.overlayKind === "lose" });
-        }
+        if (e.type === "restarted") getSave(this)?.update((d) => d.stats.plays++);
         if (e.type === "undone" && e.reverted !== "tap") {
           // Undoing a booster gives it back (as stock), so nothing paid is lost.
           const kind = e.reverted;
@@ -1049,9 +1062,13 @@ export class PlayScene extends Phaser.Scene {
       });
     }
     this.idleMs += delta;
-    const save = getSave(this)?.data;
-    const delay = hintDelayMs(save ? tutorialDone(save) : true, IDLE_HINT_MS);
-    if (this.idleMs >= delay && this.hintMove && !this.hintView) this.showHint();
+    if (
+      this.hintMove &&
+      !this.hintView &&
+      this.idleMs >= hintDelayMs(this.tutorialFinished, IDLE_HINT_MS)
+    ) {
+      this.showHint();
+    }
   }
 
   private showHint(): void {
@@ -1078,73 +1095,81 @@ export class PlayScene extends Phaser.Scene {
     this.showTip({ type: "hint" });
   }
 
-  /** Shows the onboarding tip for this moment, if there is one the player hasn't seen yet. */
+  /** Queues the onboarding tip for this moment, if there is one the player hasn't seen yet. */
   private showTip(trigger: TipTrigger): void {
     const save = getSave(this);
-    if (!save) return;
-    const id = tipFor(trigger, save.data.tips, tutorialDone(save.data));
-    if (!id) return;
+    if (!save || this.session.state.status !== "playing") return;
+    const id = tipFor(trigger, [...save.data.tips, ...this.tips.pending], this.tutorialFinished);
+    if (id) this.tips.offer(id);
+  }
+
+  /** Remembers tips the player has actually had time to read. */
+  private saveTips(ids: readonly TipId[]): void {
+    const save = getSave(this);
+    if (!save || ids.length === 0) return;
     save.update((d) => {
-      if (!d.tips.includes(id)) d.tips.push(id);
+      for (const id of ids) if (!d.tips.includes(id)) d.tips.push(id);
     });
-    this.drawCoach(TIPS[id]);
+    this.tutorialFinished = tutorialDone(save.data);
+  }
+
+  /** Runs the tip queue: swaps banners, saves read tips, fades the banner in and out. */
+  private updateCoach(delta: number): void {
+    const { seen, show } = this.tips.tick(delta);
+    this.saveTips(seen);
+    if (show !== undefined) {
+      if (show) this.drawCoach(show);
+      else this.hideCoach();
+    }
+    const id = this.tips.current;
+    if (this.coach && id) {
+      const age = this.tips.age;
+      this.coach.setAlpha(Math.max(0, Math.min(1, age / 200, (tipLifetimeMs(id) - age) / 400)));
+    }
   }
 
   /**
-   * A coach banner just above the boosters (where toasts appear). It never blocks play: the board
-   * keeps running, a tap on the banner dismisses it, and it fades by itself.
+   * The coach banner sits in the HUD strip, between Back and the speed button, so it never covers
+   * the board, the boosters, slots or columns. It never blocks play: a tap dismisses it.
    */
-  private drawCoach(message: string, animate = true): void {
+  private drawCoach(id: TipId): void {
     this.hideCoach();
-    this.coachTip = message;
-    const { boosters, dpr, frame } = this.layout;
-    const px = (v: number) => Math.round(v * dpr);
-    const width = Math.min(frame.w - px(24), px(360));
+    const { hud, dpr } = this.layout;
+    // Follow the layout's compact scaling on short screens (the HUD shrinks with it).
+    const scale = hud.h / (52 * dpr);
+    const px = (v: number) => Math.round(v * dpr * scale);
+    // Back and speed are 48 px touch zones, 4 px from the edges.
+    const side = Math.round(58 * dpr);
+    const width = Math.min(hud.w - 2 * side, px(340));
     const text = this.add
-      .text(0, 0, message, {
+      .text(0, 0, TIPS[id], {
         fontFamily: theme.font,
-        fontSize: `${px(14)}px`,
+        fontSize: `${px(13)}px`,
         color: theme.text,
         align: "center",
-        lineSpacing: px(2),
-        wordWrap: { width: width - px(32) },
+        wordWrap: { width: width - px(20) },
       })
       .setOrigin(0.5);
-    const height = text.height + px(22);
+    const height = Math.max(hud.h - px(6), text.height + px(12));
     const panel = this.add.graphics();
-    panel.fillStyle(theme.dusk, 0.96);
-    panel.fillRoundedRect(-width / 2, -height / 2, width, height, px(14));
+    panel.fillStyle(theme.dusk, 1);
+    panel.fillRoundedRect(-width / 2, -height / 2, width, height, px(12));
     panel.lineStyle(Math.max(1, 1.5 * dpr), theme.glow, 0.7);
-    panel.strokeRoundedRect(-width / 2, -height / 2, width, height, px(14));
-    const y = boosters.y - px(10) - height / 2;
-    const coach = this.add
-      .container(frame.x + frame.w / 2, y, [panel, text])
+    panel.strokeRoundedRect(-width / 2, -height / 2, width, height, px(12));
+    this.coach = this.add
+      .container(hud.x + hud.w / 2, hud.y + px(3) + height / 2, [panel, text])
       .setSize(width, height)
       .setDepth(DEPTH.hud)
+      .setAlpha(0)
       .setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.hideCoach());
-    this.coach = coach;
-    if (animate) {
-      coach.setAlpha(0).setY(y + px(12));
-      this.tweens.add({ targets: coach, alpha: 1, y, duration: 220, ease: "Quad.easeOut" });
-    }
-    // Long enough to read (about 60 ms a character), then it fades away.
-    this.tweens.add({
-      targets: coach,
-      alpha: 0,
-      delay: Math.max(4500, message.length * 60),
-      duration: 400,
-      onComplete: () => {
-        if (this.coach === coach) this.hideCoach();
-      },
-    });
+      .on("pointerup", () => {
+        this.saveTips(this.tips.dismiss());
+        this.hideCoach();
+      });
   }
 
   private hideCoach(): void {
-    this.coachTip = null;
-    if (!this.coach) return;
-    this.tweens.killTweensOf(this.coach);
-    this.coach.destroy();
+    this.coach?.destroy();
     this.coach = null;
   }
 
@@ -1312,7 +1337,6 @@ export class PlayScene extends Phaser.Scene {
 
   private toast(message: string): void {
     const { boosters, dpr, frame } = this.layout;
-    this.hideCoach(); // same spot on screen
     this.toastText?.destroy();
     this.toastText = this.add
       .text(frame.x + frame.w / 2, boosters.y - 8 * dpr, message, {
@@ -1584,6 +1608,10 @@ export class PlayScene extends Phaser.Scene {
       height += skip.height + px(8);
     }
 
+    // A tip still up when the win card arrives stayed through the whole reveal: it was read.
+    if (kind === "win") this.saveTips(this.tips.dismiss());
+    this.tips.clear();
+    this.hideCoach();
     const panel = this.add.graphics();
     panel.fillStyle(theme.panel, 0.96);
     panel.fillRoundedRect(-width / 2, 0, width, height, px(20));

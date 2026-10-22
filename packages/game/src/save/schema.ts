@@ -1,5 +1,11 @@
-/** Current save format. Bump and add a step to `MIGRATIONS` whenever the shape changes. */
-export const SAVE_VERSION = 2;
+import { TUTORIAL_TIPS } from "../tips";
+
+/**
+ * Current save format. Bump and add a step to `MIGRATIONS` when the shape changes incompatibly.
+ * Purely additive fields don't need a bump: give them a default in `migrate` instead (a bump
+ * makes tabs still running the previous build read-only).
+ */
+export const SAVE_VERSION = 1;
 
 export const BOOSTERS = ["undo", "shuffle", "extraSlot", "wand"] as const;
 export type BoosterKind = (typeof BOOSTERS)[number];
@@ -70,15 +76,6 @@ const unit = (v: unknown, fallback: number): number =>
  */
 const MIGRATIONS: Record<number, (data: Record<string, unknown>) => Record<string, unknown>> = {
   0: (data) => ({ ...data, version: 1 }),
-  // v2 adds onboarding tips. Players who already won a level know the basics: skip the tutorial.
-  1: (data) => ({
-    ...data,
-    version: 2,
-    tips:
-      isObject(data.levels) && Object.keys(data.levels).length > 0
-        ? ["launch", "collect", "portal", "park", "relaunch"]
-        : [],
-  }),
 };
 
 /**
@@ -154,8 +151,12 @@ export function migrate(raw: unknown): SaveData {
       last && typeof last.world === "number" && typeof last.level === "number"
         ? { world: count(last.world, 0), level: count(last.level, 0) }
         : null,
+    // Added without a version bump (purely additive, so tabs still on the previous build keep
+    // saving). Saves from before tips existed: players who won a level skip the tutorial.
     tips: Array.isArray(data.tips)
       ? [...new Set(data.tips.filter((id): id is string => typeof id === "string"))]
-      : [],
+      : Object.keys(levels).length > 0
+        ? [...TUTORIAL_TIPS]
+        : [],
   };
 }
