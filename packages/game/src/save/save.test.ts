@@ -1,7 +1,18 @@
+import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SaveManager } from "./manager";
+import { mergeSaves } from "./merge";
 import { SAVE_VERSION, defaultSave, migrate } from "./schema";
-import { LocalStorageStore, MemoryStore, createStore } from "./store";
+import { starsFor } from "./stars";
+import {
+  IndexedDbStore,
+  LocalStorageStore,
+  MemoryStore,
+  createStore,
+  type LoadResult,
+  type SaveStore,
+} from "./store";
 
 describe("migrate", () => {
   it("gives a fresh save for nothing or garbage", () => {
@@ -18,7 +29,7 @@ describe("migrate", () => {
     expect(migrate(JSON.parse(JSON.stringify(s)))).toEqual(s);
   });
 
-  it("repairs bad fields one by one without losing the good ones", () => {
+  it("repairs bad fields one by one; negatives clamp to 0 (never a free top-up)", () => {
     const m = migrate({
       version: SAVE_VERSION,
       coins: -50,
@@ -43,25 +54,67 @@ describe("migrate", () => {
     expect(m.lastPlayed).toBeNull();
   });
 
-  it("upgrades an unversioned save and reads a newer one as best it can", () => {
-    expect(migrate({ coins: 7 }).coins).toBe(7);
+  it("treats odd versions as unversioned instead of wiping the save", () => {
+    for (const version of [-1, 0.5, undefined])
+      expect(migrate({ version, coins: 7 }).coins).toBe(7);
     expect(migrate({ version: SAVE_VERSION + 5, coins: 9 }).coins).toBe(9);
+  });
+
+  it("keeps a level id of __proto__ as a plain key", () => {
+    const m = migrate(JSON.parse('{"levels":{"__proto__":{"stars":2,"wins":1}}}'));
+    expect(Object.getPrototypeOf(m.levels)).toBe(Object.prototype);
+    expect(Object.keys(m.levels)).toEqual(["__proto__"]);
+  });
+});
+
+describe("mergeSaves", () => {
+  it("applies this tab's counter changes on top of another tab's", () => {
+    const base = defaultSave(); // 100 coins
+    const mine = { ...defaultSave(), coins: 70 }; // spent 30
+    const theirs = { ...defaultSave(), coins: 160 }; // other tab earned 60
+    expect(mergeSaves(base, mine, theirs).coins).toBe(130);
+  });
+
+  it("unions level progress keeping the best stars and most wins", () => {
+    const base = defaultSave();
+    const mine = defaultSave();
+    mine.levels = { a: { stars: 2, wins: 1 }, b: { stars: 3, wins: 1 } };
+    const theirs = defaultSave();
+    theirs.levels = { a: { stars: 3, wins: 4 }, c: { stars: 1, wins: 1 } };
+    expect(mergeSaves(base, mine, theirs).levels).toEqual({
+      a: { stars: 3, wins: 4 },
+      b: { stars: 3, wins: 1 },
+      c: { stars: 1, wins: 1 },
+    });
+  });
+
+  it("keeps their settings unless this tab changed them", () => {
+    const base = defaultSave();
+    const theirs = { ...defaultSave(), settings: { haptics: false, sound: true, music: false } };
+    expect(mergeSaves(base, defaultSave(), theirs).settings).toEqual(theirs.settings);
+    const mine = { ...defaultSave(), settings: { haptics: true, sound: false, music: true } };
+    expect(mergeSaves(base, mine, theirs).settings).toEqual(mine.settings);
   });
 });
 
 describe("stores", () => {
-  it("memory store isolates copies", async () => {
+  it("memory store distinguishes empty from ok and isolates copies", async () => {
     const store = new MemoryStore();
+    expect(await store.load()).toEqual({ status: "empty" });
     const data = { a: 1 };
     await store.save(data);
     data.a = 2;
-    expect(await store.load()).toEqual({ a: 1 });
+    expect(await store.load()).toEqual({ status: "ok", data: { a: 1 } });
   });
 
-  it("localStorage store survives corrupt JSON and quota errors", async () => {
+  it("localStorage: unreadable is an error, corrupt JSON is empty, quota fails softly", async () => {
     const backing = new Map<string, string>();
+    let readable = true;
     const storage = {
-      getItem: (k: string) => backing.get(k) ?? null,
+      getItem: (k: string) => {
+        if (!readable) throw new Error("SecurityError");
+        return backing.get(k) ?? null;
+      },
       setItem: (k: string, v: string) => {
         if (v.length > 50) throw new Error("QuotaExceeded");
         backing.set(k, v);
@@ -70,8 +123,23 @@ describe("stores", () => {
     } as unknown as Storage;
     const store = new LocalStorageStore(storage);
     backing.set("hexhue.save", "{not json");
-    expect(await store.load()).toBeNull();
-    await expect(store.save({ big: "x".repeat(100) })).resolves.toBeUndefined();
+    expect(await store.load()).toEqual({ status: "empty" });
+    readable = false;
+    expect(await store.load()).toEqual({ status: "error" });
+    expect(await store.save({ big: "x".repeat(100) })).toBe(false);
+  });
+
+  it("IndexedDB round-trips and reports empty first", async () => {
+    const store = await IndexedDbStore.open(new IDBFactory());
+    expect(await store.load()).toEqual({ status: "empty" });
+    expect(await store.save({ coins: 5 })).toBe(true);
+    expect(await store.load()).toEqual({ status: "ok", data: { coins: 5 } });
+  });
+
+  it("never hangs: a stalled IndexedDB open falls back to localStorage or memory", async () => {
+    const stalled = { open: () => ({}) } as unknown as IDBFactory;
+    const store = await createStore({ indexedDB: stalled }, 30);
+    expect(store.kind).toBe("memory");
   });
 
   it("falls back to memory when no storage is available", async () => {
@@ -85,32 +153,90 @@ describe("stores", () => {
   });
 });
 
+/** A store whose reads can be made to fail or hang. */
+class FlakyStore extends MemoryStore {
+  mode: "ok" | "error" | "hang" = "ok";
+  override async load(): Promise<LoadResult> {
+    if (this.mode === "error") return { status: "error" };
+    if (this.mode === "hang") return new Promise(() => {});
+    return super.load();
+  }
+}
+
 describe("SaveManager", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("loads, updates in memory immediately and writes once after a burst", async () => {
+  it("updates in memory immediately and writes once after a burst", async () => {
     const store = new MemoryStore({ version: SAVE_VERSION, coins: 30 });
     const spy = vi.spyOn(store, "save");
-    const save = await SaveManager.load(store, 400);
-    expect(save.data.coins).toBe(30);
+    const save = await SaveManager.load(store, { delayMs: 400 });
     save.update((d) => (d.coins += 10));
     save.update((d) => (d.coins += 10));
     expect(save.data.coins).toBe(50);
     expect(spy).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(400);
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(((await store.load()) as { coins: number }).coins).toBe(50);
+    const stored = (await store.load()) as { status: "ok"; data: { coins: number } };
+    expect(stored.data.coins).toBe(50);
   });
 
-  it("flush writes immediately and cancels the pending write", async () => {
+  it("does not write when nothing changed (no stale overwrite on tab switch)", async () => {
     const store = new MemoryStore();
     const spy = vi.spyOn(store, "save");
     const save = await SaveManager.load(store);
-    save.update((d) => (d.coins = 5));
     await save.flush();
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("merges with another tab's progress instead of overwriting it", async () => {
+    const store = new MemoryStore();
+    const tabA = await SaveManager.load(store);
+    const tabB = await SaveManager.load(store);
+    tabB.update((d) => {
+      d.levels["moonlit-01"] = { stars: 3, wins: 1 };
+      d.coins += 40;
+    });
+    await tabB.flush();
+    tabA.update((d) => (d.coins -= 20));
+    await tabA.flush();
+    const stored = migrate(((await store.load()) as { data: unknown }).data);
+    expect(stored.levels["moonlit-01"]).toEqual({ stars: 3, wins: 1 });
+    expect(stored.coins).toBe(120);
+  });
+
+  it("a failed first read never wipes the real save; changes merge in once storage is back", async () => {
+    const real = { ...defaultSave(), coins: 500, levels: { "moonlit-05": { stars: 2, wins: 3 } } };
+    const store = new FlakyStore(real);
+    store.mode = "error";
+    const save = await SaveManager.load(store);
+    expect(save.data.coins).toBe(100); // playing on defaults meanwhile
+    save.update((d) => (d.coins += 10));
+    await save.flush(); // storage still unreadable: nothing written
+    const untouched = (await MemoryStore.prototype.load.call(store)) as { data: { coins: number } };
+    expect(untouched.data.coins).toBe(500);
+    store.mode = "ok";
+    await save.flush();
+    const stored = migrate(((await store.load()) as { data: unknown }).data);
+    expect(stored.coins).toBe(510);
+    expect(stored.levels["moonlit-05"]).toEqual({ stars: 2, wins: 3 });
+  });
+
+  it("a hanging read times out instead of blocking the game", async () => {
+    const store = new FlakyStore();
+    store.mode = "hang";
+    const pending = SaveManager.load(store, { timeoutMs: 100 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await pending).data.coins).toBe(100);
+  });
+
+  it("never writes over a save from a newer version of the game", async () => {
+    const store: SaveStore = new MemoryStore({ version: SAVE_VERSION + 1, coins: 999 });
+    const spy = vi.spyOn(store, "save");
+    const save = await SaveManager.load(store);
+    save.update((d) => (d.coins = 1));
+    await save.flush();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("keeps invariants after an update and notifies listeners", async () => {
@@ -120,5 +246,11 @@ describe("SaveManager", () => {
     save.update((d) => (d.coins = -10));
     expect(save.data.coins).toBe(0);
     expect(seen).toEqual([0]);
+  });
+});
+
+describe("starsFor", () => {
+  it("rates by assists", () => {
+    expect([0, 1, 2, 3, 9].map(starsFor)).toEqual([3, 2, 2, 1, 1]);
   });
 });

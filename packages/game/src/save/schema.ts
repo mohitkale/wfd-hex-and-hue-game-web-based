@@ -69,7 +69,10 @@ export function migrate(raw: unknown): SaveData {
   const fresh = defaultSave();
   if (!isObject(raw)) return fresh;
   let data = raw;
-  let version = typeof data.version === "number" ? data.version : 0;
+  let version =
+    typeof data.version === "number" && Number.isInteger(data.version) && data.version >= 0
+      ? data.version
+      : 0;
   if (version > SAVE_VERSION) {
     // Written by a newer build (e.g. after a rollback): read what we understand.
     version = SAVE_VERSION;
@@ -81,14 +84,20 @@ export function migrate(raw: unknown): SaveData {
     version++;
   }
 
-  const levels: Record<string, LevelProgress> = {};
-  if (isObject(data.levels)) {
-    for (const [id, p] of Object.entries(data.levels)) {
-      if (!isObject(p)) continue;
-      const stars = Math.min(3, Math.max(1, count(p.stars, 1)));
-      levels[id] = { stars, wins: Math.max(1, count(p.wins, 1)) };
-    }
-  }
+  // Built with fromEntries so an id like "__proto__" stays a plain key, never a prototype.
+  const levels: Record<string, LevelProgress> = Object.fromEntries(
+    isObject(data.levels)
+      ? Object.entries(data.levels)
+          .filter((e): e is [string, Record<string, unknown>] => isObject(e[1]))
+          .map(([id, p]) => [
+            id,
+            {
+              stars: Math.min(3, Math.max(1, count(p.stars, 1))),
+              wins: Math.max(1, count(p.wins, 1)),
+            },
+          ])
+      : [],
+  );
   const boosters = { ...fresh.boosters };
   if (isObject(data.boosters)) {
     for (const k of Object.keys(boosters) as (keyof typeof boosters)[]) {

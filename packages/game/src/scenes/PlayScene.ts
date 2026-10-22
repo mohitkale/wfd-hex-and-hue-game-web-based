@@ -450,6 +450,7 @@ export class PlayScene extends Phaser.Scene {
       case "undone":
       case "restarted":
         this.assists = e.type === "undone" ? this.assists + 1 : 0;
+        if (e.type === "restarted") getSave(this)?.update((d) => d.stats.plays++);
         this.closeCard();
         for (const view of this.departing) view.destroy();
         this.departing.clear();
