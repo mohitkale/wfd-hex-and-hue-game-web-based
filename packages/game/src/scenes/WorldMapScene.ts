@@ -12,6 +12,7 @@ import {
 import { getSave } from "../save";
 import type { SaveData } from "../save/schema";
 import { theme } from "../theme";
+import { DragScroll } from "../view/DragScroll";
 import { ensureTextures, TEX } from "../view/textures";
 import type { PlayData } from "./PlayScene";
 
@@ -26,8 +27,7 @@ const TINTS = [0x2a1650, 0x123c3c, 0x1c1a4a];
 export class WorldMapScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private readonly haptics = new Haptics();
-  private maxScroll = 0;
-  private dragging = false;
+  private scroller!: DragScroll;
   private focusY: number | null = null;
   private toast: Phaser.GameObjects.Text | null = null;
 
@@ -37,12 +37,11 @@ export class WorldMapScene extends Phaser.Scene {
 
   create(): void {
     this.objects = [];
-    this.dragging = false;
     this.toast = null;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
     this.haptics.enabled = getSave(this)?.data.settings.haptics ?? true;
-    this.setupScrolling();
+    this.scroller = new DragScroll(this, (this.registry.get("dpr") as number | undefined) ?? 1);
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
@@ -147,7 +146,7 @@ export class WorldMapScene extends Phaser.Scene {
       y += sectionH + px(16);
     });
 
-    this.maxScroll = Math.max(0, y + insets.bottom + px(24) - height);
+    this.scroller.setMax(y + insets.bottom + px(24) - height);
 
     // Sticky top bar with the title and total stars.
     // Interactive so taps on the bar never reach a node scrolled underneath it.
@@ -191,8 +190,26 @@ export class WorldMapScene extends Phaser.Scene {
       .setOrigin(1, 0.5)
       .setScrollFactor(0)
       .setDepth(11);
-    this.objects.push(bar, title, stars);
-    this.scrollTo(this.cameras.main.scrollY);
+    // Spellbook entry, between the title and the stars.
+    const book = this.add
+      .text(left + frameW / 2 + px(24), insets.top + px(28), "✦ Spellbook", {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${px(14)}px`,
+        color: theme.text,
+        backgroundColor: "#2a1650",
+        padding: { x: px(12), y: px(12) },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(11)
+      .setInteractive({ useHandCursor: true });
+    let bookPressed = false;
+    book
+      .on("pointerdown", () => (bookPressed = true))
+      .on("pointerout", () => (bookPressed = false))
+      .on("pointerup", () => bookPressed && this.scene.start("spellbook"));
+    this.objects.push(bar, title, stars, book);
   }
 
   private node(
@@ -279,7 +296,7 @@ export class WorldMapScene extends Phaser.Scene {
     disc.on("pointerdown", () => (pressed = true));
     disc.on("pointerout", () => (pressed = false));
     disc.on("pointerup", () => {
-      if (!pressed || this.dragging) return;
+      if (!pressed || this.scroller.dragging) return;
       pressed = false;
       if (!unlocked) {
         this.haptics.play("invalid");
@@ -336,34 +353,7 @@ export class WorldMapScene extends Phaser.Scene {
     this.tweens.add({ targets: this.toast, alpha: 0, delay: 1600, duration: 400 });
   }
 
-  /** Drag (touch or mouse, first finger only) and wheel scrolling. */
-  private setupScrolling(): void {
-    const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
-    let startY = 0;
-    let startScroll = 0;
-    let activePointer = -1;
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
-      if (activePointer !== -1 && activePointer !== p.id) return;
-      activePointer = p.id;
-      startY = p.y;
-      startScroll = this.cameras.main.scrollY;
-      this.dragging = false;
-    });
-    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
-      if (p.id === activePointer) activePointer = -1;
-    });
-    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
-      if (!p.isDown || p.id !== activePointer) return;
-      const dy = p.y - startY;
-      if (Math.abs(dy) > 10 * dpr) this.dragging = true;
-      if (this.dragging) this.scrollTo(startScroll - dy);
-    });
-    this.input.on("wheel", (_p: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) =>
-      this.scrollTo(this.cameras.main.scrollY + dy * dpr),
-    );
-  }
-
   private scrollTo(y: number): void {
-    this.cameras.main.setScroll(0, Math.max(0, Math.min(this.maxScroll, y)));
+    this.scroller.scrollTo(y);
   }
 }

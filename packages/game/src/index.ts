@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { Insets } from "./layout";
 import { BootScene } from "./scenes/BootScene";
+import { SpellbookScene } from "./scenes/SpellbookScene";
 import { WorldMapScene } from "./scenes/WorldMapScene";
 import { PlayScene } from "./scenes/PlayScene";
 import { createRewards } from "./rewards";
@@ -48,7 +49,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr },
     input: { activePointers: 2 },
     disableContextMenu: true,
-    scene: [BootScene, WorldMapScene, PlayScene],
+    scene: [BootScene, WorldMapScene, SpellbookScene, PlayScene],
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));

@@ -112,6 +112,8 @@ export class PlayScene extends Phaser.Scene {
   private toastText: Phaser.GameObjects.Text | null = null;
   /** Coins earned by the last win, shown on the win card. */
   private earned = 0;
+  /** The last win was this level's first: its art just joined the Spellbook. */
+  private firstClear = false;
   /** 2× has been unlocked for this level (GAME_DESIGN §3: it lasts the rest of the level). */
   private speedUnlocked = false;
   /** An ad turn came up empty this level: 1× until the next level (whose 2× is then free). */
@@ -157,6 +159,7 @@ export class PlayScene extends Phaser.Scene {
     this.wandPicker = [];
     this.toastText = null;
     this.earned = 0;
+    this.firstClear = false;
     this.speedUnlocked = false;
     this.speedDeclined = false;
     this.doubled = false;
@@ -880,6 +883,7 @@ export class PlayScene extends Phaser.Scene {
     const stars = starsFor(this.assists);
     getSave(this)?.update((d) => {
       const prev = Object.hasOwn(d.levels, id) ? d.levels[id] : undefined;
+      this.firstClear = !prev;
       this.earned = winCoins({ difficulty: this.built.difficulty, stars, firstClear: !prev });
       d.coins += this.earned;
       d.levels[id] = { stars: Math.max(stars, prev?.stars ?? 0), wins: (prev?.wins ?? 0) + 1 };
@@ -1137,6 +1141,7 @@ export class PlayScene extends Phaser.Scene {
       text("✦  Mosaic complete  ✦", 14, "#f6d97a", { fontStyle: "bold" });
       text(this.built.level.name, 24, theme.text, { fontStyle: "bold" });
       text(this.built.lore, 15, theme.textDim, { fontStyle: "italic" });
+      if (this.firstClear) text("✦ Added to your Spellbook", 13, "#c9b8ff");
       if (this.earned > 0) {
         text(`+${this.earned} ◉`, 18, "#f6d97a", { fontStyle: "bold" });
         if (this.doubled) {
