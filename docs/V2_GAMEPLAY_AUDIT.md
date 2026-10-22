@@ -28,7 +28,7 @@ different mechanic wearing similar clothes.
 
 ## 3. How v1 actually plays (measured)
 
-The v1 rules: wisps loop clockwise around the mosaic, collect the first fragment in line of sight if
+The v1 rules: wisps loop anticlockwise (on screen) around the mosaic, collect the first fragment in line of sight if
 the colour matches, charge counts down, a wisp that finishes a lap with charge left parks in one of
 `K` slots, and a loss is "lap finished and no free slot". The solver and generator use a
 _sequential_ model (one wisp at a time, each finishing its lap before the next launch).
@@ -46,7 +46,7 @@ I played the 60 shipped levels with seven simple automatic strategies in that sa
 | Wisp that collects the most right now         | 75%            | 45%             | 40%            | 53%     |
 | **Wisp that will finish its charge (greedy)** | **95%**        | **100%**        | **95%**        | **97%** |
 
-(Reproducible script: becomes `tools/audit/strategies.ts` in M8.1.)
+These figures come from a one-off script that is **not yet in the repo**; treat them as unverified until it lands as `tools/audit/strategies.ts` in M8.1 (#65), which also re-checks them.
 
 What this says:
 
@@ -126,7 +126,7 @@ M12.3/M12.4 replace this with multi-strategy success rates and decision metrics.
 | Seeded RNG                                                                               | `packages/core/src/rng.ts`                                      |
 | Level pipeline shape (content → generated JSON → CI check) and ASCII art parser          | `tools/levels`, `core/src/art.ts`                               |
 | Rewards provider interface, mock + none providers                                        | `packages/game/src/rewards/{types,providers,index}.ts`          |
-| Scenes that are not the board (title, settings, world map, spellbook)                    | `scenes/*` except `PlayScene`                                   |
+| Scenes that are not the board (boot/title, settings, world map, spellbook)               | `scenes/*` except `PlayScene`                                   |
 | Art PNG import + palette tooling                                                         | `tools/art/*` (extended in M11.4)                               |
 
 ### Replace
@@ -178,7 +178,7 @@ M12.3/M12.4 replace this with multi-strategy success rates and decision metrics.
 1. Build v2 additively and keep `main` shippable v1 until the single switch PR.
 2. Treat the solver's _settled-state abstraction_ as the first design deliverable of M8.2, before any
    engine code.
-3. Land the strategy-audit script (M8.1) in `tools/audit` so the same eight strategies become the
+3. Land the strategy-audit script (M8.1) in `tools/audit` so these seven strategies (extended to the eight in the M12.3 spec) become the
    M12.3 anti-triviality gate, and so v1 numbers above stay reproducible.
 4. Replace the single palette-distance rule with "families + ramps" in the art pipeline (M11.4).
 5. Keep one `v1` maintenance line available: if a v1 hotfix is ever needed after the switch, branch

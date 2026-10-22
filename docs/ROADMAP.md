@@ -79,12 +79,17 @@ Rules for M8–M15:
 
 **Human gates**
 
-| Gate | After | What must happen before work continues                            |
-| ---- | ----- | ----------------------------------------------------------------- |
-| G1   | M10.5 | Playable vertical slice judged by the user before bulk content.   |
-| G2   | M11.3 | Representative art approved before the art library and catalogue. |
-| G3   | M15.4 | Human playtest evidence before release.                           |
-| G4   | M15.5 | Explicit approval before tagging or publishing v2.0.0.            |
+| Gate | Task  | What must happen before anything behind it starts                          |
+| ---- | ----- | -------------------------------------------------------------------------- |
+| G1   | M10.5 | User has played the vertical slice and approved continuing.                |
+| G2   | M11.3 | User has approved the representative art before any library or catalogue.  |
+| G3   | M15.4 | Real first-time-player findings are recorded.                              |
+| G4   | M15.5 | User explicitly approves; only then is the M15.5 PR merged and v2.0.0 cut. |
+
+**A gate task's box is ticked only after the approval above**, in a follow-up docs PR (or, for G4,
+by merging the PR). The gate PR itself uses `Refs #n`, leaves its box unticked and the issue open;
+unticked, it keeps every task that `_Needs_` it blocked. The M15.5 PR is never merged before
+approval. If the user does not approve, their feedback becomes new tasks in that milestone.
 
 ### M8 — Gameplay redesign and validation foundation
 
@@ -114,7 +119,7 @@ _Make collecting cubes enjoyable to watch; deliver one polished playable level. 
 - [ ] **M10.2** Physical collection animation — Render the full pick-up-and-deliver sequence from the event stream. _Needs M9.4, M10.1._
 - [ ] **M10.3** Swarm behaviour — Show many collectors at once without clutter and without changing outcomes. _Needs M10.2._
 - [ ] **M10.4** Movement feedback and sound — Polish movement, carrying, pickup, deposit and completion feedback at 1× and 2×. _Needs M10.2, M10.3._
-- [ ] **M10.5** One complete playable level **(human gate)** — Deliver one manually designed, polished level on the new engine and stop for human evaluation of gameplay feel. _Needs M9.5, M10.4._
+- [ ] **M10.5** One complete playable level **(human gate)** — Deliver one manually designed, polished level on the new engine and stop for human evaluation of gameplay feel. _Needs M9.5, M10.4._ Box ticked only after the user approves (G1).
 
 ### M11 — High-quality witchcraft pixel art and world design
 
@@ -122,7 +127,7 @@ _Replace simplistic patterns with rich, meaningful magical illustrations. Contai
 
 - [ ] **M11.1** Visual art bible (ART_DIRECTION_V2) — Write `docs/ART_DIRECTION_V2.md`. _Needs M10.5._
 - [ ] **M11.2** Increase puzzle art density — Support roughly 24×24–40×40 art with hundreds of meaningful cells, sized by mobile testing. _Needs M11.1._
-- [ ] **M11.3** Representative magical art set **(human gate)** — Hand-craft a small representative set across the themes and stop for art review before any catalogue work. _Needs M11.1, M11.2, M11.4._
+- [ ] **M11.3** Representative magical art set **(human gate)** — Hand-craft a small representative set across the themes and stop for art review before any catalogue work. _Needs M11.1, M11.2, M11.4._ Box ticked only after the user approves the art (G2).
 - [ ] **M11.4** Improve the art pipeline — Extend the PNG import and preview tooling for production art. _Needs M11.1._
 - [ ] **M11.5** Connect artwork to gameplay rewards — Make winning reveal and animate the artwork, and store it in the Spellbook with a lore card. _Needs M11.3, M11.4._
 
@@ -164,8 +169,8 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 - [ ] **M15.1** Comprehensive gameplay tests — Test every rule and the save/resume path. _Needs M14.5._
 - [ ] **M15.2** Gameplay regression and strategy testing — Validate every production level. _Needs M15.1._
 - [ ] **M15.3** Performance and compatibility — Measure frame time and compatibility. _Needs M15.1._
-- [ ] **M15.4** Human playability validation **(human gate)** — Run and record a small session with first-time players. _Needs M15.2, M15.3._
-- [ ] **M15.5** Production readiness and release candidate **(human gate)** — Prepare v2.0.0 and stop for explicit approval before tagging or publishing. _Needs M15.4._
+- [ ] **M15.4** Human playability validation **(human gate)** — Run and record a small session with first-time players. _Needs M15.2, M15.3._ Box ticked only when real findings are recorded (G3); stays unticked while awaiting humans.
+- [ ] **M15.5** Production readiness and release candidate **(human gate)** — Prepare v2.0.0 and stop for explicit approval before tagging or publishing. _Needs M15.4._ PR is not merged, and the box not ticked, until the user approves (G4).
 
 ## Later (post-MVP, not scheduled)
 

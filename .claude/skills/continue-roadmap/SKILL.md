@@ -19,7 +19,8 @@ gh pr list --state open --json number,title,headRefName
 - If an open PR exists for a roadmap task, **resume it** (jump to step 3 or 4 based on its state)
   instead of starting new work.
 - Otherwise the next task is the first `- [ ]` line in `docs/ROADMAP.md` **whose `_Needs …_`
-  dependencies are all ticked**. If none qualifies, report what is blocking (usually a human gate).
+  dependencies are all ticked** and that is not itself awaiting approval (step 1). If none
+  qualifies, report what is blocking (usually a human gate).
 
 ## 1. Gates
 
@@ -28,19 +29,35 @@ gh pr list --state open --json number,title,headRefName
 **M8–M15 (v2):** the roadmap is approved, so crossing a milestone boundary does **not** pause the
 run. Close the finished GitHub milestone, post a one-line summary, and continue.
 
-The loop **stops** only at a human gate (the task has the `human-gate` label and is marked
-**(human gate)** in the roadmap):
+The loop **stops at the human gates**, or when a task needs a decision outside its scope (product
+direction, money, accounts, credentials). A gate task has the `human-gate` label and is marked
+**(human gate)** in the roadmap.
 
-| Gate | Task  | Before continuing                                                                       |
-| ---- | ----- | --------------------------------------------------------------------------------------- |
-| G1   | M10.5 | User has played the vertical slice and said how it feels. No M11+ work until then.      |
-| G2   | M11.3 | User has approved the representative art. No art library or catalogue before then.      |
-| G3   | M15.4 | Real first-time-player findings are recorded (or the task is marked _awaiting humans_). |
-| G4   | M15.5 | User explicitly approves the release. Never tag, release or deploy v2.0.0 without it.   |
+| Gate | Task  | Approval needed before anything behind it starts                                             |
+| ---- | ----- | -------------------------------------------------------------------------------------------- |
+| G1   | M10.5 | User has played the vertical slice and approved continuing. No M11+ work until then.         |
+| G2   | M11.3 | User has approved the representative art. No art library or catalogue before then.           |
+| G3   | M15.4 | Real first-time-player findings are recorded. No release candidate without them.             |
+| G4   | M15.5 | User explicitly approves the release. Never merge the switch, tag, release or deploy before. |
 
-At a gate: finish and merge the gate task's PR, then post the playable build or evidence,
-instructions to reproduce it, and **specific questions**. Do not start the next task. Never record CI,
-solver output or simulated players as human approval or as human feedback, and never invent feedback.
+**Approval is recorded by the roadmap box.** A gate task's box is ticked only after the user
+approves, never by the gate PR itself. Everything behind the gate lists it under `_Needs …_`, so it
+stays blocked until then. Mechanics:
+
+- The gate PR uses `Refs #n` (not `Closes`), does **not** tick the box, and the issue stays open.
+  G1, G2 and G3 PRs may be merged (they are additive and unreachable by default). **The G4 PR
+  (M15.5) must not be merged** until the user approves: it flips the default engine on the deploy
+  branch and migrates saves.
+- After merging a gate PR, post the playable build or evidence, instructions to reproduce it and
+  specific questions, then stop. An unticked gate task whose PR is merged (or, for G4, open and green) is
+  **awaiting approval**: skip it, and do not start tasks that need it.
+- When the user approves in chat, record it: comment on the gate issue quoting the approval, tick
+  the box in a small docs PR (for G4: merge the PR, then tag only if the user said to), close the
+  issue, continue.
+- If the user does not approve, their feedback becomes new tasks in the same milestone, added to the
+  roadmap and as issues; the gate box stays unticked until a later round is approved.
+- Green CI, solver output or simulated players are never approval or human feedback. Never invent
+  feedback. M15.4 stays unticked while it is _awaiting humans_.
 
 ## 2. Implement
 
@@ -86,7 +103,7 @@ gh pr merge <n> --squash --delete-branch
 git checkout main && git pull --ff-only
 ```
 
-The `Closes #n` line closes the issue; confirm it did. Then loop back to step 0. After merging the
+The `Closes #n` line closes the issue (gate PRs use `Refs #n`, see step 1); confirm it did. Then loop back to step 0. After merging the
 last task of a milestone, close the GitHub milestone
 (`gh api -X PATCH repos/{owner}/{repo}/milestones/<id> -f state=closed`), apply step 1.
 

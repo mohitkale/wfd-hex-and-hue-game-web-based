@@ -14,7 +14,7 @@ gh pr diff <n>
 ```
 
 Read `CLAUDE.md`, the rules doc for the task's milestone (`docs/GAME_DESIGN.md` for M0–M7,
-`docs/GAME_DESIGN_V2.md` for M8–M15) and the roadmap task and GitHub issue the PR claims to
+`docs/GAME_DESIGN_V2.md` for M8.3–M15; M8.1 and M8.2 precede it) and the roadmap task and GitHub issue the PR claims to
 implement (its acceptance criteria are the contract). Read the
 surrounding code of changed files when needed to judge behaviour.
 
@@ -35,7 +35,9 @@ surrounding code of changed files when needed to judge behaviour.
 6. **Tests** — new logic has meaningful tests, including edge cases; tests actually assert behaviour.
 7. **Mobile & performance** — per-frame allocations, unbatched draws, layout on small portrait
    screens, touch target sizes, safe areas.
-8. **Scope & hygiene** — PR matches its roadmap task, roadmap box ticked, no secrets, no dead code.
+8. **Scope & hygiene** — PR matches its roadmap task, roadmap box ticked (except human-gate tasks
+   M10.5, M11.3, M15.4, M15.5: their PRs use `Refs`, leave the box unticked, and M15.5 must not merge
+   before approval), no secrets, no dead code.
 
 ## Output
 

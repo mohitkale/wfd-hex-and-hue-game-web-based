@@ -23,11 +23,13 @@ a session without another specific request in this project, run the **continue-r
 5. **Milestone gate (M0–M7 only, now historical):** the v1 loop stopped for the user's OK at every
    milestone boundary.
 6. **v2 (M8–M15) gates:** the roadmap is approved, so milestone boundaries do **not** pause the run.
-   Post a one-line milestone summary, close the GitHub milestone and continue. Only the four
-   **human gates** stop it: **G1** after M10.5 (playable vertical slice), **G2** after M11.3
+   Post a one-line milestone summary, close the GitHub milestone and continue. The run stops at the
+   four **human gates** (or when a task needs a product, money, account or credential decision): **G1** after M10.5 (playable vertical slice), **G2** after M11.3
    (representative art), **G3** M15.4 (human playtest evidence) and **G4** M15.5 (explicit approval
    before tagging or publishing v2.0.0). At a gate: post the build, evidence and specific questions,
-   then wait. Green CI, solver results or simulated players are never recorded as human approval.
+   then wait. A gate's roadmap box is ticked only after the user approves (the gate PR uses
+   `Refs`, not `Closes`), which keeps everything behind it blocked; the M15.5 PR is never merged
+   before approval, because merging it switches production to v2. Green CI, solver results or simulated players are never recorded as human approval.
 
 ## Non-negotiable product principles
 
