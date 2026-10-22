@@ -106,7 +106,7 @@ _Replace the perimeter-track concept with a clearly specified, strategic pick-up
 _Replace perimeter-track collection with physical pickup-and-delivery rules in a pure TypeScript engine._
 
 - [x] **M9.1** Collection and navigation engine — Implement the deterministic collection simulation in pure TypeScript, independent of Phaser. _Needs M8.5._
-- [ ] **M9.2** Numbered summon groups with real capacity — Make a group's number its true remaining collection capacity. _Needs M9.1._
+- [x] **M9.2** Numbered summon groups with real capacity — Make a group's number its true remaining collection capacity. _Needs M9.1._
 - [ ] **M9.3** Holding slots and queues — Implement limited holding slots that genuinely affect decisions, and rule-based loss. _Needs M9.2._
 - [ ] **M9.4** Deterministic game events and replay — Expose the event stream the renderer needs and prove replay reproduces logical state. _Needs M9.1, M9.2, M9.3._
 - [ ] **M9.5** Core simulation tests — Cover the whole rule set with tests and prove a full puzzle can be solved without a renderer. _Needs M9.1, M9.2, M9.3, M9.4._

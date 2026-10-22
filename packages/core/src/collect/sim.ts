@@ -4,6 +4,7 @@ import type { CollectEvent } from "./events";
 import { cachesOf, topologyOf, type CollectState, type Familiar } from "./state";
 import { hasAssignable, nearestTarget } from "./targeting";
 import { EMPTY } from "../level";
+import { remaining, uncommitted } from "./groups";
 
 /** True when no familiar exists and no group is working (GAME_DESIGN_V2 §2). */
 export function isSettled(s: CollectState): boolean {
@@ -75,7 +76,7 @@ function act(s: CollectState, f: Familiar, events: CollectEvent[]): void {
         familiar: f.id,
         group: g.id,
         color: g.color,
-        remaining: g.capacity - g.delivered,
+        remaining: remaining(g),
       });
       f.status = "idle";
       f.route = [];
@@ -108,10 +109,9 @@ function assign(
 /** Phase 2 for one working group: reassign or retire idle familiars, then maybe spawn. */
 function dispatch(s: CollectState, groupId: number, events: CollectEvent[]): void {
   const g = s.groups[groupId]!;
-  const uncommitted = () => g.capacity - g.delivered - g.committed;
 
   for (const f of s.familiars.filter((x) => x.group === groupId && x.status === "idle")) {
-    const target = uncommitted() > 0 ? nearestTarget(s, g.color) : null;
+    const target = uncommitted(g) > 0 ? nearestTarget(s, g.color) : null;
     if (target) {
       assign(s, f, target, events);
     } else {
@@ -120,7 +120,7 @@ function dispatch(s: CollectState, groupId: number, events: CollectEvent[]): voi
     }
   }
 
-  if (s.tick >= g.nextSpawn && familiarCount(s, groupId) < s.params.squad && uncommitted() > 0) {
+  if (s.tick >= g.nextSpawn && familiarCount(s, groupId) < s.params.squad && uncommitted(g) > 0) {
     const target = nearestTarget(s, g.color);
     if (target) {
       const f: Familiar = {
@@ -180,7 +180,7 @@ export function step(s: CollectState): CollectEvent[] {
     }
     s.slots[slot] = g.id;
     g.status = "waiting";
-    events.push({ type: "groupParked", group: g.id, slot, remaining: g.capacity - g.delivered });
+    events.push({ type: "groupParked", group: g.id, slot, remaining: remaining(g) });
   }
 
   // Phase 4: status. Win is tested first.
