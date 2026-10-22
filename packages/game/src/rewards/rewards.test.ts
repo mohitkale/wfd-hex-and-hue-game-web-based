@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockProvider, NoneProvider, createRewards, safeShow } from "./providers";
-import { speedOffer, unlockSpeed } from "./speed";
+import { speedButton, speedOffer, unlockSpeed } from "./speed";
 import type { AdResult, RewardsProvider } from "./types";
 
 const fake = (available: boolean, result: AdResult): RewardsProvider => ({
@@ -72,5 +72,84 @@ describe("providers", () => {
       show: () => Promise.reject(new Error("sdk crashed")),
     };
     expect(await safeShow(boom, "coins")).toBe("unavailable");
+  });
+});
+
+describe("speed button", () => {
+  const base = { unlocked: false, declined: false, speed: 1 as const, turns: 0, adAvailable: true };
+
+  it("offers free, then ad, and toggles once unlocked", () => {
+    expect(speedButton(base)).toEqual({ label: "2× free", action: "unlock" });
+    expect(speedButton({ ...base, turns: 1 })).toEqual({ label: "2× ▶", action: "unlock" });
+    expect(speedButton({ ...base, unlocked: true, speed: 2 })).toEqual({
+      label: "2×",
+      action: "toggle",
+    });
+  });
+
+  it("never advertises an ad that can't play", () => {
+    expect(speedButton({ ...base, turns: 1, adAvailable: false }).label).toBe("2×");
+  });
+
+  it("after an empty ad turn, stays 1× for the rest of the level (no same-level free 2×)", async () => {
+    const outcome = await unlockSpeed(1, new NoneProvider());
+    // The counter moved on to a free turn…
+    expect(speedOffer(outcome.turns)).toBe("free");
+    // …but this level is declined, so the button only explains.
+    expect(speedButton({ ...base, turns: outcome.turns, declined: true })).toEqual({
+      label: "1×",
+      action: "explain",
+    });
+  });
+});
+
+/** A just-enough DOM for MockProvider. */
+function fakeDocument() {
+  const nodes: { removed: boolean; listeners: Record<string, () => void>; children: unknown[] }[] =
+    [];
+  const make = () => {
+    const node = {
+      removed: false,
+      listeners: {} as Record<string, () => void>,
+      children: [] as unknown[],
+      style: { cssText: "" },
+      textContent: "",
+      setAttribute() {},
+      append(...c: unknown[]) {
+        node.children.push(...c);
+      },
+      remove() {
+        node.removed = true;
+      },
+      addEventListener(type: string, fn: () => void) {
+        node.listeners[type] = fn;
+      },
+    };
+    nodes.push(node);
+    return node;
+  };
+  const doc = { createElement: make, body: { append() {} } } as unknown as Document;
+  return { doc, nodes };
+}
+
+describe("MockProvider", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("rewards after the countdown and removes its overlay", async () => {
+    const { doc, nodes } = fakeDocument();
+    const shown = new MockProvider(3, doc).show("coins");
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await shown).toBe("rewarded");
+    expect(nodes[0]!.removed).toBe(true);
+  });
+
+  it("closing early is a dismissal", async () => {
+    const { doc, nodes } = fakeDocument();
+    const shown = new MockProvider(3, doc).show("coins");
+    await vi.advanceTimersByTimeAsync(1000);
+    nodes[2]!.listeners.click!(); // the Close button
+    expect(await shown).toBe("dismissed");
+    expect(nodes[0]!.removed).toBe(true);
   });
 });

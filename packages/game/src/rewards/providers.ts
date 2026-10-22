@@ -71,6 +71,9 @@ export function createRewards(env: {
   DEV?: boolean | undefined;
 }): RewardsProvider {
   const choice = env.PUBLIC_REWARDS ?? (env.DEV ? "mock" : "none");
+  if (choice === "mock" && !env.DEV) {
+    console.warn("PUBLIC_REWARDS=mock in a production build: fake ads will grant real rewards.");
+  }
   return choice === "mock" ? new MockProvider() : new NoneProvider();
 }
 

@@ -3,7 +3,15 @@ import { NoneProvider } from "./providers";
 import type { RewardsProvider } from "./types";
 
 export { MockProvider, NoneProvider, createRewards, safeShow } from "./providers";
-export { speedOffer, unlockSpeed, type SpeedOffer, type SpeedOutcome } from "./speed";
+export {
+  speedButton,
+  speedOffer,
+  unlockSpeed,
+  type SpeedButton,
+  type SpeedButtonInput,
+  type SpeedOffer,
+  type SpeedOutcome,
+} from "./speed";
 export type { AdResult, Placement, RewardsProvider } from "./types";
 
 /** The game's rewards provider (a no-op provider if none was registered). */

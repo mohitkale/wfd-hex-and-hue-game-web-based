@@ -29,3 +29,30 @@ export async function unlockSpeed(turns: number, provider: RewardsProvider): Pro
   if (result === "dismissed") return { granted: false, turns };
   return { granted: false, turns: turns + 1, message: "No ad right now — 2× is free next level" };
 }
+
+export interface SpeedButtonInput {
+  /** 2× already unlocked this level. */
+  unlocked: boolean;
+  /** An ad turn found no ad this level: 1× for the rest of it (next level is free). */
+  declined: boolean;
+  speed: 1 | 2;
+  turns: number;
+  adAvailable: boolean;
+}
+
+export interface SpeedButton {
+  label: string;
+  /** What a tap does: switch 1×/2×, try to unlock, or just explain (no unlock possible now). */
+  action: "toggle" | "unlock" | "explain";
+}
+
+/**
+ * The HUD speed button for the current state. Never advertises an ad that can't play, and never
+ * re-offers 2× in the same level after an ad turn came up empty.
+ */
+export function speedButton(s: SpeedButtonInput): SpeedButton {
+  if (s.unlocked) return { label: `${s.speed}×`, action: "toggle" };
+  if (s.declined) return { label: "1×", action: "explain" };
+  if (speedOffer(s.turns) === "free") return { label: "2× free", action: "unlock" };
+  return s.adAvailable ? { label: "2× ▶", action: "unlock" } : { label: "2×", action: "unlock" };
+}
