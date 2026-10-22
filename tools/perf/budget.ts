@@ -94,6 +94,20 @@ export function checkBudgets(files: readonly BuiltFile[], budgets = BUDGETS): Bu
   });
 }
 
+/**
+ * Pages with inline executable scripts. The CSP allows only same-origin script files (no
+ * 'unsafe-inline'), so any such script would be blocked in production. JSON-LD data is fine.
+ */
+export function inlineScripts(pages: readonly { path: string; html: string }[]): string[] {
+  return pages
+    .filter((p) =>
+      [...p.html.matchAll(/<script\b([^>]*)>/g)].some(
+        (m) => !/\ssrc=/.test(m[1]!) && !/type="application\/ld\+json"/.test(m[1]!),
+      ),
+    )
+    .map((p) => p.path);
+}
+
 /** A content page may load at most this much script (gzip), static imports included. */
 export const CONTENT_SCRIPT_MAX = 10 * 1024;
 

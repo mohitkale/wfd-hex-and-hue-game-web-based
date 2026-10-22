@@ -26,3 +26,24 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run budget
+
+  # The VPS image: builds it and checks that nginx serves the site with the right headers.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --build-arg SITE_URL=https://ci.example -t hexhue .
+      - name: Smoke test
+        run: |
+          docker run -d --name web -p 8080:8080 hexhue
+          for i in $(seq 1 30); do curl -fs http://localhost:8080/ >/dev/null && break; sleep 1; done
+          curl -fsI http://localhost:8080/play/ | grep -i "content-security-policy: default-src 'self'"
+          curl -fsI http://localhost:8080/sw.js | grep -i "cache-control: no-cache"
+          bundle=$(curl -fs http://localhost:8080/play/ | grep -o '/_astro/play[^"]*\.js' | head -1)
+          curl -fsI "http://localhost:8080$bundle" | grep -i "immutable"
+          curl -fs http://localhost:8080/sitemap.xml | grep -q "https://ci.example/faq/"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/nope/)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/faq)" = 301
+          test "$(curl -s -o /dev/null -w '%{redirect_url}' http://localhost:8080/faq)" = "http://localhost:8080/faq/"

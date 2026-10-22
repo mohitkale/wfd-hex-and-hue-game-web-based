@@ -1,0 +1,13 @@
+# Netlify: connect the repository and these settings apply. Netlify sets URL (the site address)
+# at build time; canonical links, share cards and the sitemap use it. See docs/DEPLOY.md.
+[build]
+  command = "npm run build && npm run budget"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  # Rewarded ads stay off until an ad network is approved.
+  PUBLIC_REWARDS = "none"
+
+# Caching and security headers live in apps/web/public/_headers (shared with deploy/nginx, and
+# checked to match by tools/deploy/headers.test.ts). 404s use the built 404.html automatically.

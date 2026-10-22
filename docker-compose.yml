@@ -1,0 +1,14 @@
+# VPS: `docker compose up -d --build` (set SITE_URL first, e.g. in a .env file next to this).
+# Serves plain HTTP on 127.0.0.1:8080: put a TLS proxy (Caddy, Traefik, nginx) in front.
+services:
+  web:
+    build:
+      context: .
+      args:
+        SITE_URL: ${SITE_URL:?Set SITE_URL to the site's public address, e.g. https://play.example.com}
+        PUBLIC_REWARDS: ${PUBLIC_REWARDS:-none}
+        PUBLIC_POSTHOG_KEY: ${PUBLIC_POSTHOG_KEY:-}
+        PUBLIC_POSTHOG_HOST: ${PUBLIC_POSTHOG_HOST:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
