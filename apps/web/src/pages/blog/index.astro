@@ -1,0 +1,76 @@
+---
+import Page from "../../layouts/Page.astro";
+import { artUrl } from "../../lib/site";
+
+interface Post {
+  url: string;
+  frontmatter: { title: string; description: string; date: string | Date; art?: string };
+}
+const posts = Object.values(import.meta.glob<Post>("./*.md", { eager: true })).sort(
+  (a, b) => new Date(b.frontmatter.date).getTime() - new Date(a.frontmatter.date).getTime(),
+);
+---
+
+<Page
+  title="Blog: Hex & Hue"
+  description="Moon phases, crystal lore, zodiac stories and notes on making a puzzle game that never blocks you."
+>
+  <h1>Blog</h1>
+  <p class="lede">The lore behind the mosaics, and notes from making the game.</p>
+  <ul class="posts">
+    {posts.map((p) => (
+      <li>
+        <a href={p.url}>
+          {p.frontmatter.art && (
+            <img
+              class="pixel"
+              src={artUrl(p.frontmatter.art)}
+              alt=""
+              width="72"
+              height="72"
+              loading="lazy"
+            />
+          )}
+          <span>
+            <strong>{p.frontmatter.title}</strong>
+            <span class="desc">{p.frontmatter.description}</span>
+          </span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</Page>
+
+<style>
+  .posts {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+    max-width: 44rem;
+  }
+  .posts a {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 16px;
+    align-items: center;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgb(42 22 80 / 0.6);
+    color: var(--text) !important;
+    text-decoration: none;
+  }
+  .posts img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+  }
+  .posts strong {
+    display: block;
+    font-size: 1.1rem;
+  }
+  .desc {
+    color: var(--mist);
+    font-size: 0.95rem;
+  }
+</style>

@@ -1,0 +1,72 @@
+---
+import Page from "./Page.astro";
+import { SITE, absolute, artUrl, ogCardUrl } from "../lib/site";
+
+interface Props {
+  frontmatter: {
+    title: string;
+    description: string;
+    /** YAML gives unquoted dates as Date objects. */
+    date: string | Date;
+    /** A mosaic id whose artwork illustrates the post. */
+    art?: string;
+  };
+}
+const { frontmatter } = Astro.props;
+const published = new Date(frontmatter.date);
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: frontmatter.title,
+  description: frontmatter.description,
+  datePublished: published.toISOString(),
+  author: { "@type": "Organization", name: SITE.name },
+  publisher: { "@type": "Organization", name: SITE.name },
+  url: absolute(Astro.url.pathname, Astro.site),
+  ...(frontmatter.art ? { image: absolute(ogCardUrl(frontmatter.art), Astro.site) } : {}),
+};
+---
+
+<Page
+  title={`${frontmatter.title}: Hex & Hue`}
+  description={frontmatter.description}
+  type="article"
+  image={frontmatter.art ? ogCardUrl(frontmatter.art) : undefined}
+  imageAlt={`${frontmatter.title}: a Hex & Hue pixel mosaic`}
+  jsonLd={jsonLd}
+>
+  <article class="prose">
+    <p class="meta">
+      <a href="/blog/">Blog</a> ·
+      <time datetime={published.toISOString()}>
+        {published.toLocaleDateString("en", { dateStyle: "long", timeZone: "UTC" })}
+      </time>
+    </p>
+    <h1>{frontmatter.title}</h1>
+    {frontmatter.art && (
+      <img class="pixel hero-art" src={artUrl(frontmatter.art)} alt="" width="160" height="160" />
+    )}
+    <slot />
+    <p class="cta-line">
+      <a href="/play/">Play Hex &amp; Hue</a>, free, and collect the mosaics yourself.
+    </p>
+  </article>
+</Page>
+
+<style>
+  .meta {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .hero-art {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    margin: 0.5rem 0 1rem;
+  }
+  .cta-line {
+    margin-top: 2.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgb(201 184 255 / 0.15);
+  }
+</style>

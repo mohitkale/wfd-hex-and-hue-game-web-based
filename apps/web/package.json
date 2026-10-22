@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@hexhue/game": "*",
-    "astro": "7.4.2"
+    "astro": "7.4.2",
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
-    "@astrojs/check": "0.9.12"
+    "@astrojs/check": "0.9.12",
+    "@types/pngjs": "^6.0.5"
   }
 }

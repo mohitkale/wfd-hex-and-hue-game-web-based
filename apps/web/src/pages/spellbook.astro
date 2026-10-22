@@ -1,0 +1,115 @@
+---
+import Page from "../layouts/Page.astro";
+import { SITE, absolute, artUrl, gallery } from "../lib/site";
+
+const worlds = gallery();
+const total = worlds.reduce((n, w) => n + w.items.length, 0);
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: "The Hex & Hue Spellbook",
+  description: `All ${total} mosaics of ${SITE.name}, with their lore.`,
+  url: absolute(Astro.url.pathname, Astro.site),
+};
+---
+
+<Page
+  title="The Spellbook: every Hex & Hue mosaic"
+  description={`Browse all ${total} magical pixel mosaics of Hex & Hue (moon phases, crystals and the zodiac), each with its own bit of lore.`}
+  jsonLd={jsonLd}
+>
+  <h1>The Spellbook</h1>
+  <p class="lede">
+    Every mosaic you can reveal in Hex &amp; Hue, with the lore it adds to your own Spellbook. In
+    the game, each one blooms in as you clear its last fragment.
+  </p>
+  <nav class="jump" aria-label="Worlds">
+    {worlds.map((w) => (
+      <a href={`#${w.id}`}>{w.name}</a>
+    ))}
+  </nav>
+  {worlds.map((w) => (
+    <section id={w.id}>
+      <h2>{w.name}</h2>
+      <ul class="cards">
+        {w.items.map((item) => (
+          <li class="card" id={item.id}>
+            <img
+              class="pixel"
+              src={artUrl(item.id)}
+              alt={`${item.name}, a pixel mosaic`}
+              width={item.width * 8}
+              height={item.height * 8}
+              loading="lazy"
+            />
+            <div>
+              <h3>
+                <span class="num">{item.number}</span> {item.name}
+              </h3>
+              <p>{item.lore}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+  <p class="play-more">
+    Fill your own Spellbook: <a href="/play/">play Hex &amp; Hue</a>, free.
+  </p>
+</Page>
+
+<style>
+  .jump {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+  }
+  .jump a {
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: var(--dusk);
+    color: var(--text) !important;
+    text-decoration: none;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    list-style: none;
+    padding: 0;
+  }
+  .card {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 14px;
+    align-items: start;
+    padding: 14px;
+    border-radius: 18px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  .card img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+  }
+  .card h3 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+  }
+  .card p {
+    margin: 0;
+    color: var(--mist);
+    font-size: 0.95rem;
+    font-style: italic;
+  }
+  .num {
+    color: var(--glow);
+    font-size: 0.85rem;
+    margin-right: 4px;
+  }
+  .play-more {
+    margin-top: 2rem;
+    text-align: center;
+  }
+</style>
