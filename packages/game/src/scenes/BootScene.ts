@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { whenSaveReady } from "../save";
 import { theme } from "../theme";
 import { ensureTextures, TEX } from "../view/textures";
+import { fadeIn, go } from "../view/transition";
 
 /** Title screen. Tap anywhere to open the world map. */
 export class BootScene extends Phaser.Scene {
@@ -15,10 +16,11 @@ export class BootScene extends Phaser.Scene {
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
     // Progress loads in the background; a tap during that brief moment just waits for it.
-    this.input.once("pointerup", () => whenSaveReady(this, () => this.scene.start("levels")));
+    this.input.once("pointerup", () => whenSaveReady(this, () => go(this, "levels")));
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
+    fadeIn(this);
   }
 
   private layout(): void {

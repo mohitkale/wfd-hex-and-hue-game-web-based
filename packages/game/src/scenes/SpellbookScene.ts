@@ -8,6 +8,7 @@ import { theme } from "../theme";
 import { artTexture } from "../view/artThumb";
 import { Button } from "../view/Button";
 import { DragScroll } from "../view/DragScroll";
+import { fadeIn, go } from "../view/transition";
 
 /** Cell size (device px) of card thumbnails and page art textures; both are scaled up to fit. */
 const THUMB_CELL = 4;
@@ -46,6 +47,7 @@ export class SpellbookScene extends Phaser.Scene {
       this.closePage();
     });
     this.layout();
+    fadeIn(this);
   }
 
   private layout(): void {
@@ -137,7 +139,7 @@ export class SpellbookScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(11)
       .setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.scene.start("levels"));
+      .on("pointerup", () => go(this, "levels"));
     this.objects.push(
       barBg,
       back,

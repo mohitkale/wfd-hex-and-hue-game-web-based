@@ -15,6 +15,7 @@ import type { SaveData } from "../save/schema";
 import { theme } from "../theme";
 import { DragScroll } from "../view/DragScroll";
 import { ensureTextures, TEX } from "../view/textures";
+import { fadeIn, go } from "../view/transition";
 import type { PlayData } from "./PlayScene";
 
 /** Section tint per world, in play order. */
@@ -49,6 +50,7 @@ export class WorldMapScene extends Phaser.Scene {
     // Open on the level to play next.
     const { height } = this.scale.gameSize;
     this.scroller.scrollTo(this.focusY !== null ? this.focusY - height * 0.45 : 0);
+    fadeIn(this);
   }
 
   private save(): Pick<SaveData, "levels" | "skipped"> {
@@ -246,7 +248,7 @@ export class WorldMapScene extends Phaser.Scene {
     book
       .on("pointerdown", () => (bookPressed = true))
       .on("pointerout", () => (bookPressed = false))
-      .on("pointerup", () => bookPressed && this.scene.start("spellbook"));
+      .on("pointerup", () => bookPressed && go(this, "spellbook"));
     this.objects.push(bar, soundZone, title, slash, stars, book);
   }
 
@@ -357,8 +359,8 @@ export class WorldMapScene extends Phaser.Scene {
         scale: 0.9,
         duration: 70,
         yoyo: true,
-        onComplete: () => this.scene.start("play", data),
       });
+      go(this, "play", data);
     });
     return out;
   }

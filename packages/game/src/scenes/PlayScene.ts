@@ -4,6 +4,7 @@ import {
   createRng,
   wandColors,
   trackFor,
+  wispAt,
   type BuiltLevel,
   type LaunchSource,
   type SessionEvent,
@@ -14,6 +15,9 @@ import { computeLayout, type Insets, type Layout } from "../layout";
 import { getAudio } from "../audio";
 import { PRICES, pay, paymentFor, winCoins } from "../economy";
 import { Haptics } from "../haptics";
+import { IDLE_HINT_MS } from "../hint";
+import { getHinter } from "../hinter";
+import { ComboTracker, confettiColors, isComboMilestone } from "../juice";
 import { flatLevels } from "../progress";
 import {
   AD_COINS,
@@ -46,6 +50,7 @@ import { Button } from "../view/Button";
 import { MosaicView } from "../view/MosaicView";
 import { WispView } from "../view/WispView";
 import { TEX, ensureTextures } from "../view/textures";
+import { fadeIn, go, isLeaving } from "../view/transition";
 
 export interface PlayData {
   world: number;
@@ -54,7 +59,16 @@ export interface PlayData {
 
 /** Draw order; explicit so rebuilt layers never cover persistent wisps. */
 // The HUD stays above result cards so Back always works.
-const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, fx: 3, overlay: 4, hud: 5 } as const;
+const DEPTH = {
+  chrome: 0,
+  mosaic: 1,
+  hint: 1.5,
+  wisps: 2,
+  fx: 3,
+  overlay: 4,
+  confetti: 4.5,
+  hud: 5,
+} as const;
 
 /** Losses in a row on one level before the lose card offers a free skip. */
 const SKIP_AFTER = 3;
@@ -124,6 +138,19 @@ export class PlayScene extends Phaser.Scene {
   private adOffer: Phaser.GameObjects.Text | null = null;
   /** Bumped every run; async ad results from an earlier run are ignored. */
   private runId = 0;
+  /** Fragment bursts and portal rings; rebuilt with the layout (sizes follow the cell). */
+  private burst: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private confetti: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private readonly combo = new ComboTracker();
+  /** How long the board has sat idle and waiting for the player. */
+  private idleMs = 0;
+  /** A hint search was started for the current idle board. */
+  private hintAsked = false;
+  /** The hint's answer, shown once the board has been idle for `IDLE_HINT_MS`. */
+  private hintMove: LaunchSource | null = null;
+  private hintView: Phaser.GameObjects.Image | null = null;
+  /** One reused "Combo ×n" label (a new Text per combo would mean a texture upload each time). */
+  private comboLabel: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super("play");
@@ -165,6 +192,14 @@ export class PlayScene extends Phaser.Scene {
     this.speedDeclined = false;
     this.doubled = false;
     this.adOffer = null;
+    this.burst = null;
+    this.confetti = null;
+    this.combo.reset();
+    this.idleMs = 0;
+    this.hintAsked = false;
+    this.hintMove = null;
+    this.hintView = null;
+    this.comboLabel = null;
     this.runId++;
     const save = getSave(this);
     const unsubscribeSave = save?.subscribe((d) => this.boosterBar?.update(d));
@@ -194,11 +229,15 @@ export class PlayScene extends Phaser.Scene {
       this.scale.off("resize", this.relayout, this);
       this.mosaic?.destroy();
       this.mosaic = null;
+      getHinter().cancel();
     });
     this.relayout();
+    fadeIn(this);
   }
 
   override update(_time: number, delta: number): void {
+    // Leaving (fading out): the board freezes, so nothing can win, lose or launch behind the fade.
+    if (isLeaving(this)) return;
     const s = this.session.state;
     if (s.status === "playing" && (s.track.length > 0 || this.session.pending.length > 0)) {
       const { steps, acc } = accumulate(this.acc, delta, this.speed);
@@ -215,6 +254,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.reveal) this.stepReveal(delta);
     this.mosaic?.flush();
     this.moveWisps(delta);
+    this.updateHint(delta);
   }
 
   // ── Layout ──────────────────────────────────────────────────────────────
@@ -262,6 +302,9 @@ export class PlayScene extends Phaser.Scene {
     }
     this.mosaic = new MosaicView(this, this.layout, level, this.session.state.cells);
     this.mosaic.image.setDepth(DEPTH.mosaic);
+    this.createEmitters();
+    // Redrawn at the new spot by the next idle frame.
+    this.hideHint();
     if (this.reveal) this.paintArtwork(this.reveal.shown);
     else if (this.session.state.status === "won" && !this.revealPending) {
       this.paintArtwork(level.cells.length);
@@ -301,7 +344,7 @@ export class PlayScene extends Phaser.Scene {
       .zone(hud.x + 4 * dpr, hud.y + (hud.h - touch) / 2, touch, touch)
       .setOrigin(0, 0)
       .setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.scene.start("levels"));
+      .on("pointerup", () => go(this, "levels"));
     const back = this.add
       .text(backZone.x + touch / 2, hud.y + hud.h / 2, "‹", {
         fontFamily: theme.font,
@@ -374,6 +417,7 @@ export class PlayScene extends Phaser.Scene {
 
   private tap(source: LaunchSource): void {
     if (this.session.state.status !== "playing") return;
+    this.clearHint();
     const id = this.session.tapTarget(source);
     if (id === null) {
       this.rejectTap(source);
@@ -576,6 +620,7 @@ export class PlayScene extends Phaser.Scene {
   private onEvent(e: SessionEvent): void {
     switch (e.type) {
       case "wand": {
+        this.clearHint();
         this.haptics.play("portal");
         getAudio(this).play("booster");
         e.cells.forEach((cell, i) => {
@@ -587,6 +632,7 @@ export class PlayScene extends Phaser.Scene {
         break;
       }
       case "slotAdded":
+        this.clearHint();
         getAudio(this).play("booster");
         // Slot count changed: the layout (slot row) must be rebuilt.
         this.lastLayoutKey = "";
@@ -594,6 +640,7 @@ export class PlayScene extends Phaser.Scene {
         if (e.revivedWispId !== null) this.closeCard();
         break;
       case "shuffled":
+        this.clearHint();
         getAudio(this).play("booster");
         this.refreshTargets();
         break;
@@ -609,15 +656,28 @@ export class PlayScene extends Phaser.Scene {
           view.setCharge(e.chargeLeft);
           this.spark(e.cell, view);
         }
+        if (this.mosaic) {
+          const at = this.mosaic.cellCenter(e.cell);
+          this.burst?.setParticleTint(hexToNumber(this.built.level.palette[e.color]!));
+          this.burst?.explode(5, at.x, at.y);
+          const chain = this.combo.hit(e.wispId, this.session.state.step);
+          if (isComboMilestone(chain)) this.showCombo(chain, view ?? at);
+        }
         break;
       }
-      case "portal":
+      case "portal": {
         this.haptics.play("portal");
         getAudio(this).play("portal");
+        const { x, y } = this.layout.portal;
+        this.burst?.setParticleTint(theme.glow);
+        this.burst?.explode(10, x, y);
+        this.combo.end(e.wispId);
         this.departToPortal(e.wispId);
         break;
+      }
       case "parked":
         this.haptics.play("park");
+        this.combo.end(e.wispId);
         getAudio(this).play("park");
         break;
       case "won":
@@ -651,6 +711,8 @@ export class PlayScene extends Phaser.Scene {
       case "undone":
       case "restarted":
         this.assists = e.type === "undone" ? this.assists + 1 : 0;
+        this.combo.reset();
+        this.clearHint();
         if (e.type === "restarted") getSave(this)?.update((d) => d.stats.plays++);
         if (e.type === "undone" && e.reverted !== "tap") {
           // Undoing a booster gives it back (as stock), so nothing paid is lost.
@@ -859,6 +921,156 @@ export class PlayScene extends Phaser.Scene {
     return this.layout.cell * 0.42;
   }
 
+  // ── Juice & hints ───────────────────────────────────────────────────────
+
+  /**
+   * Particle emitters. The burst is sized to the cell, so it is rebuilt with the layout; confetti
+   * depends only on dpr and the palette, so flakes in flight survive a resize.
+   */
+  private createEmitters(): void {
+    this.burst?.destroy();
+    const { cell, dpr } = this.layout;
+    // The spark texture is 16px; particles are scaled from that.
+    const flake = 16;
+    this.burst = this.add
+      .particles(0, 0, TEX.spark, {
+        emitting: false,
+        lifespan: { min: 240, max: 480 },
+        speed: { min: cell * 1.2, max: cell * 4 },
+        angle: { min: 0, max: 360 },
+        scale: { start: (cell * 0.32) / flake, end: 0 },
+        alpha: { start: 1, end: 0 },
+        blendMode: Phaser.BlendModes.ADD,
+        // Caps particles alive at once (`maxParticles` would cap all ever created, pool included).
+        maxAliveParticles: 240,
+      })
+      .setDepth(DEPTH.fx);
+    if (this.confetti) return;
+    this.confetti = this.add
+      .particles(0, 0, TEX.spark, {
+        emitting: false,
+        lifespan: { min: 1400, max: 2200 },
+        speed: { min: 260 * dpr, max: 560 * dpr },
+        angle: { min: 235, max: 305 },
+        gravityY: 520 * dpr,
+        rotate: { start: 0, end: 540 },
+        scale: { min: (7 * dpr) / flake, max: (12 * dpr) / flake },
+        alpha: { start: 1, end: 0, ease: "Quad.easeIn" },
+        tint: confettiColors(this.built.level.palette),
+        maxAliveParticles: 160,
+      })
+      .setDepth(DEPTH.confetti);
+  }
+
+  /** Win: two fountains of palette-colored confetti from under the finished artwork. */
+  private celebrate(): void {
+    const { boardRect } = this.layout;
+    const y = boardRect.y + boardRect.h;
+    this.confetti?.explode(40, boardRect.x + boardRect.w * 0.25, y);
+    this.confetti?.explode(40, boardRect.x + boardRect.w * 0.75, y);
+  }
+
+  /** A run of back-to-back collections: a gold "Combo ×n" pops up by the wisp. */
+  private showCombo(length: number, at: Point): void {
+    const { cell, dpr, frame } = this.layout;
+    const margin = 60 * dpr;
+    const x = Math.min(frame.x + frame.w - margin, Math.max(frame.x + margin, at.x));
+    const y = Math.max(frame.y + 24 * dpr, at.y - cell * 1.4);
+    this.comboLabel ??= this.add
+      .text(0, 0, "", {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${Math.round(16 * dpr)}px`,
+        color: "#f6d97a",
+        stroke: "#140b2e",
+        strokeThickness: Math.round(4 * dpr),
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH.fx);
+    const label = this.comboLabel;
+    this.tweens.killTweensOf(label);
+    label.setText(`Combo ×${length}`).setPosition(x, y).setAlpha(1).setScale(0.6).setVisible(true);
+    this.tweens.add({ targets: label, scale: 1, duration: 200, ease: "Back.easeOut" });
+    this.tweens.add({
+      targets: label,
+      y: y - cell * 1.5,
+      alpha: 0,
+      delay: 450,
+      duration: 500,
+      ease: "Quad.easeIn",
+      onComplete: () => label.setVisible(false),
+    });
+    this.burst?.setParticleTint(theme.glow);
+    this.burst?.explode(12, at.x, at.y);
+  }
+
+  /**
+   * Idle hints: once nothing has moved for a moment, a worker searches for a launch that keeps the
+   * board winnable; after `IDLE_HINT_MS` without a tap, that column or slot glows. Free, and never
+   * counted as an assist.
+   */
+  private updateHint(delta: number): void {
+    const s = this.session.state;
+    const idle =
+      s.status === "playing" &&
+      s.track.length === 0 &&
+      this.session.pending.length === 0 &&
+      this.overlayKind === null &&
+      this.wandPicker.length === 0;
+    if (!idle) {
+      if (this.hintAsked) this.clearHint();
+      return;
+    }
+    if (!this.hintAsked) {
+      this.hintAsked = true;
+      const run = this.runId;
+      getHinter().request(s, (move) => {
+        if (run === this.runId && this.hintAsked) this.hintMove = move;
+      });
+    }
+    this.idleMs += delta;
+    if (this.idleMs >= IDLE_HINT_MS && this.hintMove && !this.hintView) this.showHint();
+  }
+
+  private showHint(): void {
+    const w = this.hintMove ? wispAt(this.session.state, this.hintMove) : null;
+    const view = w ? this.wisps.get(w.id) : undefined;
+    if (!view) return;
+    const size = view.currentRadius * 4.2;
+    const glow = this.add
+      .image(view.x, view.y, TEX.glow)
+      .setTint(theme.glow)
+      .setDisplaySize(size, size)
+      .setDepth(DEPTH.hint)
+      .setAlpha(0.25);
+    this.tweens.add({
+      targets: glow,
+      alpha: 0.9,
+      scale: glow.scale * 1.25,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+    this.hintView = glow;
+  }
+
+  /** The board changed or the player acted: forget the hint and restart the idle timer. */
+  private clearHint(): void {
+    this.idleMs = 0;
+    this.hintAsked = false;
+    this.hintMove = null;
+    getHinter().cancel();
+    this.hideHint();
+  }
+
+  private hideHint(): void {
+    if (!this.hintView) return;
+    this.tweens.killTweensOf(this.hintView);
+    this.hintView.destroy();
+    this.hintView = null;
+  }
+
   // ── End of level ────────────────────────────────────────────────────────
 
   /** Losses in a row per level this session; after `SKIP_AFTER` the lose card offers a free skip. */
@@ -887,8 +1099,8 @@ export class PlayScene extends Phaser.Scene {
     });
     this.lossStreaks().delete(id);
     const next = this.nextData();
-    if (next) this.scene.restart(next);
-    else this.scene.start("levels");
+    if (next) go(this, "play", next);
+    else go(this, "levels");
   }
 
   private recordWin(): void {
@@ -1072,6 +1284,7 @@ export class PlayScene extends Phaser.Scene {
     if (r.elapsed >= REVEAL_MS) {
       this.reveal = null;
       this.cameras.main.flash(260, 246, 217, 122);
+      this.celebrate();
       this.showCard("win");
     }
   }
@@ -1212,12 +1425,12 @@ export class PlayScene extends Phaser.Scene {
       parts.push(
         new Button(this, left, by, half, "Replay", {
           dpr,
-          onPress: () => this.scene.restart(this.data_),
+          onPress: () => go(this, "play", this.data_),
         }),
         new Button(this, right, by, half, next ? "Continue" : "Levels", {
           dpr,
           primary: true,
-          onPress: () => (next ? this.scene.restart(next) : this.scene.start("levels")),
+          onPress: () => (next ? go(this, "play", next) : go(this, "levels")),
         }),
       );
     } else {
