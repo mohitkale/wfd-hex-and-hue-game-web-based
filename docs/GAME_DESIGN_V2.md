@@ -361,9 +361,10 @@ model; branches that end in a loss are pruned.
   randomness at all. No `Date.now()` / `Math.random()` in `packages/core`.
 - State is plain serialisable data. The renderer interpolates familiars between ticks and never
   mutates state.
-- Events (M9.4): `groupSelected`, `groupResumed`, `familiarSpawned`, `familiarMoved`,
-  `cubeReserved`, `cubePickedUp`, `cubeDelivered`, `groupPartial` (capacity left), `groupParked`,
-  `slotReleased`, `groupCompleted`, `won`, `lost`.
+- Events (M9.4; exact payloads in `docs/V2_PROTOTYPE_SPEC.md` §3): `groupSelected`, `groupResumed`,
+  `familiarSpawned`, `familiarMoved`, `cubeReserved`, `cubePickedUp`, `cubeDelivered`,
+  `familiarRetired`, `groupParked` (carries the capacity left, so it is also the "partially
+  completed" event), `slotReleased`, `groupCompleted`, `won`, `lost`.
 - Replaying an action log from the level start reproduces the same state and event sequence.
 
 ## 12. Difficulty levers (bands set in M8.4)
