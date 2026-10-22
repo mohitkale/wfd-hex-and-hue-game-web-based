@@ -62,14 +62,15 @@ describe.each(Object.entries(screens))("%s", (_name, screen) => {
     };
 
     expect(inside(l.frame, safe)).toBe(true);
-    for (const r of [l.hud, l.boardRect, ...l.slots, ...l.columns]) {
+    for (const r of [l.hud, l.boardRect, l.boosters, ...l.slots, ...l.columns]) {
       expect(inside(r, l.frame)).toBe(true);
       expect(inside(r, viewport)).toBe(true);
     }
     // Top-to-bottom order without overlap.
     expect(l.portal.y - l.portal.r).toBeGreaterThanOrEqual(bottom(l.hud));
     expect(l.portal.y + l.portal.r).toBeLessThanOrEqual(l.boardRect.y);
-    expect(bottom(l.boardRect)).toBeLessThanOrEqual(l.slots[0]!.y);
+    expect(bottom(l.boardRect)).toBeLessThanOrEqual(l.boosters.y);
+    expect(bottom(l.boosters)).toBeLessThanOrEqual(l.slots[0]!.y);
     expect(bottom(l.slots[0]!)).toBeLessThanOrEqual(l.columns[0]!.y);
     // Whole pixels, board exactly (W+2)×(H+2) cells.
     expect(Number.isInteger(l.cell)).toBe(true);

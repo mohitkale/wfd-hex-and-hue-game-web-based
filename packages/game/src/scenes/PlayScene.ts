@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import {
   GameSession,
+  createRng,
+  wandColors,
   trackFor,
   type BuiltLevel,
   type LaunchSource,
@@ -9,9 +11,10 @@ import {
   type TrackWisp,
 } from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
+import { PRICES, pay, paymentFor, winCoins } from "../economy";
 import { Haptics } from "../haptics";
 import { flatLevels } from "../progress";
-import { getSave, starsFor } from "../save";
+import { getSave, starsFor, type BoosterKind } from "../save";
 import { keyToSource } from "../keys";
 import { levelAt, worlds } from "../levels";
 import {
@@ -27,6 +30,7 @@ import {
 import { hexToNumber, theme } from "../theme";
 import { revealOrder, revealedCount } from "../reveal";
 import { drawBoardChrome } from "../view/BoardChrome";
+import { BoosterBar } from "../view/BoosterBar";
 import { Button } from "../view/Button";
 import { MosaicView } from "../view/MosaicView";
 import { WispView } from "../view/WispView";
@@ -93,6 +97,11 @@ export class PlayScene extends Phaser.Scene {
   private speed: Speed = 1;
   /** Undos and boosters used this attempt; lowers the star rating, never blocks progress. */
   private assists = 0;
+  private boosterBar: BoosterBar | null = null;
+  private wandPicker: Phaser.GameObjects.GameObject[] = [];
+  private toastText: Phaser.GameObjects.Text | null = null;
+  /** Coins earned by the last win, shown on the win card. */
+  private earned = 0;
 
   constructor() {
     super("play");
@@ -125,7 +134,12 @@ export class PlayScene extends Phaser.Scene {
     this.acc = 0;
     this.speed = 1;
     this.assists = 0;
+    this.boosterBar = null;
+    this.wandPicker = [];
+    this.toastText = null;
+    this.earned = 0;
     const save = getSave(this);
+    const unsubscribeSave = save?.subscribe((d) => this.boosterBar?.update(d));
     this.haptics.enabled = save?.data.settings.haptics ?? true;
     save?.update((d) => {
       d.stats.plays++;
@@ -147,6 +161,7 @@ export class PlayScene extends Phaser.Scene {
     this.scale.on("resize", this.relayout, this);
     this.events.once("shutdown", () => {
       unsubscribe();
+      unsubscribeSave?.();
       this.input.keyboard?.off("keydown", onKey);
       this.scale.off("resize", this.relayout, this);
       this.mosaic?.destroy();
@@ -202,6 +217,8 @@ export class PlayScene extends Phaser.Scene {
     this.lastLayoutKey = key;
 
     for (const o of [...this.chrome, ...this.hud, ...this.zones, ...this.moreLabels]) o.destroy();
+    this.boosterBar?.destroy();
+    this.closeWandPicker();
     this.mosaic?.destroy();
     this.chrome = drawBoardChrome(
       this,
@@ -221,6 +238,12 @@ export class PlayScene extends Phaser.Scene {
     }
     this.drawHud();
     this.createTapZones();
+    // Below the result-card blocker, so boosters can't be used behind a card.
+    this.boosterBar = new BoosterBar(this, this.layout.boosters, dpr, DEPTH.wisps, (k) =>
+      this.useBooster(k),
+    );
+    const saved = getSave(this)?.data;
+    if (saved) this.boosterBar.update(saved);
     this.moreLabels = this.layout.columns.map((zone) =>
       this.add
         .text(zone.x + zone.w / 2, zone.y + zone.h - 10 * dpr, "", {
@@ -412,6 +435,25 @@ export class PlayScene extends Phaser.Scene {
 
   private onEvent(e: SessionEvent): void {
     switch (e.type) {
+      case "wand": {
+        this.haptics.play("portal");
+        e.cells.forEach((cell, i) => {
+          this.mosaic?.clearCell(cell);
+          if (i % 3 === 0 && this.mosaic) this.sparkle(this.mosaic.cellCenter(cell));
+        });
+        for (const id of e.spent) this.departToPortal(id);
+        this.refreshTargets();
+        break;
+      }
+      case "slotAdded":
+        // Slot count changed: the layout (slot row) must be rebuilt.
+        this.lastLayoutKey = "";
+        this.relayout();
+        if (e.revivedWispId !== null) this.closeCard();
+        break;
+      case "shuffled":
+        this.refreshTargets();
+        break;
       case "collected": {
         this.haptics.play("collect");
         this.mosaic?.clearCell(e.cell);
@@ -459,11 +501,22 @@ export class PlayScene extends Phaser.Scene {
       case "restarted":
         this.assists = e.type === "undone" ? this.assists + 1 : 0;
         if (e.type === "restarted") getSave(this)?.update((d) => d.stats.plays++);
+        if (e.type === "undone" && e.reverted !== "tap") {
+          // Undoing a booster gives it back (as stock), so nothing paid is lost.
+          const kind = e.reverted;
+          getSave(this)?.update((d) => d.boosters[kind]++);
+          this.toast("Booster returned");
+        }
         this.closeCard();
+        this.closeWandPicker();
         for (const view of this.departing) view.destroy();
         this.departing.clear();
+        // The slot count may have changed (revive undone, or retry after a revive).
+        this.relayout();
         this.rebuildMosaic();
         this.refreshTargets(true);
+        // Undo can land back on a lost board: show its card so Retry is always reachable.
+        if (this.session.state.status === "lost") this.showCard("lose", false);
         break;
       default:
         break;
@@ -692,10 +745,131 @@ export class PlayScene extends Phaser.Scene {
     this.lossStreaks().delete(id);
     const stars = starsFor(this.assists);
     getSave(this)?.update((d) => {
-      const prev = d.levels[id];
+      const prev = Object.hasOwn(d.levels, id) ? d.levels[id] : undefined;
+      this.earned = winCoins({ difficulty: this.built.difficulty, stars, firstClear: !prev });
+      d.coins += this.earned;
       d.levels[id] = { stars: Math.max(stars, prev?.stars ?? 0), wins: (prev?.wins ?? 0) + 1 };
       d.stats.wins++;
     });
+  }
+
+  // ── Boosters ────────────────────────────────────────────────────────────
+
+  /**
+   * Uses a booster, paying from stock first, then coins. Never blocks: if the player can't pay,
+   * a toast explains how coins are earned (and Retry stays free).
+   */
+  private useBooster(kind: BoosterKind, color?: number): void {
+    const save = getSave(this);
+    const status = this.session.state.status;
+    if (!save || status === "won") return;
+    const payment = paymentFor(save.data, kind);
+    if (kind === "wand" && color === undefined && payment.kind !== "short") {
+      return this.openWandPicker();
+    }
+    if (payment.kind === "short") {
+      this.haptics.play("invalid");
+      this.toast(`Need ${payment.missing} more ◉ — clear mosaics to earn coins`);
+      return;
+    }
+    // Count the assist first: a booster can win the level synchronously (Wand), and the win
+    // records its stars immediately. Undo counts itself through the "undone" event.
+    if (kind !== "undo") this.assists++;
+    const used =
+      kind === "undo"
+        ? this.session.undo()
+        : kind === "shuffle"
+          ? this.session.shuffle(createRng(Date.now() >>> 0))
+          : kind === "extraSlot"
+            ? this.session.extraSlot()
+            : this.session.wand(color!);
+    if (!used) {
+      if (kind !== "undo") this.assists--;
+      this.haptics.play("invalid");
+      this.toast(
+        kind === "undo"
+          ? "Nothing to undo yet"
+          : kind === "shuffle"
+            ? "No other order works right now"
+            : "Nothing to collect there",
+      );
+      return;
+    }
+    save.update((d) => pay(d, kind, payment));
+    this.haptics.play("tap");
+    if (payment.kind === "coins") this.boosterBar?.pulseCoins();
+  }
+
+  /** Wand: pick one of the colors that currently has exposed fragments. */
+  private openWandPicker(): void {
+    if (this.wandPicker.length > 0) return this.closeWandPicker();
+    const colors = wandColors(this.session.state);
+    if (this.session.state.status !== "playing") return;
+    if (colors.length === 0) {
+      this.toast("Nothing exposed to collect right now");
+      return;
+    }
+    const { boosters, dpr, frame } = this.layout;
+    const r = 16 * dpr;
+    const y = boosters.y - 26 * dpr;
+    const gap = 12 * dpr;
+    const total = colors.length * (2 * r) + (colors.length - 1) * gap;
+    const startX = frame.x + (frame.w - total) / 2 + r;
+    const blocker = this.add
+      .rectangle(0, 0, this.scale.gameSize.width, this.scale.gameSize.height, 0x07040f, 0.35)
+      .setOrigin(0, 0)
+      .setInteractive()
+      .setDepth(DEPTH.overlay)
+      .on("pointerup", () => this.closeWandPicker());
+    const label = this.add
+      .text(frame.x + frame.w / 2, y - r - 10 * dpr, "Pick a color to collect", {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(14 * dpr)}px`,
+        color: theme.text,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH.overlay);
+    const chips = colors.map((c, i) =>
+      this.add
+        .circle(startX + i * (2 * r + gap), y, r, hexToNumber(this.built.level.palette[c]!))
+        .setStrokeStyle(Math.max(1, 2 * dpr), 0xffffff, 0.9)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(DEPTH.overlay)
+        .on("pointerup", () => {
+          this.closeWandPicker();
+          this.useBooster("wand", c);
+        }),
+    );
+    this.wandPicker = [blocker, label, ...chips];
+  }
+
+  private closeWandPicker(): void {
+    for (const o of this.wandPicker) o.destroy();
+    this.wandPicker = [];
+  }
+
+  private toast(message: string): void {
+    const { boosters, dpr, frame } = this.layout;
+    this.toastText?.destroy();
+    this.toastText = this.add
+      .text(frame.x + frame.w / 2, boosters.y - 8 * dpr, message, {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(13 * dpr)}px`,
+        color: theme.text,
+        backgroundColor: "#2a1650",
+        padding: { x: Math.round(12 * dpr), y: Math.round(8 * dpr) },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH.hud);
+    this.tweens.add({ targets: this.toastText, alpha: 0, delay: 1800, duration: 400 });
+  }
+
+  /** "Revive +1 slot (2)" / "+1 Slot ◉40" for the lose card. */
+  private boosterLabel(kind: BoosterKind, label: string): string {
+    const save = getSave(this)?.data;
+    if (!save) return label;
+    const p = paymentFor(save, kind);
+    return p.kind === "owned" ? `${label} (${save.boosters[kind]})` : `${label} ◉${PRICES[kind]}`;
   }
 
   private stepReveal(delta: number): void {
@@ -749,6 +923,7 @@ export class PlayScene extends Phaser.Scene {
    */
   private showCard(kind: "win" | "lose", animate = true): void {
     this.closeCard();
+    this.closeWandPicker();
     this.overlayKind = kind;
     const { frame, dpr, boardRect } = this.layout;
     const px = (v: number) => Math.round(v * dpr);
@@ -798,6 +973,7 @@ export class PlayScene extends Phaser.Scene {
       text("✦  Mosaic complete  ✦", 14, "#f6d97a", { fontStyle: "bold" });
       text(this.built.level.name, 24, theme.text, { fontStyle: "bold" });
       text(this.built.lore, 15, theme.textDim, { fontStyle: "italic" });
+      if (this.earned > 0) text(`+${this.earned} ◉`, 18, "#f6d97a", { fontStyle: "bold" });
     } else {
       text("The slots are full", 22, theme.text, { fontStyle: "bold" });
       text(
@@ -827,24 +1003,37 @@ export class PlayScene extends Phaser.Scene {
         }),
       );
     } else {
-      const canUndo = this.session.canUndo;
+      // Retry is always free. Revive (+1 slot) and Undo are boosters, paid from stock or coins.
       parts.push(
-        new Button(this, canUndo ? left : 0, by, canUndo ? half : width - px(40), "Retry", {
+        new Button(this, left, by, half, "Retry", {
           dpr,
           primary: true,
           onPress: () => this.session.restart(),
         }),
+        new Button(this, right, by, half, this.boosterLabel("extraSlot", "+1 Slot"), {
+          dpr,
+          onPress: () => this.useBooster("extraSlot"),
+        }),
       );
-      if (canUndo) {
-        parts.push(
-          new Button(this, right, by, half, "Undo move", {
-            dpr,
-            onPress: () => this.session.undo(),
-          }),
-        );
-      }
     }
     let height = by + px(24) + px(22);
+    if (kind === "lose" && this.session.canUndo) {
+      let pressed = false;
+      const undo = this.add
+        .text(0, height - px(8), this.boosterLabel("undo", "Undo last move"), {
+          fontFamily: theme.font,
+          fontSize: font(14),
+          color: theme.text,
+          padding: { x: px(16), y: px(14) },
+        })
+        .setOrigin(0.5, 0)
+        .setInteractive({ useHandCursor: true })
+        .on("pointerdown", () => (pressed = true))
+        .on("pointerout", () => (pressed = false))
+        .on("pointerup", () => pressed && this.useBooster("undo"));
+      parts.push(undo);
+      height += undo.height - px(8);
+    }
     const beaten = Object.hasOwn(getSave(this)?.data.levels ?? {}, this.built.level.id);
     if (
       kind === "lose" &&
