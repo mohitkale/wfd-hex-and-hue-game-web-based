@@ -6,7 +6,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
-import { checkBudgets, scriptLeaks, type BuiltFile } from "./budget";
+import { CONTENT_SCRIPT_MAX, checkBudgets, scriptLeaks, type BuiltFile } from "./budget";
 
 const root = fileURLToPath(new URL("../../apps/web/dist/", import.meta.url));
 
@@ -40,12 +40,22 @@ for (const r of checkBudgets(files)) {
   const where = r.file ? ` (${r.file})` : "";
   console.log(`${r.ok ? "✓" : "✗"} ${r.label}: ${kb(r.value)} / ${kb(r.max)}${where}`);
 }
+const bundles = new Map(
+  files
+    .filter((f) => f.path.startsWith("_astro/") && f.path.endsWith(".js"))
+    .map((f) => [f.path, { gzip: f.gzip, code: readFileSync(join(root, f.path), "utf8") }]),
+);
 const leaks = scriptLeaks(
   files
     .filter((f) => f.path.endsWith(".html"))
     .map((f) => ({ path: f.path, html: readFileSync(join(root, f.path), "utf8") })),
+  bundles,
 );
-for (const page of leaks) console.log(`✗ ${page} loads a script bundle (only the game page may)`);
+for (const l of leaks) {
+  console.log(
+    `✗ ${l.page} loads ${kb(l.gzip)} of script (content pages: ${kb(CONTENT_SCRIPT_MAX)})`,
+  );
+}
 failed ||= leaks.length > 0;
 if (failed) {
   console.error("Performance budget exceeded.");

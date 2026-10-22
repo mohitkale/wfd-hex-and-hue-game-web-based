@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUDGETS, checkBudgets, scriptLeaks, type BuiltFile } from "./budget";
+import { BUDGETS, checkBudgets, scriptClosure, scriptLeaks, type BuiltFile } from "./budget";
 
 const file = (path: string, gzip: number, bytes = gzip * 3): BuiltFile => ({ path, gzip, bytes });
 
@@ -36,15 +36,34 @@ describe("performance budget", () => {
   });
 });
 
-describe("script leaks", () => {
-  it("only the play page may load a script bundle", () => {
-    const bundle = '<script type="module" src="/_astro/play.abc.js"></script>';
+describe("content page scripts", () => {
+  const bundles = new Map([
+    ["_astro/base.js", { gzip: 900, code: 'import{a}from"./analytics.js";' }],
+    ["_astro/analytics.js", { gzip: 1_000, code: "export const a=1;" }],
+    ["_astro/play.js", { gzip: 397_000, code: 'import"./base.js";' }],
+  ]);
+  const page = (path: string, ...srcs: string[]) => ({
+    path,
+    html: srcs.map((s) => `<script type="module" src="/_astro/${s}"></script>`).join(""),
+  });
+
+  it("follows static imports between bundles", () => {
+    expect(scriptClosure(["_astro/base.js"], (p) => bundles.get(p)?.code ?? "").sort()).toEqual([
+      "_astro/analytics.js",
+      "_astro/base.js",
+    ]);
+  });
+
+  it("lets content pages load small shared scripts, but never the game bundle", () => {
     expect(
-      scriptLeaks([
-        { path: "play/index.html", html: bundle },
-        { path: "index.html", html: '<script type="module">setupPwa()</script>' },
-        { path: "blog/x/index.html", html: bundle },
-      ]),
-    ).toEqual(["blog/x/index.html"]);
+      scriptLeaks(
+        [
+          page("play/index.html", "play.js"),
+          page("index.html", "base.js"),
+          page("blog/x/index.html", "play.js"),
+        ],
+        bundles,
+      ),
+    ).toEqual([{ page: "blog/x/index.html", gzip: 397_000 + 900 + 1_000 }]);
   });
 });
