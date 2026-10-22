@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseAsciiArt, parseLevel, verifySolution } from "@hexhue/core";
 import { worlds } from "../../content/worlds";
+import { artProblems } from "../art/check";
 import { OUTPUT_DIR, sourceHash, type BuiltWorld } from "./format";
 
 const REBUILD = "run `npm run levels` and commit the result";
@@ -43,6 +44,7 @@ describe.each(worlds)("world $id", (world) => {
     expect(level.slots).toBe(config.generate.slots);
     expect(level.trackCap).toBe(config.generate.trackCap);
     expect(level.columns.length).toBeLessThanOrEqual(config.generate.columns);
+    expect(artProblems(level), "art readability (see tools/art/check.ts)").toEqual([]);
 
     expect(
       verifySolution(level, entry.solution),

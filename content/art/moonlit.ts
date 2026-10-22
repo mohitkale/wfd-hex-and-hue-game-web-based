@@ -78,7 +78,7 @@ export const lantern: AsciiArt = {
 };
 
 export const moonPhases: AsciiArt = {
-  legend: { n: night, d: "#2e2468", y: moon, s: starlight },
+  legend: { n: night, d: "#355c7d", y: moon, s: starlight },
   rows: [
     "nnnnnnsnnnnnnnnnnns",
     "nnddynnndyysnnyyynn",

@@ -20,7 +20,9 @@
     "test:watch": "vitest",
     "build": "npm run build --workspaces --if-present",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build",
-    "levels": "tsx tools/levels/build.ts"
+    "levels": "tsx tools/levels/build.ts",
+    "art:import": "tsx tools/art/import.ts",
+    "art:preview": "tsx tools/art/preview.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

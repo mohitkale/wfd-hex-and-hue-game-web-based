@@ -34,7 +34,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 ## M4 — Content: 3 worlds × 20 levels
 
-- [ ] **M4.1** PNG → art importer and art preview tool (the ASCII art format shipped in M2.3).
+- [x] **M4.1** PNG → art importer and art preview tool (the ASCII art format shipped in M2.3).
 - [ ] **M4.2** World 1 "Moonlit Beginnings": 20 original artworks + lore lines, gentle curve with tutorial levels.
 - [ ] **M4.3** World 2 "Crystal Garden": 20 artworks + lore, layered colors introduced.
 - [ ] **M4.4** World 3 "Zodiac Realm": 20 artworks (12 signs + constellations) + lore, tighter slots.
