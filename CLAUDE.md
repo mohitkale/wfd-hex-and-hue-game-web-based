@@ -33,6 +33,8 @@ a session without another specific request in this project, run the **continue-r
 - Ads, analytics and payments sit behind provider-agnostic interfaces; the engine never imports a
   vendor SDK.
 - All art, names, audio and UI are original. Inspiration from Food Hunt is mechanical only.
+- Art must read on the dark board: CI rejects colors too dark for the panel or too similar to
+  each other in one artwork (`tools/art/check.ts`).
 
 ## Architecture
 
@@ -56,6 +58,8 @@ npm run dev          # Astro dev server with the game at /play
 npm run verify       # lint + typecheck + test + build (must pass before any PR)
 npm test             # vitest (includes the shipped-level check)
 npm run levels       # rebuild stale levels after editing content/ or core engine files (commit the JSON)
+npm run art:import -- art.png name   # PNG pixel art → AsciiArt snippet for content/art
+npm run art:preview  # dist/art-preview.html: all levels, stats and difficulty curve
 ```
 
 ## Conventions
