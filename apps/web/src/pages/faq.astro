@@ -1,0 +1,84 @@
+---
+import Page from "../layouts/Page.astro";
+
+const faqs: { q: string; a: string }[] = [
+  {
+    q: "Is Hex & Hue really free?",
+    a: "Yes. Every level is free to play, forever. There are no lives, no energy and no timers, and no level is ever locked behind a payment.",
+  },
+  {
+    q: "Are there ads?",
+    a: "Only ones you choose. Some optional rewards (like doubling your coins) can be unlocked by watching a short ad, but the game never shows forced ads and keeps working if an ad isn't available.",
+  },
+  {
+    q: "How do I play?",
+    a: "Tap a summon column to send its front wisp around the board. A wisp collects the first fragment it sees when the color matches. Out of charge, it leaves through the portal; with charge left, it rests in a slot until you send it again. Clear every fragment to reveal the artwork.",
+  },
+  {
+    q: "What happens if I get stuck?",
+    a: "Retry is always free and instant. You can also use boosters (Undo, Shuffle, +1 Slot and the Magic Wand), which you earn by playing. If a level gives you real trouble, you can skip it after a few tries and come back any time.",
+  },
+  {
+    q: "Is every level solvable?",
+    a: "Yes. Every level that ships is checked by a solver, so there is always a way to win from the start.",
+  },
+  {
+    q: "Can I play offline or install it?",
+    a: "Yes. Once you have opened the game, it keeps working without a connection. On most phones and computers you can install it from the world map or your browser's menu, and it launches like an app.",
+  },
+  {
+    q: "Where is my progress saved?",
+    a: "On your device, in your browser's storage. There is no account to create. Clearing your browser's site data will reset your progress.",
+  },
+  {
+    q: "Is it accessible?",
+    a: "Settings include color symbols (a shape for each color), reduced motion, separate sound and music volumes, and a vibration switch.",
+  },
+  {
+    q: "Who makes the art?",
+    a: "All art, names, lore and sounds in Hex & Hue are original. The moon, crystal and zodiac themes are made for the witchy, pagan and astrology-loving community.",
+  },
+];
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+---
+
+<Page
+  title="FAQ: Hex & Hue"
+  description="Answers about Hex & Hue: free to play, optional ads, how to play, offline play, saving and accessibility."
+  jsonLd={jsonLd}
+>
+  <h1>Frequently asked questions</h1>
+  <div class="prose">
+    {faqs.map((f) => (
+      <details>
+        <summary>{f.q}</summary>
+        <p>{f.a}</p>
+      </details>
+    ))}
+  </div>
+</Page>
+
+<style>
+  details {
+    border-bottom: 1px solid rgb(201 184 255 / 0.15);
+    padding: 4px 0;
+  }
+  summary {
+    cursor: pointer;
+    padding: 14px 0;
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+  details p {
+    margin: 0 0 16px;
+    color: var(--mist);
+  }
+</style>

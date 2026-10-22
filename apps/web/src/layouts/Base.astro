@@ -1,18 +1,31 @@
 ---
+import { SITE, absolute } from "../lib/site";
+
 interface Props {
   title: string;
-  description?: string;
+  description?: string | undefined;
   /** Pinch-zoom stays on for content pages; only the game disables it. */
   zoomable?: boolean;
   /** Registers the offline service worker (the game page only; see pwa/client.ts). */
   offline?: boolean;
+  /** Share-card image path (default: the site card). */
+  image?: string | undefined;
+  /** Open Graph type: "website" or "article". */
+  type?: "website" | "article" | undefined;
+  /** Structured data (schema.org) for this page. */
+  jsonLd?: object | undefined;
 }
 const {
   title,
   zoomable = true,
   offline = false,
-  description = "A free magical color-sorting pixel puzzle. A Little Magic in Every Color.",
+  description = SITE.description,
+  image = "/og.png",
+  type = "website",
+  jsonLd,
 } = Astro.props;
+const canonical = absolute(Astro.url.pathname, Astro.site);
+const imageUrl = absolute(image, Astro.site);
 ---
 
 <!doctype html>
@@ -31,7 +44,19 @@ const {
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={imageUrl} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
     <title>{title}</title>
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
   </head>
   <body data-offline={offline ? "" : undefined}>
     <slot />

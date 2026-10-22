@@ -1,0 +1,175 @@
+---
+import Base from "./Base.astro";
+
+interface Props {
+  title: string;
+  description?: string | undefined;
+  image?: string | undefined;
+  type?: "website" | "article" | undefined;
+  jsonLd?: object | undefined;
+}
+const props = Astro.props;
+const path = Astro.url.pathname.replace(/\/$/, "") || "/";
+const footerLinks = [
+  { href: "/play", label: "Play" },
+  { href: "/spellbook", label: "Spellbook" },
+  { href: "/blog", label: "Blog" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/privacy", label: "Privacy" },
+];
+const nav = [
+  { href: "/spellbook", label: "Spellbook" },
+  { href: "/blog", label: "Blog" },
+  { href: "/faq", label: "FAQ" },
+];
+---
+
+<Base {...props}>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <span class="brand-moon" aria-hidden="true"></span>Hex &amp; Hue
+    </a>
+    <nav aria-label="Site">
+      {nav.map((n) => (
+        <a href={n.href} aria-current={path.startsWith(n.href) ? "page" : undefined}>
+          {n.label}
+        </a>
+      ))}
+      <a class="nav-play" href="/play">
+        Play
+      </a>
+    </nav>
+  </header>
+  <main class="page">
+    <slot />
+  </main>
+  <footer class="site-footer">
+    <p>Hex &amp; Hue is free to play, forever: no timers, no lives, no paywalled levels.</p>
+    <ul class="links">
+      {footerLinks.map((l) => (
+        <li>
+          <a href={l.href}>{l.label}</a>
+        </li>
+      ))}
+    </ul>
+  </footer>
+</Base>
+
+<style is:global>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px
+      max(16px, env(safe-area-inset-left));
+    background: rgb(20 11 46 / 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgb(201 184 255 / 0.12);
+  }
+  .site-header a {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+  .brand-moon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    box-shadow: inset -5px 0 0 0 var(--glow);
+  }
+  .site-header nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .site-header nav a {
+    padding: 10px 10px;
+    border-radius: 999px;
+    color: var(--mist);
+    font-size: 0.95rem;
+  }
+  .site-header nav a[aria-current="page"] {
+    color: var(--text);
+    background: rgb(201 184 255 / 0.1);
+  }
+  .site-header nav a.nav-play {
+    padding: 10px 18px;
+    background: var(--glow);
+    color: var(--night);
+    font-weight: 700;
+  }
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+    line-height: 1.6;
+  }
+  .page h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    line-height: 1.15;
+    margin: 0 0 0.5rem;
+  }
+  .page h2 {
+    margin-top: 2.5rem;
+  }
+  .page a {
+    color: var(--glow);
+  }
+  .lede {
+    color: var(--mist);
+    font-size: 1.15rem;
+    max-width: 40rem;
+  }
+  .prose {
+    max-width: 42rem;
+  }
+  .prose img {
+    max-width: 100%;
+  }
+  .pixel {
+    image-rendering: pixelated;
+  }
+  .site-footer {
+    padding: 32px 16px max(32px, env(safe-area-inset-bottom));
+    text-align: center;
+    color: var(--mist);
+    font-size: 0.9rem;
+    border-top: 1px solid rgb(201 184 255 / 0.12);
+  }
+  .site-footer a {
+    color: var(--text);
+  }
+  .site-footer .links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 18px;
+    list-style: none;
+    padding: 0;
+  }
+  .site-footer .links a {
+    display: inline-block;
+    padding: 8px 0;
+  }
+  @media (max-width: 420px) {
+    .brand {
+      font-size: 1rem;
+    }
+    .site-header nav a {
+      padding: 10px 7px;
+    }
+  }
+</style>

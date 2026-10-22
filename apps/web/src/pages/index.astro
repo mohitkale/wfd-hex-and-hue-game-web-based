@@ -1,60 +1,271 @@
 ---
-import Base from "../layouts/Base.astro";
+import Page from "../layouts/Page.astro";
+import { SITE, absolute, artUrl, gallery } from "../lib/site";
+
+const worlds = gallery();
+const blurbs: Record<string, string> = {
+  moonlit: "Crescents, candles and starlit spells: a gentle start under the moon.",
+  crystal: "Amethyst, quartz and pendulums, with layered colors to untangle.",
+  zodiac: "All twelve signs and the constellations, with tighter slots for seasoned witches.",
+};
+const strip = [
+  worlds[0]!.items[0]!,
+  worlds[1]!.items[4]!,
+  worlds[2]!.items[0]!,
+  worlds[0]!.items[2]!,
+  worlds[1]!.items[0]!,
+];
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "VideoGame",
+  name: SITE.fullName,
+  description: SITE.description,
+  url: absolute("/", Astro.site),
+  image: absolute("/og.png", Astro.site),
+  genre: ["Puzzle", "Casual"],
+  gamePlatform: "Web browser",
+  applicationCategory: "Game",
+  operatingSystem: "Any",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+};
 ---
 
-<Base title="Hex & Hue: Magic Pixel Puzzle">
-  <main>
-    <div class="wisp" aria-hidden="true"></div>
+<Page title={`${SITE.fullName}: a free cozy witchy puzzle`} jsonLd={jsonLd}>
+  <section class="hero">
+    <div class="moon" aria-hidden="true"></div>
     <h1>Hex &amp; Hue</h1>
-    <p class="tagline">A Little Magic in Every Color</p>
-    <p>
-      Summon Wisps, collect every fragment of the mosaic and fill your Spellbook with magical art.
-      Free to play, forever.
+    <p class="tagline">{SITE.tagline}</p>
+    <p class="lede">
+      Summon glowing wisps, collect every fragment of a magical mosaic and fill your Spellbook with
+      moon, crystal and zodiac art. A cozy color-sorting puzzle you can play anywhere, for free.
     </p>
-    <a class="play" href="/play">
-      Play now
+    <div class="ctas">
+      <a class="cta" href="/play">
+        Play now, free
+      </a>
+      <a class="cta secondary" href="/spellbook">
+        Browse the Spellbook
+      </a>
+    </div>
+    <ul class="strip" aria-label="Some of the mosaics you will reveal">
+      {strip.map((item) => (
+        <li>
+          <img class="pixel" src={artUrl(item.id)} alt={item.name} width="96" height="96" />
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section>
+    <h2>How to play</h2>
+    <ol class="steps">
+      <li>
+        <strong>Tap a column</strong>
+        <span>Its front wisp flies around the board, gathering power from the mosaic.</span>
+      </li>
+      <li>
+        <strong>Match the colors</strong>
+        <span>
+          A wisp collects the first fragment it sees when it is the wisp's own color. Spent wisps
+          leave through the portal; others rest in a slot.
+        </span>
+      </li>
+      <li>
+        <strong>Reveal the art</strong>
+        <span>
+          Clear every fragment and the finished illustration blooms into your Spellbook, with a
+          little lore to keep.
+        </span>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Made to never get in your way</h2>
+    <ul class="promises">
+      <li>
+        <strong>Free forever.</strong> No energy, no lives, no timers, no paywalled levels.
+      </li>
+      <li>
+        <strong>Retry is always free</strong> and instant; every booster can be earned by playing.
+      </li>
+      <li>
+        <strong>Plays offline</strong> and installs like an app on your phone.
+      </li>
+      <li>
+        <strong>Comfortable for everyone:</strong> color symbols, reduced motion and volume
+        controls.
+      </li>
+      <li>
+        <strong>Original art and lore</strong>, made for the witchy and the starry-eyed.
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Three worlds to explore</h2>
+    <div class="worlds">
+      {worlds.map((w) => (
+        <article class="world">
+          <div class="thumbs">
+            {w.items.slice(0, 3).map((item) => (
+              <img
+                class="pixel"
+                src={artUrl(item.id)}
+                alt={item.name}
+                width="72"
+                height="72"
+                loading="lazy"
+              />
+            ))}
+          </div>
+          <h3>{w.name}</h3>
+          <p>{blurbs[w.id]}</p>
+          <p class="count">{w.items.length} mosaics</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="final">
+    <p>Ready for a little magic?</p>
+    <a class="cta" href="/play">
+      Start playing
     </a>
-  </main>
-</Base>
+  </section>
+</Page>
 
 <style>
-  main {
-    min-height: 100dvh;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: 0.75rem;
-    padding: max(2rem, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
-      max(2rem, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  .hero {
     text-align: center;
-    background: radial-gradient(circle at 50% 35%, var(--dusk), var(--night) 70%);
+    padding: 24px 0 8px;
+    background: radial-gradient(circle at 50% 10%, rgb(42 22 80 / 0.9), transparent 70%);
   }
-  h1 {
-    font-size: clamp(2.5rem, 9vw, 4.5rem);
-    margin: 0;
+  .moon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 12px;
+    border-radius: 50%;
+    box-shadow:
+      inset -14px 0 0 0 var(--glow),
+      0 0 40px 6px rgb(246 217 122 / 0.25);
   }
   .tagline {
-    color: var(--mist);
-    margin: 0;
+    color: var(--glow);
+    margin: 0 0 1rem;
+    font-size: 1.15rem;
   }
-  p {
-    max-width: 32rem;
+  .hero .lede {
+    margin: 0 auto;
   }
-  .wisp {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: var(--glow);
-    box-shadow: 0 0 40px 12px rgb(246 217 122 / 0.35);
+  .ctas {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 1.5rem 0;
   }
-  .play {
-    margin-top: 1rem;
-    padding: 0.9rem 2.4rem;
+  .cta {
+    display: inline-block;
+    padding: 0.9rem 2rem;
     border-radius: 999px;
+    background: var(--glow);
+    color: var(--night) !important;
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-decoration: none;
+  }
+  .cta.secondary {
+    background: var(--dusk);
+    color: var(--text) !important;
+  }
+  .strip {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+  }
+  .strip img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+  .steps li {
+    counter-increment: step;
+    padding: 20px;
+    border-radius: 20px;
+    background: rgb(42 22 80 / 0.6);
+    display: grid;
+    gap: 6px;
+  }
+  .steps li::before {
+    content: counter(step);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
     background: var(--glow);
     color: var(--night);
     font-weight: 700;
-    font-size: 1.15rem;
-    text-decoration: none;
+  }
+  .steps span {
+    color: var(--mist);
+  }
+  .promises {
+    padding-left: 1.2rem;
+    max-width: 42rem;
+  }
+  .promises li {
+    margin: 0.4rem 0;
+  }
+  .worlds {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .world {
+    padding: 20px;
+    border-radius: 20px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  .world h3 {
+    margin: 12px 0 4px;
+  }
+  .world p {
+    margin: 0;
+    color: var(--mist);
+  }
+  .world .count {
+    margin-top: 8px;
+    color: var(--glow);
+    font-size: 0.9rem;
+  }
+  .thumbs {
+    display: flex;
+    gap: 8px;
+  }
+  .thumbs img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+  }
+  .final {
+    text-align: center;
+    margin-top: 3rem;
+  }
+  .final p {
+    font-size: 1.3rem;
   }
 </style>
