@@ -99,7 +99,7 @@ _Replace the perimeter-track concept with a clearly specified, strategic pick-up
 - [x] **M8.2** Design the new core gameplay (GAME_DESIGN_V2) — Write `docs/GAME_DESIGN_V2.md`, precise enough for an independent implementation and solver. _Needs M8.1._
 - [x] **M8.3** Define reachability and blocked cubes — Specify the spatial collection system: which cubes a collector can physically reach and how outer cubes expose inner ones. _Needs M8.2._
 - [x] **M8.4** Define strategic difficulty — Set measurable requirements for easy, medium and hard levels and for the anti-triviality tests. _Needs M8.2, M8.3._
-- [ ] **M8.5** Gameplay prototyping specification — Produce the technical design for one playable vertical slice and confirm the redesign is coherent, implementable, deterministic and testable. _Needs M8.2, M8.3, M8.4._
+- [x] **M8.5** Gameplay prototyping specification — Produce the technical design for one playable vertical slice and confirm the redesign is coherent, implementable, deterministic and testable. _Needs M8.2, M8.3, M8.4._
 
 ### M9 — Collection engine and puzzle simulation
 
