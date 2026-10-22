@@ -5,15 +5,37 @@ import Base from "../layouts/Base.astro";
 <Base
   title="Play · Hex & Hue"
   description="Play Hex & Hue free in your browser: a cozy magical color-sorting pixel puzzle that works offline."
-  zoomable={false}
   offline
 >
   <div id="game"></div>
+  <!-- Painted at once while the game downloads; fades when the title screen is ready. -->
+  <div id="splash" aria-hidden="true">
+    <div class="splash-moon"></div>
+    <p class="splash-title">Hex &amp; Hue</p>
+    <p class="splash-tagline">A Little Magic in Every Color</p>
+    <p class="splash-loading">Summoning wisps…</p>
+  </div>
+  <!-- Portrait-first: on a short landscape screen, a gentle (non-blocking) hint. -->
+  <p id="rotate-hint" aria-hidden="true">
+    ↻ Hex &amp; Hue is best played upright
+  </p>
+  <noscript>
+    <p class="noscript">Hex &amp; Hue needs JavaScript to play. Please turn it on and reload.</p>
+  </noscript>
 </Base>
 
 <script>
   import { mountGame } from "@hexhue/game";
 
+  const splash = document.getElementById("splash");
+  window.addEventListener(
+    "hexhue:ready",
+    () => {
+      splash?.classList.add("gone");
+      setTimeout(() => splash?.remove(), 400);
+    },
+    { once: true },
+  );
   const parent = document.getElementById("game");
   if (parent) {
     mountGame(parent).canvas?.setAttribute("aria-label", "Hex & Hue game");
@@ -21,6 +43,73 @@ import Base from "../layouts/Base.astro";
 </script>
 
 <style is:global>
+  #splash {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 6px;
+    text-align: center;
+    background: var(--night);
+    pointer-events: none;
+    transition: opacity 0.35s;
+  }
+  #splash.gone {
+    opacity: 0;
+  }
+  .splash-moon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--glow);
+    box-shadow: 0 0 60px 20px rgb(246 217 122 / 0.3);
+    margin-bottom: 24px;
+  }
+  .splash-title {
+    margin: 0;
+    font-size: 44px;
+  }
+  .splash-tagline {
+    margin: 0;
+    color: var(--mist);
+    font-size: 18px;
+  }
+  .splash-loading {
+    margin-top: 48px;
+    color: var(--mist);
+    font-size: 15px;
+  }
+  #rotate-hint {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom) + 6px);
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgb(42 22 80 / 0.9);
+    color: var(--mist);
+    font-size: 13px;
+    pointer-events: none;
+    animation: rotate-hint-out 0.6s 6s forwards;
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    #rotate-hint {
+      display: block;
+    }
+  }
+  @keyframes rotate-hint-out {
+    to {
+      opacity: 0;
+    }
+  }
+  .noscript {
+    position: fixed;
+    inset: auto 16px 40% 16px;
+    text-align: center;
+  }
   html,
   body {
     height: 100%;

@@ -60,7 +60,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 - [x] **M7.1** Astro landing page, `/spellbook` public gallery, `/blog` + FAQ, SEO/OG images.
 - [x] **M7.2** Analytics abstraction (PostHog adapter, consent banner, key funnel events).
 - [x] **M7.3** Deploy configs: Netlify (`netlify.toml`) and VPS (Docker + nginx), caching headers, docs.
-- [ ] **M7.4** Launch QA: device matrix pass, Lighthouse ≥ 90, bug bash fixes, v1.0.0 tag.
+- [x] **M7.4** Launch QA: device matrix pass, Lighthouse ≥ 90, bug bash fixes, v1.0.0 tag.
 
 ## Later (post-MVP, not scheduled)
 

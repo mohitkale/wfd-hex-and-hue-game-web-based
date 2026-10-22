@@ -22,6 +22,8 @@ export class BootScene extends Phaser.Scene {
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
     fadeIn(this);
+    // The page's HTML splash (shown while the game downloads) can go now.
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("hexhue:ready"));
   }
 
   private layout(): void {

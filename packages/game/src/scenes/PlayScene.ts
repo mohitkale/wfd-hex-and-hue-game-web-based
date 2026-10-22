@@ -71,6 +71,9 @@ export interface PlayData {
 
 /** Draw order; explicit so rebuilt layers never cover persistent wisps. */
 // The HUD stays above result cards so Back always works.
+/** Width of the speed button's touch zone (CSS px): fits "2× free". */
+const SPEED_ZONE_CSS = 84;
+
 const DEPTH = {
   chrome: 0,
   mosaic: 1,
@@ -366,7 +369,8 @@ export class PlayScene extends Phaser.Scene {
           fontSize: `${Math.round(12 * dpr)}px`,
           color: theme.textDim,
         })
-        .setOrigin(0.5, 1)
+        // Placed beside the last visible wisp by refreshTargets (never over it).
+        .setOrigin(0, 0.5)
         .setDepth(DEPTH.wisps)
         .setVisible(false),
     );
@@ -425,13 +429,15 @@ export class PlayScene extends Phaser.Scene {
       )
       .setOrigin(0.5);
 
+    // Right-aligned: the label ("2× free", "2× ▶") can be wider than its 48 px touch zone.
+    const speedW = SPEED_ZONE_CSS * dpr;
     const speedZone = this.add
-      .zone(hud.x + hud.w - touch - 4 * dpr, hud.y + (hud.h - touch) / 2, touch, touch)
+      .zone(hud.x + hud.w - speedW - 4 * dpr, hud.y + (hud.h - touch) / 2, speedW, touch)
       .setOrigin(0, 0)
       .setInteractive({ useHandCursor: true })
       .on("pointerup", () => this.toggleSpeed());
     this.speedLabel = this.add
-      .text(speedZone.x + touch / 2, hud.y + hud.h / 2, "", {
+      .text(hud.x + hud.w - 8 * dpr, hud.y + hud.h / 2, "", {
         fontFamily: theme.font,
         fontStyle: "bold",
         fontSize: font(16),
@@ -439,7 +445,7 @@ export class PlayScene extends Phaser.Scene {
         backgroundColor: "#2a1650",
         padding: { x: Math.round(8 * dpr), y: Math.round(4 * dpr) },
       })
-      .setOrigin(0.5);
+      .setOrigin(1, 0.5);
     this.updateSpeedLabel();
 
     this.hud = [backZone, back, title, subtitle, speedZone, this.speedLabel];
@@ -921,7 +927,17 @@ export class PlayScene extends Phaser.Scene {
       if (more) {
         const hidden = column.length - VISIBLE_STACK;
         more.setVisible(hidden > 0);
-        if (hidden > 0) more.setText(`+${hidden}`);
+        if (hidden > 0) {
+          // Beside the last visible wisp, so it never sits on top of one in a short column.
+          const last = VISIBLE_STACK - 1;
+          const r = front * (1 - last * 0.18);
+          more
+            .setText(`+${hidden}`)
+            .setPosition(
+              zone.x + zone.w / 2 + r + 6 * dpr,
+              zone.y + front * 1.3 + last * front * 1.75,
+            );
+        }
       }
     });
 
@@ -1230,7 +1246,8 @@ export class PlayScene extends Phaser.Scene {
     const scale = hud.h / (52 * dpr);
     const px = (v: number) => Math.round(v * dpr * scale);
     // Back and speed are 48 px touch zones, 4 px from the edges.
-    const side = Math.round(58 * dpr);
+    // Clear of Back on the left and the (wider) speed button on the right.
+    const side = Math.round((SPEED_ZONE_CSS + 8) * dpr);
     const width = Math.min(hud.w - 2 * side, px(340));
     const text = this.add
       .text(0, 0, TIPS[id], {
