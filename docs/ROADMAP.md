@@ -41,7 +41,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 
 ## M5 — Progression, economy & rewards
 
-- [ ] **M5.1** Save system: IndexedDB with localStorage fallback, versioned migrations, no sign-up.
+- [x] **M5.1** Save system: IndexedDB with localStorage fallback, versioned migrations, no sign-up.
 - [ ] **M5.2** World map & level select with stars/completion, next-level auto-advance.
 - [ ] **M5.3** Coins & boosters: Undo, Shuffle, Extra Slot, Magic Wand, Revive; generous earn rates.
 - [ ] **M5.4** Rewards interface (provider-agnostic) with mock + "none" providers; 2× alternating free/ad policy; double-coins offer. Never blocks play.

@@ -3,6 +3,7 @@ import type { Insets } from "./layout";
 import { BootScene } from "./scenes/BootScene";
 import { LevelSelectScene } from "./scenes/LevelSelectScene";
 import { PlayScene } from "./scenes/PlayScene";
+import { loadSave } from "./save";
 import { theme } from "./theme";
 
 /** Reads the CSS safe-area insets (notch, home indicator) in device pixels. */
@@ -50,6 +51,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
+  void loadSave(game);
 
   // Coalesce bursts (address-bar show/hide, drag-resize, rotation) into one resize per frame and
   // skip no-op ones.

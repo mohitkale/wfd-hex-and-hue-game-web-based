@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { whenSaveReady } from "../save";
 import { theme } from "../theme";
 import { ensureTextures, TEX } from "../view/textures";
 
@@ -13,7 +14,8 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
-    this.input.once("pointerup", () => this.scene.start("levels"));
+    // Progress loads in the background; a tap during that brief moment just waits for it.
+    this.input.once("pointerup", () => whenSaveReady(this, () => this.scene.start("levels")));
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();

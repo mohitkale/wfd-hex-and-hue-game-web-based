@@ -10,6 +10,7 @@ import {
 } from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
 import { Haptics } from "../haptics";
+import { getSave, starsFor } from "../save";
 import { keyToSource } from "../keys";
 import { levelAt, worlds } from "../levels";
 import {
@@ -86,6 +87,8 @@ export class PlayScene extends Phaser.Scene {
   private readonly haptics = new Haptics();
   private acc = 0;
   private speed: Speed = 1;
+  /** Undos and boosters used this attempt; lowers the star rating, never blocks progress. */
+  private assists = 0;
 
   constructor() {
     super("play");
@@ -117,6 +120,13 @@ export class PlayScene extends Phaser.Scene {
     this.lastLayoutKey = "";
     this.acc = 0;
     this.speed = 1;
+    this.assists = 0;
+    const save = getSave(this);
+    this.haptics.enabled = save?.data.settings.haptics ?? true;
+    save?.update((d) => {
+      d.stats.plays++;
+      d.lastPlayed = { world: this.data_.world, level: this.data_.level };
+    });
 
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
@@ -417,6 +427,7 @@ export class PlayScene extends Phaser.Scene {
         break;
       case "won":
         this.haptics.play("win");
+        this.recordWin();
         // Let the last wisp reach the portal, then bloom the artwork back in.
         this.revealPending = true;
         this.time.delayedCall(450, () => {
@@ -431,12 +442,14 @@ export class PlayScene extends Phaser.Scene {
         break;
       case "lost":
         this.haptics.play("lose");
+        getSave(this)?.update((d) => d.stats.losses++);
         this.time.delayedCall(350, () => {
           if (this.session.state.status === "lost") this.showCard("lose");
         });
         break;
       case "undone":
       case "restarted":
+        this.assists = e.type === "undone" ? this.assists + 1 : 0;
         this.closeCard();
         for (const view of this.departing) view.destroy();
         this.departing.clear();
@@ -634,6 +647,16 @@ export class PlayScene extends Phaser.Scene {
   }
 
   // ── End of level ────────────────────────────────────────────────────────
+
+  private recordWin(): void {
+    const id = this.built.level.id;
+    const stars = starsFor(this.assists);
+    getSave(this)?.update((d) => {
+      const prev = d.levels[id];
+      d.levels[id] = { stars: Math.max(stars, prev?.stars ?? 0), wins: (prev?.wins ?? 0) + 1 };
+      d.stats.wins++;
+    });
+  }
 
   private stepReveal(delta: number): void {
     const r = this.reveal!;
