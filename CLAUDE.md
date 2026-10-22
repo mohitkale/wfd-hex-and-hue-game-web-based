@@ -4,7 +4,7 @@ Web-first, free-to-play magical color-sorting puzzle (track-around "pixel flow" 
 witchy / pagan / astrology / fantasy community. Repo: `mohitkale/wfd-hex-and-hue-game-web-based`.
 
 - Gameplay rules: `docs/GAME_DESIGN.md` (v1 track mechanic, shipped as v1.0.0). **v2 rules:**
-  `docs/GAME_DESIGN_V2.md` (written in M8.2; source of truth for the new engine once it exists).
+  `docs/GAME_DESIGN_V2.md` (source of truth for the new engine).
 - Plan and progress: `docs/ROADMAP.md` (milestones `M0…M15`, one PR per task, mirrored as GitHub
   milestones + issues). `M0…M7` are the shipped v1.0.0 record; `M8…M15` are the v2.0.0 redesign.
 - Why v2 exists and what is reusable: `docs/V2_GAMEPLAY_AUDIT.md`.
