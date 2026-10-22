@@ -48,9 +48,13 @@ describe("audit strategies", () => {
     expect(picked).toEqual([0, 0, 1]);
   });
 
-  it("is deterministic for fixed seeds on shipped levels", () => {
+  it("is deterministic for fixed seeds, and the seed matters for random play", () => {
     const level = worlds[0]!.levels[4]!.level;
     expect(winRates(level, 8)).toEqual(winRates(level, 8));
+    expect(winRates(easy, 4)).toEqual(winRates(easy, 4));
+    const outcomes = new Set<boolean>();
+    for (let seed = 1; seed <= 30; seed++) outcomes.add(playsToWin(level, STRATEGIES.random, seed));
+    expect(outcomes.size).toBe(2);
   });
 
   it("decision profile of a no-choice-matters level is all free steps", () => {
