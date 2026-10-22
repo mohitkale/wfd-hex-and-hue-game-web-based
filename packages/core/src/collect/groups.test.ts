@@ -10,6 +10,15 @@ import { isSettled, runUntilSettled, step } from "./sim";
 import { createCollectState, type CollectState } from "./state";
 
 const select = (column: number): Action => ({ kind: "select", column });
+
+/** Steps until settled, calling `each` after every tick; fails (instead of hanging) past 5,000 ticks. */
+function stepUntilSettled(s: CollectState, each: () => void = () => undefined): void {
+  for (let i = 0; i < 5_000 && !isSettled(s) && s.status === "playing"; i++) {
+    step(s);
+    each();
+  }
+  expect(isSettled(s) || s.status !== "playing", "game did not settle").toBe(true);
+}
 const resume = (slot: number): Action => ({ kind: "resume", slot });
 
 /** 7 purple cubes on the bottom row, 5 more sealed in behind blue: Purple 12 can reach only 7. */
@@ -63,11 +72,10 @@ describe("group capacity is real (GAME_DESIGN_V2 §5)", () => {
     apply(s, select(0));
     // With six familiars out at once, the group must still stop at 12.
     let peak = 0;
-    while (!isSettled(s)) {
-      step(s);
+    stepUntilSettled(s, () => {
       expect(violation(s)).toBeNull();
       peak = Math.max(peak, s.groups[0]!.delivered + s.groups[0]!.committed);
-    }
+    });
     expect(peak).toBe(12);
     expect(s.groups[0]).toMatchObject({ status: "completed", delivered: 12 });
     expect(s.grid.filter((c) => c === 0)).toHaveLength(3);
@@ -81,26 +89,36 @@ describe("group capacity is real (GAME_DESIGN_V2 §5)", () => {
     const s = createCollectState(purple12());
     apply(s, select(0));
     const seen: number[] = [remaining(s.groups[0]!)];
-    while (!isSettled(s)) {
-      step(s);
+    stepUntilSettled(s, () => {
       const now = remaining(s.groups[0]!);
       if (now !== seen.at(-1)) {
         expect(now).toBe(seen.at(-1)! - 1);
         seen.push(now);
       }
-    }
+    });
     expect(seen).toEqual([12, 11, 10, 9, 8, 7, 6, 5]);
   });
 
-  it("uncommitted plus committed plus delivered is always the capacity", () => {
+  it("collected + in transit + not yet sent = the original capacity, counted independently", () => {
     const s = createCollectState(purple12());
     apply(s, select(0));
-    while (!isSettled(s)) {
-      step(s);
+    let sawInTransit = 0;
+    stepUntilSettled(s, () => {
       const g = s.groups[0]!;
-      expect(uncommitted(g) + g.committed + g.delivered).toBe(g.capacity);
-      expect(uncommitted(g)).toBeGreaterThanOrEqual(0);
-    }
+      // In transit = this group's familiars that hold a reservation or a carried cube.
+      const inTransit = s.familiars.filter((f) => f.group === g.id && f.cube !== -1).length;
+      sawInTransit = Math.max(sawInTransit, inTransit);
+      expect(g.committed).toBe(inTransit);
+      expect(g.delivered + inTransit + uncommitted(g)).toBe(12);
+      // Cubes of its colour: on the board + carried + delivered account for all 12.
+      const onBoard = s.grid.filter((c) => c === 1).length;
+      const carried = s.familiars.filter(
+        (f) => f.group === g.id && (f.status === "carrying" || f.status === "deliver"),
+      ).length;
+      expect(onBoard + carried + g.delivered).toBe(12);
+      expect(violation(s)).toBeNull();
+    });
+    expect(sawInTransit).toBeGreaterThan(1); // several familiars were out at once
   });
 
   it("parks with the exact remaining number in the event", () => {
@@ -169,6 +187,34 @@ describe("group views", () => {
     apply(s, resume(0));
     runUntilSettled(s);
     expect(groupViews(s)[0]).toMatchObject({ status: "completed", slot: null, remaining: 0 });
+  });
+
+  it("is exact mid-run for several working groups with familiars in different states", () => {
+    const level = board(["RRRRRR", "GGGGGG"], [[["R", 6]], [["G", 6]]], {
+      colors: "RG",
+      slots: 2,
+      squad: 3,
+      spawnGap: 1,
+    });
+    const s = createCollectState(level);
+    apply(s, select(0));
+    apply(s, select(1));
+    let checked = 0;
+    stepUntilSettled(s, () => {
+      const views = groupViews(s);
+      for (const g of s.groups) {
+        const v = views[g.id]!;
+        expect(v.remaining).toBe(g.capacity - g.delivered); // committed cubes do not lower the number
+        expect(v.familiars).toBe(s.familiars.filter((f) => f.group === g.id).length);
+        if (g.status !== "queued") {
+          expect(v.column).toBeNull();
+          expect(v.depth).toBeNull();
+        }
+        if (g.status !== "waiting") expect(v.slot).toBeNull();
+      }
+      if (views.every((v) => v.familiars >= 2)) checked++;
+    });
+    expect(checked).toBeGreaterThan(0); // both groups had several familiars out at the same time
   });
 
   it("reports depth within a column", () => {
@@ -244,6 +290,7 @@ describe("shown numbers across random games (regression for inconsistent counts)
           if (legal.length > 0) apply(s, legal[rng.int(0, legal.length - 1)]!);
         }
         step(s);
+        expect(violation(s), `seed ${seed} tick ${s.tick}`).toBeNull();
         for (const f of s.familiars) {
           expect(s.groups[f.group]!.status, `seed ${seed} tick ${s.tick}`).toBe("working");
         }
