@@ -4,7 +4,7 @@ _A Little Magic in Every Color._
 
 **Status:** v2.0.0 rules (roadmap M8–M15). Written in M8.2. The rules below are frozen except where
 a later task is named as completing them: difficulty bands (M8.4, `docs/DIFFICULTY_V2.md`) and the
-level data model (M8.5). Reachability edge cases and cost were completed in M8.3 (§4a). This is the source of truth for the v2 engine
+level data model (M8.5, `docs/V2_PROTOTYPE_SPEC.md`). Reachability edge cases and cost were completed in M8.3 (§4a). This is the source of truth for the v2 engine
 (`packages/core/src/collect/`). `docs/GAME_DESIGN.md` describes the shipped v1 track mechanic and
 stays until the v2 switch (M15.5).
 
@@ -71,7 +71,7 @@ A level is: `width`, `height`, `palette`, `cells` (palette index or `EMPTY`, row
 - The level has a **settled-sequential solution** (§10), stored with it and verified by the solver.
 - `portalX` must be in `[0, W−1]`; the portal is `(portalX, H)`, a ring cell, never a mosaic cell.
 
-The exact serialisation and module layout are fixed in M8.5.
+The exact types, serialisation and module layout are in `docs/V2_PROTOTYPE_SPEC.md` §2–§4.
 
 ## 4. Open space and reachability
 
