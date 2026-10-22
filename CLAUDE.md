@@ -55,11 +55,13 @@ tools/levels/   level pipeline: content → packages/game/src/levels/generated/*
 ```
 npm install          # once
 npm run dev          # Astro dev server with the game at /play
-npm run verify       # lint + typecheck + test + build (must pass before any PR)
+npm run verify       # lint + typecheck + test + build + budget (must pass before any PR)
 npm test             # vitest (includes the shipped-level check)
 npm run levels       # rebuild stale levels after editing content/ or core engine files (commit the JSON)
 npm run art:import -- art.png name   # PNG pixel art → AsciiArt snippet for content/art
 npm run art:preview  # dist/art-preview.html: all levels, stats and difficulty curve
+npm run icons        # regenerate PWA icons (apps/web/public/icons) from tools/icons/icon.ts
+npm run budget       # check the production build against the performance budget (in verify/CI)
 ```
 
 ## Conventions

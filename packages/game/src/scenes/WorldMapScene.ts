@@ -10,16 +10,62 @@ import {
   nextLevel,
   worldProgress,
 } from "../progress";
+import { INSTALL_AFTER_WINS, canInstall, onInstallChange, promptInstall } from "../pwa";
 import { getSave } from "../save";
 import type { SaveData } from "../save/schema";
 import { theme } from "../theme";
-import { DragScroll } from "../view/DragScroll";
+import { DragScroll, takeRestoredScroll } from "../view/DragScroll";
 import { ensureTextures, TEX } from "../view/textures";
 import { fadeIn, go } from "../view/transition";
+import { syncPlan } from "../view/virtual";
 import type { PlayData } from "./PlayScene";
 
 /** Section tint per world, in play order. */
 const TINTS = [0x2a1650, 0x123c3c, 0x1c1a4a];
+
+/** Margin-zone nodes built per frame while scrolling (viewport nodes are built at once). */
+const NODES_PER_FRAME = 3;
+
+/** "Not now" on the install offer hides it for this long (per device: install is per device). */
+const INSTALL_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
+const INSTALL_SNOOZE_KEY = "hexhue:installSnoozedAt";
+
+function installSnoozed(): boolean {
+  try {
+    const at = Number(localStorage.getItem(INSTALL_SNOOZE_KEY));
+    return Number.isFinite(at) && Date.now() - at < INSTALL_SNOOZE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function snoozeInstall(): void {
+  try {
+    localStorage.setItem(INSTALL_SNOOZE_KEY, String(Date.now()));
+  } catch {
+    // Storage blocked: the offer just comes back next visit.
+  }
+}
+
+interface NodeState {
+  unlocked: boolean;
+  stars: number;
+  skipped: boolean;
+  isNext: boolean;
+  captionLeft: boolean;
+  dpr: number;
+}
+
+/** Everything needed to build a level node when it scrolls near the viewport. */
+interface NodeSpec {
+  x: number;
+  y: number;
+  r: number;
+  number: number;
+  name: string;
+  data: PlayData;
+  state: NodeState;
+}
 
 /**
  * The world map: each world is a tinted section with its progress, and its levels sit along a
@@ -28,6 +74,13 @@ const TINTS = [0x2a1650, 0x123c3c, 0x1c1a4a];
  */
 export class WorldMapScene extends Phaser.Scene {
   private objects: Phaser.GameObjects.GameObject[] = [];
+  /** Level nodes are built lazily near the viewport (see view/virtual.ts). */
+  private nodeSpecs: NodeSpec[] = [];
+  private nodeObjects = new Map<number, Phaser.GameObjects.GameObject[]>();
+  /** `nodeSpecs` y positions (cached for the per-frame sync). */
+  private nodeYs: number[] = [];
+  /** The viewport the last sync settled for; nothing to do while it is unchanged. */
+  private syncedView = "";
   private readonly haptics = new Haptics();
   private scroller!: DragScroll;
   private focusY: number | null = null;
@@ -39,18 +92,63 @@ export class WorldMapScene extends Phaser.Scene {
 
   create(): void {
     this.objects = [];
+    this.nodeSpecs = [];
+    this.nodeObjects = new Map();
+    this.nodeYs = [];
+    this.syncedView = "";
     this.toast = null;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
     this.haptics.enabled = getSave(this)?.data.settings.haptics ?? true;
     this.scroller = new DragScroll(this, (this.registry.get("dpr") as number | undefined) ?? 1);
     this.scale.on("resize", this.layout, this);
-    this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
+    const offInstall = onInstallChange(() => this.layout());
+    this.events.once("shutdown", () => {
+      this.scale.off("resize", this.layout, this);
+      offInstall();
+    });
     this.layout();
-    // Open on the level to play next.
+    // Open on the level to play next (or where the map was, after a pixel-ratio change).
     const { height } = this.scale.gameSize;
-    this.scroller.scrollTo(this.focusY !== null ? this.focusY - height * 0.45 : 0);
+    const restored = takeRestoredScroll(
+      this,
+      (this.registry.get("dpr") as number | undefined) ?? 1,
+    );
+    this.scroller.scrollTo(restored ?? (this.focusY !== null ? this.focusY - height * 0.45 : 0));
     fadeIn(this);
+  }
+
+  override update(): void {
+    this.syncNodes();
+  }
+
+  /** Builds nodes scrolling into view and drops those far away. */
+  private syncNodes(): void {
+    const camera = this.cameras.main;
+    const { height } = this.scale.gameSize;
+    const view = `${camera.scrollY}:${height}`;
+    if (view === this.syncedView) return;
+    const plan = syncPlan(
+      this.nodeYs,
+      new Set(this.nodeObjects.keys()),
+      camera.scrollY,
+      height,
+      height,
+      NODES_PER_FRAME,
+    );
+    for (const i of plan.destroy) {
+      for (const o of this.nodeObjects.get(i)!) {
+        this.tweens.killTweensOf(o);
+        o.destroy();
+      }
+      this.nodeObjects.delete(i);
+    }
+    for (const i of plan.create) {
+      const n = this.nodeSpecs[i]!;
+      this.nodeObjects.set(i, this.node(n.x, n.y, n.r, n.number, n.name, n.data, n.state));
+    }
+    // Settled once the margin is fully built (the budget left nothing for later frames).
+    if (plan.create.length < NODES_PER_FRAME) this.syncedView = view;
   }
 
   private save(): Pick<SaveData, "levels" | "skipped"> {
@@ -62,6 +160,13 @@ export class WorldMapScene extends Phaser.Scene {
     this.tweens.killAll();
     for (const o of this.objects) o.destroy();
     this.objects = [];
+    for (const list of this.nodeObjects.values()) for (const o of list) o.destroy();
+    this.nodeObjects.clear();
+    this.nodeSpecs = [];
+    this.syncedView = "";
+    // killAll above stopped the toast's fade: drop it rather than leave it stuck on screen.
+    this.toast?.destroy();
+    this.toast = null;
     const { width, height } = this.scale.gameSize;
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     const insets = (this.registry.get("insets") as { top: number; bottom: number } | undefined) ?? {
@@ -115,15 +220,20 @@ export class WorldMapScene extends Phaser.Scene {
         x: cx + amp * Math.sin(i * 0.9 + w),
         y: sectionTop + headerH + i * nodeGap + nodeGap / 2,
       }));
-      const path = this.add.graphics();
+      // Path dots: one batched Blitter per world (a Graphics would be re-tessellated every frame).
+      const dot = this.dotTexture(px(2));
+      const path = this.add.blitter(0, 0, dot);
+      const half = px(2) + 1;
       for (let i = 0; i < nodes.length - 1; i++) {
         const a = nodes[i]!;
         const b = nodes[i + 1]!;
         const lit = isPassed(save, world.levels[i]!.level.id);
-        path.fillStyle(lit ? theme.glow : theme.mist, lit ? 0.7 : 0.25);
         const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / px(9));
         for (let k = 1; k < steps; k++) {
-          path.fillCircle(a.x + ((b.x - a.x) * k) / steps, a.y + ((b.y - a.y) * k) / steps, px(2));
+          path
+            .create(a.x + ((b.x - a.x) * k) / steps - half, a.y + ((b.y - a.y) * k) / steps - half)
+            .setTint(lit ? theme.glow : theme.mist)
+            .setAlpha(lit ? 0.7 : 0.25);
         }
       }
       this.objects.push(path);
@@ -135,21 +245,34 @@ export class WorldMapScene extends Phaser.Scene {
         if (isNext) this.focusY = ny;
         else if (!next && w === worlds.length - 1 && i === world.levels.length - 1)
           this.focusY = ny;
-        this.objects.push(
-          ...this.node(x, ny, px(26), i + 1, built.level.name, data, {
+        this.nodeSpecs.push({
+          x,
+          y: ny,
+          r: px(26),
+          number: i + 1,
+          name: built.level.name,
+          data,
+          state: {
             unlocked: isUnlocked(worlds, save, w, i),
             stars: getSave(this)?.data.levels[built.level.id]?.stars ?? 0,
             skipped: !isCompleted(save, built.level.id) && isPassed(save, built.level.id),
             isNext,
             captionLeft: x > cx,
             dpr,
-          }),
-        );
+          },
+        });
       });
       y += sectionH + px(16);
     });
 
-    this.scroller.setMax(y + insets.bottom + px(24) - height);
+    // Install offer (where the browser supports it), once the player has won a couple of levels.
+    const offerInstall =
+      canInstall() &&
+      !installSnoozed() &&
+      (getSave(this)?.data.stats.wins ?? 0) >= INSTALL_AFTER_WINS;
+    this.nodeYs = this.nodeSpecs.map((n) => n.y);
+    // Room at the end so the pinned install offer never covers the last line of the map.
+    this.scroller.setMax(y + insets.bottom + px(offerInstall ? 96 : 24) - height);
 
     // Sticky top bar with the title and total stars.
     // Interactive so taps on the bar never reach a node scrolled underneath it.
@@ -250,6 +373,43 @@ export class WorldMapScene extends Phaser.Scene {
       .on("pointerout", () => (bookPressed = false))
       .on("pointerup", () => bookPressed && go(this, "spellbook"));
     this.objects.push(bar, soundZone, title, slash, stars, book);
+
+    if (offerInstall) this.drawInstallOffer(cx, height - insets.bottom - px(16), px);
+  }
+
+  /** "⤓ Install … · Not now", pinned above the bottom edge. */
+  private drawInstallOffer(cx: number, bottom: number, px: (v: number) => number): void {
+    const button = (label: string, primary: boolean, onPress: () => void) => {
+      let pressed = false;
+      return this.add
+        .text(0, bottom, label, {
+          fontFamily: theme.font,
+          fontStyle: primary ? "bold" : "normal",
+          fontSize: `${px(14)}px`,
+          color: primary ? "#1a0f33" : theme.text,
+          backgroundColor: primary ? "#f6d97a" : "#2a1650",
+          padding: { x: px(16), y: px(15) },
+        })
+        .setOrigin(0, 1)
+        .setScrollFactor(0)
+        .setDepth(11)
+        .setInteractive({ useHandCursor: true })
+        .on("pointerdown", () => (pressed = true))
+        .on("pointerout", () => (pressed = false))
+        .on("pointerup", () => {
+          if (!pressed || this.scroller.dragging) return;
+          for (const o of offer) o.destroy();
+          onPress();
+        });
+    };
+    const install = button("⤓ Install Hex & Hue", true, () => void promptInstall());
+    const later = button("Not now", false, snoozeInstall);
+    const gap = px(8);
+    const total = install.width + gap + later.width;
+    install.setX(cx - total / 2);
+    later.setX(cx - total / 2 + install.width + gap);
+    const offer = [install, later];
+    this.objects.push(...offer);
   }
 
   private node(
@@ -259,14 +419,7 @@ export class WorldMapScene extends Phaser.Scene {
     number: number,
     name: string,
     data: PlayData,
-    state: {
-      unlocked: boolean;
-      stars: number;
-      skipped: boolean;
-      isNext: boolean;
-      captionLeft: boolean;
-      dpr: number;
-    },
+    state: NodeState,
   ): Phaser.GameObjects.GameObject[] {
     const { dpr, unlocked, stars, isNext, skipped } = state;
     const out: Phaser.GameObjects.GameObject[] = [];
@@ -365,15 +518,39 @@ export class WorldMapScene extends Phaser.Scene {
     return out;
   }
 
-  private lockIcon(x: number, y: number, size: number, dpr: number): Phaser.GameObjects.Graphics {
-    const g = this.add.graphics({ x, y });
-    g.lineStyle(Math.max(1, 2 * dpr), theme.mist, 0.6);
-    g.beginPath();
-    g.arc(0, -size * 0.15, size * 0.35, Math.PI, 0);
-    g.strokePath();
-    g.fillStyle(theme.mist, 0.6);
-    g.fillRoundedRect(-size * 0.5, -size * 0.15, size, size * 0.75, size * 0.12);
-    return g;
+  /** A padlock, drawn once per size into a texture and shown as a cheap Image. */
+  private lockIcon(x: number, y: number, size: number, dpr: number): Phaser.GameObjects.Image {
+    const s = Math.round(size);
+    const key = `lock-${s}-${dpr}`;
+    if (!this.textures.exists(key)) {
+      const line = Math.max(1, 2 * dpr);
+      const box = s + 2 * line;
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      const cx = box / 2;
+      const cy = box / 2 + s * 0.1;
+      g.lineStyle(line, theme.mist, 0.6);
+      g.beginPath();
+      g.arc(cx, cy - s * 0.15, s * 0.35, Math.PI, 0);
+      g.strokePath();
+      g.fillStyle(theme.mist, 0.6);
+      g.fillRoundedRect(cx - s * 0.5, cy - s * 0.15, s, s * 0.75, s * 0.12);
+      g.generateTexture(key, box, box);
+      g.destroy();
+    }
+    return this.add.image(x, y, key);
+  }
+
+  /** A filled white dot texture of radius `r`, tinted per Blitter bob. */
+  private dotTexture(r: number): string {
+    const key = `dot-${r}`;
+    if (!this.textures.exists(key)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(r + 1, r + 1, r);
+      g.generateTexture(key, 2 * r + 2, 2 * r + 2);
+      g.destroy();
+    }
+    return key;
   }
 
   private showToast(message: string): void {

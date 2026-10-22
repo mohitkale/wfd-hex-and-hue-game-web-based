@@ -7,7 +7,7 @@ import { getSave } from "../save";
 import { theme } from "../theme";
 import { artTexture } from "../view/artThumb";
 import { Button } from "../view/Button";
-import { DragScroll } from "../view/DragScroll";
+import { DragScroll, takeRestoredScroll } from "../view/DragScroll";
 import { fadeIn, go } from "../view/transition";
 
 /** Cell size (device px) of card thumbnails and page art textures; both are scaled up to fit. */
@@ -47,6 +47,8 @@ export class SpellbookScene extends Phaser.Scene {
       this.closePage();
     });
     this.layout();
+    const restored = takeRestoredScroll(this, dpr);
+    if (restored !== null) this.scroller.scrollTo(restored);
     fadeIn(this);
   }
 
