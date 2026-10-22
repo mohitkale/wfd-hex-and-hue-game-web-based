@@ -12,6 +12,7 @@ import {
   type TrackWisp,
 } from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
+import { track } from "../analytics";
 import { getAudio } from "../audio";
 import { PRICES, pay, paymentFor, winCoins } from "../economy";
 import { Haptics } from "../haptics";
@@ -149,6 +150,8 @@ export class PlayScene extends Phaser.Scene {
   private adOffer: Phaser.GameObjects.Text | null = null;
   /** Bumped every run; async ad results from an earlier run are ignored. */
   private runId = 0;
+  /** When this attempt began (scene time), for level durations in analytics. */
+  private attemptStart = 0;
   /** Fragment bursts and portal rings; rebuilt with the layout (sizes follow the cell). */
   private burst: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private confetti: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
@@ -231,6 +234,7 @@ export class PlayScene extends Phaser.Scene {
       d.stats.plays++;
       d.lastPlayed = { world: this.data_.world, level: this.data_.level };
     });
+    this.startAttempt();
 
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
@@ -563,6 +567,12 @@ export class PlayScene extends Phaser.Scene {
     if (ad) this.pauseForAd();
     const outcome = await unlockSpeed(turns, getRewards(this));
     if (ad) this.resumeAfterAd();
+    if (ad) {
+      track(this, "ad_result", {
+        placement: "speed2x",
+        result: outcome.granted ? "rewarded" : "not_rewarded",
+      });
+    }
     if (run !== this.runId) return; // the level was left or restarted meanwhile
     save?.update((d) => (d.speedTurns = outcome.turns));
     if (outcome.granted) {
@@ -610,7 +620,9 @@ export class PlayScene extends Phaser.Scene {
     if (!rewards.isAvailable(placement)) return "unavailable";
     this.pauseForAd();
     try {
-      return await safeShow(rewards, placement);
+      const result = await safeShow(rewards, placement);
+      track(this, "ad_result", { placement, result });
+      return result;
     } finally {
       this.resumeAfterAd();
     }
@@ -760,6 +772,10 @@ export class PlayScene extends Phaser.Scene {
         this.haptics.play("lose");
         getAudio(this).play("lose");
         getSave(this)?.update((d) => d.stats.losses++);
+        track(this, "level_lose", {
+          level: this.built.level.id,
+          seconds: this.attemptSeconds(),
+        });
         this.lossStreaks().set(
           this.built.level.id,
           (this.lossStreaks().get(this.built.level.id) ?? 0) + 1,
@@ -773,7 +789,10 @@ export class PlayScene extends Phaser.Scene {
         this.assists = e.type === "undone" ? this.assists + 1 : 0;
         this.combo.reset();
         this.clearHint();
-        if (e.type === "restarted") getSave(this)?.update((d) => d.stats.plays++);
+        if (e.type === "restarted") {
+          getSave(this)?.update((d) => d.stats.plays++);
+          this.startAttempt();
+        }
         if (e.type === "undone" && e.reverted !== "tap") {
           // Undoing a booster gives it back (as stock), so nothing paid is lost.
           const kind = e.reverted;
@@ -1167,6 +1186,7 @@ export class PlayScene extends Phaser.Scene {
     save.update((d) => {
       for (const id of ids) if (!d.tips.includes(id)) d.tips.push(id);
     });
+    for (const tip of ids) track(this, "tutorial_tip", { tip });
     this.tutorialFinished = tutorialDone(save.data);
   }
 
@@ -1273,6 +1293,7 @@ export class PlayScene extends Phaser.Scene {
       if (!d.skipped.includes(id)) d.skipped.push(id);
     });
     this.lossStreaks().delete(id);
+    track(this, "level_skip", { level: id });
     const next = this.nextData();
     if (next) go(this, "play", next);
     else go(this, "levels");
@@ -1290,6 +1311,24 @@ export class PlayScene extends Phaser.Scene {
       d.levels[id] = { stars: Math.max(stars, prev?.stars ?? 0), wins: (prev?.wins ?? 0) + 1 };
       d.stats.wins++;
     });
+    track(this, "level_win", {
+      level: id,
+      stars,
+      assists: this.assists,
+      seconds: this.attemptSeconds(),
+    });
+  }
+
+  /** A new attempt at this level (scene start or Retry). */
+  private startAttempt(): void {
+    this.attemptStart = this.time.now;
+    const level = this.built.level.id;
+    const replay = Object.hasOwn(getSave(this)?.data.levels ?? {}, level);
+    track(this, "level_start", { level, replay });
+  }
+
+  private attemptSeconds(): number {
+    return Math.round((this.time.now - this.attemptStart) / 1000);
   }
 
   // ── Boosters ────────────────────────────────────────────────────────────
@@ -1337,6 +1376,11 @@ export class PlayScene extends Phaser.Scene {
       return;
     }
     save.update((d) => pay(d, kind, payment));
+    track(this, "booster_use", {
+      level: this.built.level.id,
+      booster: kind,
+      paid: payment.kind === "coins" ? "coins" : "owned",
+    });
     this.haptics.play("tap");
     if (payment.kind === "coins") {
       this.boosterBar?.pulseCoins();

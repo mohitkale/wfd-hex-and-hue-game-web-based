@@ -11,6 +11,7 @@ import {
   worldProgress,
 } from "../progress";
 import { isReducedMotion } from "../a11y";
+import { track } from "../analytics";
 import { illumination, isLit, moonPhase, phaseName } from "../moon";
 import { INSTALL_AFTER_WINS, canInstall, onInstallChange, promptInstall } from "../pwa";
 import { getSave } from "../save";
@@ -377,7 +378,9 @@ export class WorldMapScene extends Phaser.Scene {
           onPress();
         });
     };
-    const install = button("⤓ Install Hex & Hue", true, () => void promptInstall());
+    const install = button("⤓ Install Hex & Hue", true, () => {
+      void promptInstall().then((accepted) => track(this, "install_prompt", { accepted }));
+    });
     const later = button("Not now", false, snoozeInstall);
     const gap = px(8);
     const total = install.width + gap + later.width;

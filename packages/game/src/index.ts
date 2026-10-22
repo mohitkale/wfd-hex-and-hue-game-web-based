@@ -8,6 +8,7 @@ import { SettingsScene } from "./scenes/SettingsScene";
 import { AudioEngine, audioSettings } from "./audio";
 import { reducedMotion } from "./a11y";
 import { nextRenderDpr, renderDpr } from "./display";
+import { createAnalytics, track } from "./analytics";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
@@ -109,6 +110,23 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
       applyMotion();
     });
     unsubscribe = () => void off();
+  });
+  // Analytics: only with a configured key, and only once the player has agreed (see analytics/).
+  const analytics = createAnalytics({
+    PUBLIC_POSTHOG_KEY: import.meta.env?.PUBLIC_POSTHOG_KEY,
+    PUBLIC_POSTHOG_HOST: import.meta.env?.PUBLIC_POSTHOG_HOST,
+  });
+  game.registry.set("analytics", analytics);
+  track(game, "app_open", {
+    standalone: window.matchMedia?.("(display-mode: standalone)").matches ?? false,
+  });
+  const flushAnalytics = () => analytics.flush(document.visibilityState === "hidden");
+  const analyticsTimer = window.setInterval(flushAnalytics, 30_000);
+  document.addEventListener("visibilitychange", flushAnalytics);
+  game.events.once(Phaser.Core.Events.DESTROY, () => {
+    window.clearInterval(analyticsTimer);
+    document.removeEventListener("visibilitychange", flushAnalytics);
+    analytics.flush(true);
   });
   game.registry.set(
     "rewards",
