@@ -8,6 +8,7 @@ import { SettingsScene } from "./scenes/SettingsScene";
 import { AudioEngine, audioSettings } from "./audio";
 import { reducedMotion } from "./a11y";
 import { nextRenderDpr, renderDpr } from "./display";
+import { CONSENT_EVENT, createAnalytics, readConsent, safeFlush, track } from "./analytics";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
@@ -109,6 +110,36 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
       applyMotion();
     });
     unsubscribe = () => void off();
+  });
+  // Analytics: only with a configured key, and only once the player has agreed (see analytics/).
+  const analytics = createAnalytics({
+    PUBLIC_POSTHOG_KEY: import.meta.env?.PUBLIC_POSTHOG_KEY,
+    PUBLIC_POSTHOG_HOST: import.meta.env?.PUBLIC_POSTHOG_HOST,
+  });
+  game.registry.set("analytics", analytics);
+  const appOpen = () =>
+    track(game, "app_open", {
+      standalone: window.matchMedia?.("(display-mode: standalone)").matches ?? false,
+    });
+  appOpen();
+  // A first-time player answers the consent banner after the game opened: count this session's
+  // open once they agree (it was dropped while consent was unknown).
+  let opened = readConsent() === "granted";
+  const onConsent = () => {
+    if (!opened && readConsent() === "granted") {
+      opened = true;
+      appOpen();
+    }
+  };
+  window.addEventListener(CONSENT_EVENT, onConsent);
+  const flushAnalytics = () => safeFlush(analytics, document.visibilityState === "hidden");
+  const analyticsTimer = window.setInterval(flushAnalytics, 30_000);
+  document.addEventListener("visibilitychange", flushAnalytics);
+  game.events.once(Phaser.Core.Events.DESTROY, () => {
+    window.clearInterval(analyticsTimer);
+    document.removeEventListener("visibilitychange", flushAnalytics);
+    window.removeEventListener(CONSENT_EVENT, onConsent);
+    safeFlush(analytics, true);
   });
   game.registry.set(
     "rewards",

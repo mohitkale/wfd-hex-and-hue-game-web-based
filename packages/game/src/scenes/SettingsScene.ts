@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { getAnalytics, privacySignal, readConsent, writeConsent } from "../analytics";
 import { getAudio } from "../audio";
 import { getSave } from "../save";
 import type { Settings } from "../save/schema";
@@ -220,6 +221,24 @@ export class SettingsScene extends Phaser.Scene {
       ),
     );
     y += px(56);
+
+    // Only when analytics are configured at all; a browser privacy signal keeps them off.
+    if (getAnalytics(this).name !== "none") {
+      y += px(8);
+      section("Privacy");
+      if (privacySignal()) {
+        push(text(left, y, "Anonymous play stats: off", 16));
+        push(text(left, y + px(20), "Your browser asks sites not to track", 12, theme.textDim));
+        y += px(56);
+      } else {
+        toggleRow(
+          "Share anonymous play stats",
+          readConsent() === "granted",
+          (v) => writeConsent(v ? "granted" : "denied"),
+          "Levels played and won; nothing personal",
+        );
+      }
+    }
 
     y += px(8);
     section("Help");

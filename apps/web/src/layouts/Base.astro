@@ -72,8 +72,10 @@ const imageUrl = absolute(image, Astro.site);
   <body data-offline={offline ? "" : undefined}>
     <slot />
     <script>
+      import { setupConsentBanner } from "../analytics/banner";
       import { setupPwa } from "../pwa/client";
       setupPwa();
+      setupConsentBanner();
     </script>
   </body>
 </html>
@@ -122,6 +124,73 @@ const imageUrl = absolute(image, Astro.site);
     cursor: pointer;
   }
   .hh-toast button.hh-toast-primary {
+    background: var(--glow);
+    color: var(--night);
+    font-weight: 700;
+  }
+  /* Analytics consent (analytics/banner.ts): bottom on content pages, top in the game. */
+  .hh-consent {
+    position: fixed;
+    z-index: 99;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(560px, calc(100vw - 24px));
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 14px;
+    border: 1px solid rgb(201 184 255 / 0.35);
+    border-radius: 18px;
+    background: var(--dusk);
+    color: var(--text);
+    font-size: 14px;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.4);
+  }
+  .hh-consent[data-position="bottom"] {
+    bottom: calc(env(safe-area-inset-bottom) + 12px);
+  }
+  .hh-consent[data-position="top"] {
+    /* Between the game's Back and 2× buttons (52 px each side), over the level title only. */
+    top: calc(env(safe-area-inset-top) + 4px);
+    width: min(420px, calc(100vw - 128px));
+    padding: 4px 6px 4px 12px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    font-size: 13px;
+  }
+  .hh-consent[data-position="top"] p {
+    flex: 1 1 auto;
+  }
+  .hh-consent[data-position="top"] button {
+    padding: 0 12px;
+  }
+  /* The update banner steps down when the consent strip is showing. */
+  body:has(.hh-consent[data-position="top"]) .hh-toast {
+    top: calc(env(safe-area-inset-top) + 64px);
+  }
+  .hh-consent p {
+    flex: 1 1 260px;
+    margin: 0;
+  }
+  .hh-consent a {
+    color: var(--glow);
+  }
+  .hh-consent div {
+    display: flex;
+    gap: 8px;
+  }
+  .hh-consent button {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: rgb(201 184 255 / 0.15);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .hh-consent button.primary {
     background: var(--glow);
     color: var(--night);
     font-weight: 700;

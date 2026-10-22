@@ -94,12 +94,45 @@ export function checkBudgets(files: readonly BuiltFile[], budgets = BUDGETS): Bu
   });
 }
 
+/** A content page may load at most this much script (gzip), static imports included. */
+export const CONTENT_SCRIPT_MAX = 10 * 1024;
+
+/** Build-relative paths of the `_astro` script bundles a page's HTML loads. */
+export function pageScripts(html: string): string[] {
+  return [...html.matchAll(/<script[^>]*\ssrc="\/(_astro\/[^"]+\.js)"/g)].map((m) => m[1]!);
+}
+
+/** `entries` plus every bundle they statically import (relative "./x.js" imports in _astro). */
+export function scriptClosure(
+  entries: readonly string[],
+  code: (path: string) => string,
+): string[] {
+  const seen = new Set<string>();
+  const visit = (path: string) => {
+    if (seen.has(path)) return;
+    seen.add(path);
+    for (const m of code(path).matchAll(/(?:from|import)\s*["']\.\/([^"']+\.js)["']/g)) {
+      visit(`_astro/${m[1]}`);
+    }
+  };
+  entries.forEach(visit);
+  return [...seen];
+}
+
 /**
- * Content pages must stay free of script bundles (the game's Phaser bundle above all): only the
- * play page may load one. Returns the pages that break this. Inline scripts are fine.
+ * Content pages (everything but the game) must stay light: the game's Phaser bundle above all
+ * must never load there. Returns the pages whose scripts, imports included, exceed the limit.
  */
-export function scriptLeaks(pages: readonly { path: string; html: string }[]): string[] {
+export function scriptLeaks(
+  pages: readonly { path: string; html: string }[],
+  bundles: ReadonlyMap<string, { gzip: number; code: string }>,
+  max = CONTENT_SCRIPT_MAX,
+): { page: string; gzip: number }[] {
   return pages
-    .filter((p) => p.path !== "play/index.html" && /<script[^>]*\ssrc="\/_astro\//.test(p.html))
-    .map((p) => p.path);
+    .filter((p) => p.path !== "play/index.html")
+    .map((p) => {
+      const all = scriptClosure(pageScripts(p.html), (path) => bundles.get(path)?.code ?? "");
+      return { page: p.path, gzip: all.reduce((n, f) => n + (bundles.get(f)?.gzip ?? 0), 0) };
+    })
+    .filter((r) => r.gzip > max);
 }

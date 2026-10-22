@@ -16,13 +16,39 @@ import Page from "../layouts/Page.astro";
     <p>
       Your progress (levels, stars, coins, boosters, settings and which tips you have seen) is saved
       in your browser's storage on your own device. It is never sent to us. Clearing your browser's
-      site data removes it.
+      site data removes it, along with your analytics choice.
     </p>
     <h2>Offline files</h2>
     <p>
       To play offline, the game keeps a copy of its own files in your browser's cache. They contain
       no personal data.
     </p>
+    <h2>Anonymous play stats (only if you agree)</h2>
+    <p>
+      If you allow it in the banner or in the game's Settings, Hex &amp; Hue counts a few anonymous
+      events to learn which levels are too hard and where players stop: opening the game, starting,
+      winning, losing or skipping a level (with its time and stars), boosters used, tips read, and
+      how optional ads and the install offer ended.
+    </p>
+    <ul>
+      <li>
+        They are tied to a random id created on your device when you agree, never to your name,
+        email or account (there is none). No cookies are used.
+      </li>
+      <li>
+        They are sent to our analytics service (PostHog) and used only to improve the game. Like any
+        web request, PostHog sees your IP address when they arrive; we ask it not to look up your
+        location from it and not to build a profile of you.
+      </li>
+      <li>
+        Nothing is collected until you agree. If your browser sends a "do not track" or Global
+        Privacy Control signal, nothing is collected and we don't ask.
+      </li>
+      <li>
+        You can change your mind any time in Settings; turning it off deletes the random id and
+        anything not yet sent.
+      </li>
+    </ul>
     <h2>Optional ads</h2>
     <p>
       Rewarded ads only play when you choose to watch one. If an ad provider is used, it may process
