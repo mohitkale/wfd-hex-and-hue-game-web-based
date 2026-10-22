@@ -23,6 +23,7 @@
     "levels": "tsx tools/levels/build.ts",
     "art:import": "tsx tools/art/import.ts",
     "art:preview": "tsx tools/art/preview.ts",
+    "audit:v1": "tsx tools/audit/run.ts",
     "icons": "tsx tools/icons/build.ts",
     "budget": "tsx tools/perf/check.ts"
   },

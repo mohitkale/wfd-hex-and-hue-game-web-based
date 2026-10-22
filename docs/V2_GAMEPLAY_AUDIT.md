@@ -46,7 +46,8 @@ I played the 60 shipped levels with seven simple automatic strategies in that sa
 | Wisp that collects the most right now         | 75%            | 45%             | 40%            | 53%     |
 | **Wisp that will finish its charge (greedy)** | **95%**        | **100%**        | **95%**        | **97%** |
 
-These figures come from a one-off script that is **not yet in the repo**; treat them as unverified until it lands as `tools/audit/strategies.ts` in M8.1 (#65), which also re-checks them.
+Reproduce with `npm run audit:v1` (`tools/audit/strategies.ts`; added in M8.1, #65). Per-level rows
+are printed by the same command; the table above is its "Mean win rate" block.
 
 What this says:
 
@@ -60,6 +61,35 @@ What this says:
 3. **Difficulty is mostly "which slot did I waste".** Losses come from filling `K` slots; there is no
    spatial or timing decision, because the sequential model means the player's only decision is
    _which front wisp next_.
+
+## 3a. Decision profile (M8.1)
+
+`npm run audit:v1 -- --decisions` walks each level's stored winning solution and, at every state,
+asks the solver which legal launches keep the level winnable (budget 4,000 nodes per check; an
+over-budget answer counts as not viable, so "viable" can only be underestimated).
+
+| World   | Legal launches per step | Still winnable | Steps where _every_ launch is fine | Steps with one forced launch |
+| ------- | ----------------------- | -------------- | ---------------------------------- | ---------------------------- |
+| Moonlit | 4.2                     | 4.1            | 91%                                | 7%                           |
+| Crystal | 4.2                     | 4.0            | 88%                                | 6%                           |
+| Zodiac  | 4.6                     | 4.3            | 84%                                | 4%                           |
+| All 60  | 4.3                     | 4.2            | **88%**                            | 5%                           |
+
+34 of the 60 levels have at least 90% such "free" steps. Along the intended line the player almost
+never faces a move that can lose the level. Losses happen only after slack has been spent elsewhere
+(parked wisps filling slots), which is why a random player loses 36% of the time while a player who
+simply avoids wasting slots (the finish-the-charge rule) loses almost never. The levels test "don't
+waste slots", not "plan ahead".
+
+Caveat: this is a property of the v1 sequential model. It says how much the _levels_ ask for under
+that model, not that every real-time play is this easy.
+
+## 3b. Baseline that v2 must beat
+
+M12.3 (anti-triviality) must show, for medium and hard v2 levels, success rates for the equivalent
+strategies well below these v1 figures. The v1 numbers to beat: finish-the-charge greedy 97%,
+random 64%, most-collected 53%, first-column 35%. A v2 level where any simple strategy wins
+consistently is rejected (thresholds are set in M8.4).
 
 ## 4. Why the mechanic produces repetitive play
 
@@ -90,6 +120,9 @@ What this says:
   path and the other forgives everything.
 - The curve in `content/curve.ts` then _targets_ this score with hill-climbing, so it optimises
   the weak proxy directly.
+
+Measured consequence (§3a): scores rise to 0.57 in the last Zodiac levels, yet the intended line is
+still "free" at most steps. The score tracks slot slack and one random policy, not decision depth.
 
 M12.3/M12.4 replace this with multi-strategy success rates and decision metrics.
 
@@ -178,7 +211,7 @@ M12.3/M12.4 replace this with multi-strategy success rates and decision metrics.
 1. Build v2 additively and keep `main` shippable v1 until the single switch PR.
 2. Treat the solver's _settled-state abstraction_ as the first design deliverable of M8.2, before any
    engine code.
-3. Land the strategy-audit script (M8.1) in `tools/audit` so these seven strategies (extended to the eight in the M12.3 spec) become the
+3. Land the strategy-audit script (M8.1, done) in `tools/audit` so these seven strategies (extended to the eight in the M12.3 spec) become the
    M12.3 anti-triviality gate, and so v1 numbers above stay reproducible.
 4. Replace the single palette-distance rule with "families + ramps" in the art pipeline (M11.4).
 5. Keep one `v1` maintenance line available: if a v1 hotfix is ever needed after the switch, branch

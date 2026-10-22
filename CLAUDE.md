@@ -81,6 +81,7 @@ npm test             # vitest (includes the shipped-level check)
 npm run levels       # rebuild stale levels after editing content/ or core engine files (commit the JSON)
 npm run art:import -- art.png name   # PNG pixel art → AsciiArt snippet for content/art
 npm run art:preview  # dist/art-preview.html: all levels, stats and difficulty curve
+npm run audit:v1      # v1 audit: simple-strategy win rates per level (add -- --decisions for decision profile)
 npm run icons        # regenerate PWA icons (apps/web/public/icons) from tools/icons/icon.ts
 npm run budget       # check the production build against the performance budget (in verify/CI)
 ```
