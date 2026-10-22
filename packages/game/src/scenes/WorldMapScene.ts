@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { getAudio } from "../audio";
 import { Haptics } from "../haptics";
 import { worlds } from "../levels";
 import {
@@ -170,16 +171,42 @@ export class WorldMapScene extends Phaser.Scene {
           .setOrigin(0.5, 1),
       );
     }
+    // Sound toggle (all audio) on the left; volumes live in Settings (M6.5).
+    const soundOn = () => {
+      const st = getSave(this)?.data.settings;
+      return st ? st.sound || st.music : true;
+    };
+    const touch = px(48);
+    const soundZone = this.add
+      .zone(left + px(4), insets.top + (px(56) - touch) / 2, touch, touch)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(11)
+      .setInteractive({ useHandCursor: true });
     const title = this.add
-      .text(left + px(20), insets.top + px(28), "Hex & Hue", {
+      .text(left + px(4) + touch / 2, insets.top + px(28), soundOn() ? "♪" : "♪̸", {
         fontFamily: theme.font,
         fontStyle: "bold",
         fontSize: `${px(22)}px`,
-        color: theme.text,
+        color: soundOn() ? theme.text : theme.textDim,
       })
-      .setOrigin(0, 0.5)
+      .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(11);
+    let soundPressed = false;
+    soundZone
+      .on("pointerdown", () => (soundPressed = true))
+      .on("pointerout", () => (soundPressed = false))
+      .on("pointerup", () => {
+        if (!soundPressed) return;
+        const next = !soundOn();
+        getSave(this)?.update((d) => {
+          d.settings.sound = next;
+          d.settings.music = next;
+        });
+        title.setText(next ? "♪" : "♪̸").setColor(next ? theme.text : theme.textDim);
+        if (next) getAudio(this).play("ui");
+      });
     const stars = this.add
       .text(left + frameW - px(20), insets.top + px(28), `★ ${total}`, {
         fontFamily: theme.font,
@@ -192,7 +219,7 @@ export class WorldMapScene extends Phaser.Scene {
       .setDepth(11);
     // Spellbook entry, between the title and the stars.
     const book = this.add
-      .text(left + frameW / 2 + px(24), insets.top + px(28), "✦ Spellbook", {
+      .text(left + frameW / 2, insets.top + px(28), "✦ Spellbook", {
         fontFamily: theme.font,
         fontStyle: "bold",
         fontSize: `${px(14)}px`,
@@ -209,7 +236,7 @@ export class WorldMapScene extends Phaser.Scene {
       .on("pointerdown", () => (bookPressed = true))
       .on("pointerout", () => (bookPressed = false))
       .on("pointerup", () => bookPressed && this.scene.start("spellbook"));
-    this.objects.push(bar, title, stars, book);
+    this.objects.push(bar, soundZone, title, stars, book);
   }
 
   private node(
@@ -300,6 +327,7 @@ export class WorldMapScene extends Phaser.Scene {
       pressed = false;
       if (!unlocked) {
         this.haptics.play("invalid");
+        getAudio(this).play("invalid");
         this.tweens.add({
           targets: [disc, label],
           x: { from: x - 5 * dpr, to: x },
@@ -312,6 +340,7 @@ export class WorldMapScene extends Phaser.Scene {
         return;
       }
       this.haptics.play("tap");
+      getAudio(this).play("tap");
       this.tweens.add({
         targets: [disc, label],
         scale: 0.9,

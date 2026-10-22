@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { getAudio } from "../audio";
 import { theme } from "../theme";
 
 export interface ButtonOptions {
@@ -56,6 +57,7 @@ export class Button extends Phaser.GameObjects.Container {
     this.on("pointerup", () => {
       if (!pressed) return;
       release();
+      getAudio(scene).play("ui");
       options.onPress();
     });
     scene.add.existing(this);

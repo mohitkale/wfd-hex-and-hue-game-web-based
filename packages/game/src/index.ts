@@ -4,8 +4,10 @@ import { BootScene } from "./scenes/BootScene";
 import { SpellbookScene } from "./scenes/SpellbookScene";
 import { WorldMapScene } from "./scenes/WorldMapScene";
 import { PlayScene } from "./scenes/PlayScene";
+import { AudioEngine, audioSettings } from "./audio";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
+import { defaultSave } from "./save/schema";
 import { theme } from "./theme";
 
 /** Reads the CSS safe-area insets (notch, home indicator) in device pixels. */
@@ -53,7 +55,23 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
-  void loadSave(game);
+  // Audio stays silent until the first tap or key (browser rule), then follows the saved settings.
+  const audio = new AudioEngine(audioSettings(defaultSave().settings));
+  game.registry.set("audio", audio);
+  const unlock = () => audio.unlock();
+  window.addEventListener("pointerdown", unlock, { capture: true });
+  window.addEventListener("keydown", unlock, { capture: true });
+  const onVisibility = () => audio.setHidden(document.visibilityState === "hidden");
+  document.addEventListener("visibilitychange", onVisibility);
+  game.events.once(Phaser.Core.Events.DESTROY, () => {
+    window.removeEventListener("pointerdown", unlock, { capture: true });
+    window.removeEventListener("keydown", unlock, { capture: true });
+    document.removeEventListener("visibilitychange", onVisibility);
+  });
+  void loadSave(game).then((save) => {
+    audio.configure(audioSettings(save.data.settings));
+    save.subscribe((d) => audio.configure(audioSettings(d.settings)));
+  });
   game.registry.set(
     "rewards",
     createRewards({ PUBLIC_REWARDS: import.meta.env?.PUBLIC_REWARDS, DEV: import.meta.env?.DEV }),
