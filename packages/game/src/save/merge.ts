@@ -24,6 +24,7 @@ export function mergeSaves(base: SaveData, mine: SaveData, theirs: SaveData): Sa
   return migrate({
     ...theirs,
     levels: Object.fromEntries(Object.entries(levels)),
+    skipped: [...new Set([...theirs.skipped, ...mine.skipped])],
     coins: delta(base.coins, mine.coins, theirs.coins),
     boosters,
     speedTurns: delta(base.speedTurns, mine.speedTurns, theirs.speedTurns),

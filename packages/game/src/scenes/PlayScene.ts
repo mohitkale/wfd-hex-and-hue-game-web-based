@@ -10,6 +10,7 @@ import {
 } from "@hexhue/core";
 import { computeLayout, type Insets, type Layout } from "../layout";
 import { Haptics } from "../haptics";
+import { flatLevels } from "../progress";
 import { getSave, starsFor } from "../save";
 import { keyToSource } from "../keys";
 import { levelAt, worlds } from "../levels";
@@ -39,6 +40,9 @@ export interface PlayData {
 /** Draw order; explicit so rebuilt layers never cover persistent wisps. */
 // The HUD stays above result cards so Back always works.
 const DEPTH = { chrome: 0, mosaic: 1, wisps: 2, fx: 3, overlay: 4, hud: 5 } as const;
+
+/** Losses in a row on one level before the lose card offers a free skip. */
+const SKIP_AFTER = 3;
 
 /** Win reveal: how long the finished artwork takes to bloom back in. */
 const REVEAL_MS = 1100;
@@ -443,6 +447,10 @@ export class PlayScene extends Phaser.Scene {
       case "lost":
         this.haptics.play("lose");
         getSave(this)?.update((d) => d.stats.losses++);
+        this.lossStreaks().set(
+          this.built.level.id,
+          (this.lossStreaks().get(this.built.level.id) ?? 0) + 1,
+        );
         this.time.delayedCall(350, () => {
           if (this.session.state.status === "lost") this.showCard("lose");
         });
@@ -649,8 +657,39 @@ export class PlayScene extends Phaser.Scene {
 
   // ── End of level ────────────────────────────────────────────────────────
 
+  /** Losses in a row per level this session; after `SKIP_AFTER` the lose card offers a free skip. */
+  private lossStreaks(): Map<string, number> {
+    let streaks = this.registry.get("lossStreaks") as Map<string, number> | undefined;
+    if (!streaks) {
+      streaks = new Map();
+      this.registry.set("lossStreaks", streaks);
+    }
+    return streaks;
+  }
+
+  /** The level after this one in play order (crossing into the next world), if any. */
+  private nextData(): PlayData | null {
+    const all = flatLevels(worlds);
+    const i = all.findIndex((r) => r.world === this.data_.world && r.level === this.data_.level);
+    const next = all[i + 1];
+    return next ? { world: next.world, level: next.level } : null;
+  }
+
+  /** Never stuck: marks the level skipped (it stays replayable) and moves on. */
+  private skipLevel(): void {
+    const id = this.built.level.id;
+    getSave(this)?.update((d) => {
+      if (!d.skipped.includes(id)) d.skipped.push(id);
+    });
+    this.lossStreaks().delete(id);
+    const next = this.nextData();
+    if (next) this.scene.restart(next);
+    else this.scene.start("levels");
+  }
+
   private recordWin(): void {
     const id = this.built.level.id;
+    this.lossStreaks().delete(id);
     const stars = starsFor(this.assists);
     getSave(this)?.update((d) => {
       const prev = d.levels[id];
@@ -775,7 +814,7 @@ export class PlayScene extends Phaser.Scene {
     const right = half / 2 + gap / 2;
     const by = y + px(24);
     if (kind === "win") {
-      const next = levelAt(this.data_.world, this.data_.level + 1);
+      const next = this.nextData();
       parts.push(
         new Button(this, left, by, half, "Replay", {
           dpr,
@@ -784,10 +823,7 @@ export class PlayScene extends Phaser.Scene {
         new Button(this, right, by, half, next ? "Continue" : "Levels", {
           dpr,
           primary: true,
-          onPress: () =>
-            next
-              ? this.scene.restart({ world: this.data_.world, level: this.data_.level + 1 })
-              : this.scene.start("levels"),
+          onPress: () => (next ? this.scene.restart(next) : this.scene.start("levels")),
         }),
       );
     } else {
@@ -808,7 +844,21 @@ export class PlayScene extends Phaser.Scene {
         );
       }
     }
-    const height = by + px(24) + px(22);
+    let height = by + px(24) + px(22);
+    if (kind === "lose" && (this.lossStreaks().get(this.built.level.id) ?? 0) >= SKIP_AFTER) {
+      const skip = this.add
+        .text(0, height + px(4), "Skip this level for now ›", {
+          fontFamily: theme.font,
+          fontSize: font(14),
+          color: theme.textDim,
+          padding: { x: px(12), y: px(10) },
+        })
+        .setOrigin(0.5, 0)
+        .setInteractive({ useHandCursor: true })
+        .on("pointerup", () => this.skipLevel());
+      parts.push(skip);
+      height += skip.height + px(8);
+    }
 
     const panel = this.add.graphics();
     panel.fillStyle(theme.panel, 0.96);
