@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { paintSymbol } from "../a11y";
 
 export const TEX = { glow: "glow", spark: "spark" } as const;
 
@@ -24,4 +25,18 @@ export function ensureTextures(scene: Phaser.Scene): void {
     ctx.fillRect(2, 2, size - 4, size - 4);
     tex.refresh();
   }
+}
+
+/** A white colorblind symbol (see a11y.ts) for palette color `index`, drawn once per game. */
+export function symbolTexture(scene: Phaser.Scene, index: number): string {
+  const key = `symbol-${index}`;
+  if (!scene.textures.exists(key)) {
+    const size = 64;
+    const tex = scene.textures.createCanvas(key, size, size)!;
+    const ctx = tex.getContext();
+    ctx.fillStyle = "#ffffff";
+    paintSymbol(ctx, index, size / 2, size / 2, size * 0.9);
+    tex.refresh();
+  }
+  return key;
 }

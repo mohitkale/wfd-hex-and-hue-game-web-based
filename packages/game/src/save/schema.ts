@@ -1,3 +1,4 @@
+import type { MotionSetting } from "../a11y";
 import { TUTORIAL_TIPS } from "../tips";
 
 /**
@@ -25,6 +26,10 @@ export interface Settings {
   sfxVolume: number;
   /** 0..1 */
   musicVolume: number;
+  /** A symbol per color on wisps and fragments (matching never depends on hue alone). */
+  colorblind: boolean;
+  /** "system" follows the OS reduce-motion preference. */
+  reducedMotion: MotionSetting;
 }
 
 export interface SaveData {
@@ -54,7 +59,15 @@ export function defaultSave(): SaveData {
     coins: 100,
     boosters: { undo: 2, shuffle: 2, extraSlot: 2, wand: 2 },
     speedTurns: 0,
-    settings: { haptics: true, sound: true, music: true, sfxVolume: 0.8, musicVolume: 0.5 },
+    settings: {
+      haptics: true,
+      sound: true,
+      music: true,
+      sfxVolume: 0.8,
+      musicVolume: 0.5,
+      colorblind: false,
+      reducedMotion: "system",
+    },
     stats: { plays: 0, wins: 0, losses: 0 },
     lastPlayed: null,
     tips: [],
@@ -141,6 +154,11 @@ export function migrate(raw: unknown): SaveData {
       music: flag(settings.music, true),
       sfxVolume: unit(settings.sfxVolume, fresh.settings.sfxVolume),
       musicVolume: unit(settings.musicVolume, fresh.settings.musicVolume),
+      colorblind: flag(settings.colorblind, false),
+      reducedMotion:
+        settings.reducedMotion === "on" || settings.reducedMotion === "off"
+          ? settings.reducedMotion
+          : "system",
     },
     stats: {
       plays: count(stats.plays, 0),

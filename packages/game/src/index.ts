@@ -4,12 +4,25 @@ import { BootScene } from "./scenes/BootScene";
 import { SpellbookScene } from "./scenes/SpellbookScene";
 import { WorldMapScene } from "./scenes/WorldMapScene";
 import { PlayScene } from "./scenes/PlayScene";
+import { SettingsScene } from "./scenes/SettingsScene";
 import { AudioEngine, audioSettings } from "./audio";
+import { reducedMotion } from "./a11y";
 import { nextRenderDpr, renderDpr } from "./display";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
 import { theme } from "./theme";
+
+/** MediaQueryList change listeners (Safari before 14 only has the old addListener API). */
+function listen(q: MediaQueryList | null, fn: () => void): void {
+  if (q?.addEventListener) q.addEventListener("change", fn);
+  else q?.addListener?.(fn);
+}
+
+function unlisten(q: MediaQueryList | null, fn: () => void): void {
+  if (q?.removeEventListener) q.removeEventListener("change", fn);
+  else q?.removeListener?.(fn);
+}
 
 /** Reads the CSS safe-area insets (notch, home indicator) in device pixels. */
 function readInsets(dpr: number): Insets {
@@ -56,7 +69,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     // All sound comes from our own Web Audio engine; Phaser's would be a second, unused context.
     audio: { noAudio: true },
     disableContextMenu: true,
-    scene: [BootScene, WorldMapScene, SpellbookScene, PlayScene],
+    scene: [BootScene, WorldMapScene, SpellbookScene, SettingsScene, PlayScene],
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
@@ -75,11 +88,26 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     for (const g of gestures) window.removeEventListener(g, unlock, { capture: true });
     document.removeEventListener("visibilitychange", onVisibility);
     unsubscribe();
+    unlisten(motionQuery, applyMotion);
     audio.dispose();
   });
+  // Reduced motion: the player's setting, or the OS preference on "system". Scenes read the
+  // "reducedMotion" registry flag when they play effects.
+  const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
+  let motionSetting: "system" | "on" | "off" = "system";
+  const applyMotion = () =>
+    game.registry.set("reducedMotion", reducedMotion(motionSetting, !!motionQuery?.matches));
+  applyMotion();
+  listen(motionQuery, applyMotion);
   void loadSave(game).then((save) => {
     audio.configure(audioSettings(save.data.settings));
-    const off = save.subscribe((d) => audio.configure(audioSettings(d.settings)));
+    motionSetting = save.data.settings.reducedMotion;
+    applyMotion();
+    const off = save.subscribe((d) => {
+      audio.configure(audioSettings(d.settings));
+      motionSetting = d.settings.reducedMotion;
+      applyMotion();
+    });
     unsubscribe = () => void off();
   });
   game.registry.set(
@@ -133,17 +161,17 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   let dprQuery: MediaQueryList | null = null;
   let watchedRatio = 0;
   const watchDpr = () => {
-    dprQuery?.removeEventListener("change", onResize);
+    unlisten(dprQuery, onResize);
     watchedRatio = window.devicePixelRatio;
     dprQuery = window.matchMedia?.(`(resolution: ${watchedRatio}dppx)`) ?? null;
-    dprQuery?.addEventListener("change", onResize);
+    listen(dprQuery, onResize);
   };
   watchDpr();
   // Dev-only handle for debugging and browser-driven checks.
   if (import.meta.env?.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
   game.events.once(Phaser.Core.Events.DESTROY, () => {
     window.removeEventListener("resize", onResize);
-    dprQuery?.removeEventListener("change", onResize);
+    unlisten(dprQuery, onResize);
   });
   return game;
 }

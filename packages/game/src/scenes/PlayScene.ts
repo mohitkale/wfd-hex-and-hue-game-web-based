@@ -18,6 +18,7 @@ import { Haptics } from "../haptics";
 import { IDLE_HINT_MS } from "../hint";
 import { getHinter } from "../hinter";
 import { ComboTracker, confettiColors, isComboMilestone } from "../juice";
+import { isReducedMotion } from "../a11y";
 import {
   TIPS,
   TipQueue,
@@ -52,14 +53,14 @@ import {
   type Point,
   type Speed,
 } from "../motion";
-import { hexToNumber, theme } from "../theme";
+import { hexToNumber, inkFor, theme } from "../theme";
 import { revealOrder, revealedCount } from "../reveal";
 import { drawBoardChrome } from "../view/BoardChrome";
 import { BoosterBar } from "../view/BoosterBar";
 import { Button } from "../view/Button";
 import { MosaicView } from "../view/MosaicView";
 import { WispView } from "../view/WispView";
-import { TEX, ensureTextures } from "../view/textures";
+import { TEX, ensureTextures, symbolTexture } from "../view/textures";
 import { fadeIn, go, isLeaving } from "../view/transition";
 
 export interface PlayData {
@@ -152,6 +153,8 @@ export class PlayScene extends Phaser.Scene {
   private burst: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private confetti: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private confettiDpr = 0;
+  /** Colorblind symbols on wisps, fragments and the wand picker (read from settings per run). */
+  private colorblind = false;
   private readonly combo = new ComboTracker();
   /** How long the board has sat idle and waiting for the player. */
   private idleMs = 0;
@@ -223,6 +226,7 @@ export class PlayScene extends Phaser.Scene {
     this.tutorialFinished = save ? tutorialDone(save.data) : true;
     const unsubscribeSave = save?.subscribe((d) => this.boosterBar?.update(d));
     this.haptics.enabled = save?.data.settings.haptics ?? true;
+    this.colorblind = save?.data.settings.colorblind ?? false;
     save?.update((d) => {
       d.stats.plays++;
       d.lastPlayed = { world: this.data_.world, level: this.data_.level };
@@ -321,7 +325,13 @@ export class PlayScene extends Phaser.Scene {
     for (const o of this.chrome) {
       (o as unknown as Phaser.GameObjects.Components.Depth).setDepth(DEPTH.chrome);
     }
-    this.mosaic = new MosaicView(this, this.layout, level, this.session.state.cells);
+    this.mosaic = new MosaicView(
+      this,
+      this.layout,
+      level,
+      this.session.state.cells,
+      this.colorblind,
+    );
     this.mosaic.image.setDepth(DEPTH.mosaic);
     this.createEmitters();
     // Sized for the pixel ratio: recreated on the next combo.
@@ -440,6 +450,11 @@ export class PlayScene extends Phaser.Scene {
 
   // ── Input ───────────────────────────────────────────────────────────────
 
+  /** Reduced motion (setting or OS): decorative movement is skipped, the board still moves. */
+  private get calm(): boolean {
+    return isReducedMotion(this);
+  }
+
   private tap(source: LaunchSource): void {
     if (this.session.state.status !== "playing") return;
     this.clearHint();
@@ -452,7 +467,9 @@ export class PlayScene extends Phaser.Scene {
     this.haptics.play("tap");
     getAudio(this).play("tap");
     const view = this.wisps.get(id);
-    if (view) {
+    if (this.calm) {
+      // No squish or pulse: the queued ring and the launch itself acknowledge the tap.
+    } else if (view) {
       // Squish: immediate acknowledgement, even if the launch has to wait for the entry.
       this.tweens.killTweensOf(view);
       view.setScale(0.82);
@@ -480,16 +497,18 @@ export class PlayScene extends Phaser.Scene {
     const w = source.kind === "column" ? s.columns[source.index]?.[0] : s.slots[source.index];
     const view = w ? this.wisps.get(w.id) : undefined;
     const amplitude = 6 * this.layout.dpr;
-    if (view) {
+    if (view && !this.calm) {
       view.shake(amplitude);
       return;
     }
+    // Empty zone, or reduced motion: a still outline around the zone says "nothing to launch".
     const zone =
       source.kind === "column"
         ? this.layout.columns[source.index]
         : this.layout.slots[source.index];
     if (!zone) return;
     const g = this.flashZone(zone);
+    if (this.calm) return; // the outline alone says "nothing here"
     const x0 = g.x;
     this.tweens.addCounter({
       from: 0,
@@ -684,8 +703,10 @@ export class PlayScene extends Phaser.Scene {
         }
         if (this.mosaic) {
           const at = this.mosaic.cellCenter(e.cell);
-          this.burst?.setParticleTint(hexToNumber(this.built.level.palette[e.color]!));
-          this.burst?.explode(5, at.x, at.y);
+          if (!this.calm) {
+            this.burst?.setParticleTint(hexToNumber(this.built.level.palette[e.color]!));
+            this.burst?.explode(5, at.x, at.y);
+          }
           this.showTip({ type: "collected" });
           const chain = this.combo.hit(e.wispId, this.session.state.step);
           if (isComboMilestone(chain)) this.showCombo(chain, view ?? at);
@@ -696,8 +717,10 @@ export class PlayScene extends Phaser.Scene {
         this.haptics.play("portal");
         getAudio(this).play("portal");
         const { x, y } = this.layout.portal;
-        this.burst?.setParticleTint(theme.glow);
-        this.burst?.explode(10, x, y);
+        if (!this.calm) {
+          this.burst?.setParticleTint(theme.glow);
+          this.burst?.explode(10, x, y);
+        }
         this.combo.end(e.wispId);
         this.showTip({ type: "portal" });
         this.departToPortal(e.wispId);
@@ -775,7 +798,7 @@ export class PlayScene extends Phaser.Scene {
 
   /** A fragment flies from its cell into the collecting wisp. */
   private spark(cell: number, view: WispView): void {
-    if (!this.mosaic) return;
+    if (!this.mosaic || this.calm) return;
     const from = this.mosaic.cellCenter(cell);
     const size = this.layout.cell * 0.7;
     const fx = this.add
@@ -823,7 +846,13 @@ export class PlayScene extends Phaser.Scene {
 
   private rebuildMosaic(): void {
     this.mosaic?.destroy();
-    this.mosaic = new MosaicView(this, this.layout, this.built.level, this.session.state.cells);
+    this.mosaic = new MosaicView(
+      this,
+      this.layout,
+      this.built.level,
+      this.session.state.cells,
+      this.colorblind,
+    );
     this.mosaic.image.setDepth(DEPTH.mosaic);
   }
 
@@ -886,7 +915,16 @@ export class PlayScene extends Phaser.Scene {
     for (const w of all) {
       const target = next.get(w.id);
       if (!target || this.wisps.has(w.id)) continue;
-      const view = new WispView(this, w.id, palette[w.color]!, w.charge, 1).setDepth(DEPTH.wisps);
+      const symbol = this.colorblind ? w.color : null;
+      const view = new WispView(
+        this,
+        w.id,
+        palette[w.color]!,
+        w.charge,
+        1,
+        symbol,
+        9 * dpr,
+      ).setDepth(DEPTH.wisps);
       this.wisps.set(w.id, view);
       this.snap(w.id, view, target);
       if (!snapNew && target.kind === "rest") {
@@ -923,7 +961,8 @@ export class PlayScene extends Phaser.Scene {
   private moveWisps(delta: number): void {
     const alpha = this.alpha();
     const trackR = this.trackRadius();
-    const pulse = this.queued.size > 0 ? 0.5 + 0.5 * Math.sin(this.time.now / 140) : 0;
+    const pulse =
+      this.queued.size === 0 ? 0 : this.calm ? 1 : 0.5 + 0.5 * Math.sin(this.time.now / 140);
     for (const [id, view] of this.wisps) {
       if (this.queued.has(id)) view.pulseRing(pulse);
       const target = this.targets.get(id);
@@ -1004,6 +1043,7 @@ export class PlayScene extends Phaser.Scene {
 
   /** Win: two fountains of palette-colored confetti from under the finished artwork. */
   private celebrate(): void {
+    if (this.calm) return;
     const { boardRect } = this.layout;
     const y = boardRect.y + boardRect.h;
     this.confetti?.explode(40, boardRect.x + boardRect.w * 0.25, y);
@@ -1029,17 +1069,25 @@ export class PlayScene extends Phaser.Scene {
       .setDepth(DEPTH.fx);
     const label = this.comboLabel;
     this.tweens.killTweensOf(label);
-    label.setText(`Combo ×${length}`).setPosition(x, y).setAlpha(1).setScale(0.6).setVisible(true);
-    this.tweens.add({ targets: label, scale: 1, duration: 200, ease: "Back.easeOut" });
+    const calm = this.calm;
+    label
+      .setText(`Combo ×${length}`)
+      .setPosition(x, y)
+      .setAlpha(1)
+      .setScale(calm ? 1 : 0.6)
+      .setVisible(true);
+    if (!calm) this.tweens.add({ targets: label, scale: 1, duration: 200, ease: "Back.easeOut" });
     this.tweens.add({
       targets: label,
-      y: y - cell * 1.5,
+      // Reduced motion: the label just fades where it appeared.
+      y: calm ? y : y - cell * 1.5,
       alpha: 0,
       delay: 450,
       duration: 500,
       ease: "Quad.easeIn",
       onComplete: () => label.setVisible(false),
     });
+    if (calm) return;
     this.burst?.setParticleTint(theme.glow);
     this.burst?.explode(12, at.x, at.y);
   }
@@ -1088,16 +1136,18 @@ export class PlayScene extends Phaser.Scene {
       .setTint(theme.glow)
       .setDisplaySize(size, size)
       .setDepth(DEPTH.hint)
-      .setAlpha(0.25);
-    this.tweens.add({
-      targets: glow,
-      alpha: 0.9,
-      scale: glow.scale * 1.25,
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
+      .setAlpha(this.calm ? 0.8 : 0.25);
+    // Reduced motion: a steady glow instead of a pulse.
+    if (!this.calm)
+      this.tweens.add({
+        targets: glow,
+        alpha: 0.9,
+        scale: glow.scale * 1.25,
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
     this.hintView = glow;
     this.showTip({ type: "hint" });
   }
@@ -1334,7 +1384,17 @@ export class PlayScene extends Phaser.Scene {
           this.useBooster("wand", c);
         }),
     );
-    this.wandPicker = [blocker, label, ...chips];
+    // Colorblind: each chip shows its color's symbol (not interactive: taps reach the chip).
+    const marks = this.colorblind
+      ? colors.map((c, i) =>
+          this.add
+            .image(startX + i * (2 * r + gap), y, symbolTexture(this, c))
+            .setDisplaySize(r * 1.1, r * 1.1)
+            .setTint(hexToNumber(inkFor(this.built.level.palette[c]!)))
+            .setDepth(DEPTH.overlay),
+        )
+      : [];
+    this.wandPicker = [blocker, label, ...chips, ...marks];
   }
 
   private closeWandPicker(): void {
@@ -1408,7 +1468,8 @@ export class PlayScene extends Phaser.Scene {
     }
     if (r.elapsed >= REVEAL_MS) {
       this.reveal = null;
-      this.cameras.main.flash(260, 246, 217, 122);
+      // No full-screen flash under reduced motion (flashes are a photosensitivity concern too).
+      if (!this.calm) this.cameras.main.flash(260, 246, 217, 122);
       this.celebrate();
       this.showCard("win");
     }
@@ -1424,6 +1485,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private sparkle(at: { x: number; y: number }): void {
+    if (this.calm) return;
     const size = this.layout.cell * 0.9;
     const s = this.add
       .image(at.x, at.y, TEX.glow)
@@ -1634,7 +1696,10 @@ export class PlayScene extends Phaser.Scene {
         ? boardRect.y + boardRect.h + (below - height) / 2
         : frame.y + frame.h - height - px(12);
     card.y = top;
-    if (animate) {
+    if (animate && this.calm) {
+      card.setAlpha(0);
+      this.tweens.add({ targets: card, alpha: 1, duration: 200 });
+    } else if (animate) {
       card.y = top + px(40);
       card.setAlpha(0);
       this.tweens.add({ targets: card, y: top, alpha: 1, duration: 320, ease: "Back.easeOut" });

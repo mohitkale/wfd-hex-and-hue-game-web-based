@@ -10,6 +10,8 @@ import {
   nextLevel,
   worldProgress,
 } from "../progress";
+import { isReducedMotion } from "../a11y";
+import { illumination, isLit, moonPhase, phaseName } from "../moon";
 import { INSTALL_AFTER_WINS, canInstall, onInstallChange, promptInstall } from "../pwa";
 import { getSave } from "../save";
 import type { SaveData } from "../save/schema";
@@ -180,7 +182,7 @@ export class WorldMapScene extends Phaser.Scene {
     const save = this.save();
     const next = nextLevel(worlds, save);
     const barH = insets.top + px(56);
-    let y = barH + px(16);
+    let y = this.drawSky(barH, cx, frameW, px);
     this.focusY = null;
 
     worlds.forEach((world, w) => {
@@ -296,53 +298,26 @@ export class WorldMapScene extends Phaser.Scene {
           .setOrigin(0.5, 1),
       );
     }
-    // Sound toggle (all audio) on the left; volumes live in Settings (M6.5).
-    const soundOn = () => {
-      const st = getSave(this)?.data.settings;
-      return st ? st.sound || st.music : true;
-    };
+    // Settings (sound, volumes, accessibility) on the left.
     const touch = px(48);
-    const soundZone = this.add
+    let settingsPressed = false;
+    const settingsZone = this.add
       .zone(left + px(4), insets.top + (px(56) - touch) / 2, touch, touch)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(11)
-      .setInteractive({ useHandCursor: true });
-    const iconX = left + px(4) + touch / 2;
-    const iconY = insets.top + px(28);
-    const title = this.add
-      .text(iconX, iconY, "♪", {
-        fontFamily: theme.font,
-        fontStyle: "bold",
-        fontSize: `${px(22)}px`,
-        color: theme.text,
-      })
-      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => (settingsPressed = true))
+      .on("pointerout", () => (settingsPressed = false))
+      .on("pointerup", () => {
+        if (!settingsPressed) return;
+        getAudio(this).play("ui");
+        go(this, "settings");
+      });
+    const gear = this.add
+      .image(left + px(4) + touch / 2, insets.top + px(28), this.gearTexture(px(24)))
       .setScrollFactor(0)
       .setDepth(11);
-    // Muted: a drawn slash (font-independent) and a dimmer note.
-    const slash = this.add.graphics().setScrollFactor(0).setDepth(12);
-    slash.lineStyle(Math.max(2, 2 * dpr), 0xff8fa3, 1);
-    slash.lineBetween(iconX - px(11), iconY + px(11), iconX + px(11), iconY - px(11));
-    const showSound = (on: boolean) => {
-      title.setColor(on ? theme.text : theme.textDim);
-      slash.setVisible(!on);
-    };
-    showSound(soundOn());
-    let soundPressed = false;
-    soundZone
-      .on("pointerdown", () => (soundPressed = true))
-      .on("pointerout", () => (soundPressed = false))
-      .on("pointerup", () => {
-        if (!soundPressed) return;
-        const next = !soundOn();
-        getSave(this)?.update((d) => {
-          d.settings.sound = next;
-          d.settings.music = next;
-        });
-        showSound(next);
-        if (next) getAudio(this).play("ui");
-      });
     const stars = this.add
       .text(left + frameW - px(20), insets.top + px(28), `★ ${total}`, {
         fontFamily: theme.font,
@@ -372,7 +347,7 @@ export class WorldMapScene extends Phaser.Scene {
       .on("pointerdown", () => (bookPressed = true))
       .on("pointerout", () => (bookPressed = false))
       .on("pointerup", () => bookPressed && go(this, "spellbook"));
-    this.objects.push(bar, soundZone, title, slash, stars, book);
+    this.objects.push(bar, settingsZone, gear, stars, book);
 
     if (offerInstall) this.drawInstallOffer(cx, height - insets.bottom - px(16), px);
   }
@@ -429,14 +404,15 @@ export class WorldMapScene extends Phaser.Scene {
         .setTint(theme.glow)
         .setDisplaySize(r * 4, r * 4)
         .setAlpha(0.7);
-      this.tweens.add({
-        targets: halo,
-        scale: halo.scale * 1.25,
-        alpha: 0.35,
-        duration: 900,
-        yoyo: true,
-        repeat: -1,
-      });
+      if (!isReducedMotion(this))
+        this.tweens.add({
+          targets: halo,
+          scale: halo.scale * 1.25,
+          alpha: 0.35,
+          duration: 900,
+          yoyo: true,
+          repeat: -1,
+        });
       out.push(halo);
     }
     const fill = isNext ? theme.glow : stars > 0 ? 0x4a2f7a : unlocked ? theme.dusk : 0x1a1236;
@@ -494,12 +470,13 @@ export class WorldMapScene extends Phaser.Scene {
       if (!unlocked) {
         this.haptics.play("invalid");
         getAudio(this).play("invalid");
-        this.tweens.add({
-          targets: [disc, label],
-          x: { from: x - 5 * dpr, to: x },
-          duration: 260,
-          ease: "Bounce.easeOut",
-        });
+        if (!isReducedMotion(this))
+          this.tweens.add({
+            targets: [disc, label],
+            x: { from: x - 5 * dpr, to: x },
+            duration: 260,
+            ease: "Bounce.easeOut",
+          });
         const gate = gatingLevel(worlds, data);
         const gateName = gate ? worlds[gate.world]!.levels[gate.level]!.level.name : "";
         this.showToast(`Finish “${gateName}” to open this one`);
@@ -507,12 +484,13 @@ export class WorldMapScene extends Phaser.Scene {
       }
       this.haptics.play("tap");
       getAudio(this).play("tap");
-      this.tweens.add({
-        targets: [disc, label],
-        scale: 0.9,
-        duration: 70,
-        yoyo: true,
-      });
+      if (!isReducedMotion(this))
+        this.tweens.add({
+          targets: [disc, label],
+          scale: 0.9,
+          duration: 70,
+          yoyo: true,
+        });
       go(this, "play", data);
     });
     return out;
@@ -538,6 +516,105 @@ export class WorldMapScene extends Phaser.Scene {
       g.destroy();
     }
     return this.add.image(x, y, key);
+  }
+
+  /** A settings gear (drawn, so it never turns into a color emoji). */
+  private gearTexture(size: number): string {
+    const key = `gear-${size}`;
+    if (!this.textures.exists(key)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      const c = size / 2;
+      g.fillStyle(0xf5efff, 1);
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4;
+        const w = size * 0.16;
+        const pts = [
+          [-w / 2, -size * 0.5],
+          [w / 2, -size * 0.5],
+          [w / 2, 0],
+          [-w / 2, 0],
+        ].map(
+          ([x, y]) =>
+            new Phaser.Math.Vector2(
+              c + x! * Math.cos(a) - y! * Math.sin(a),
+              c + x! * Math.sin(a) + y! * Math.cos(a),
+            ),
+        );
+        g.fillPoints(pts, true);
+      }
+      g.fillCircle(c, c, size * 0.36);
+      g.fillStyle(theme.night, 1);
+      g.fillCircle(c, c, size * 0.15);
+      g.generateTexture(key, size, size);
+      g.destroy();
+    }
+    return key;
+  }
+
+  /**
+   * The sky above the map: tonight's real moon phase, drawn pixel by pixel, over stars that stay
+   * put for the day. Returns the y below it.
+   */
+  private drawSky(top: number, cx: number, frameW: number, px: (v: number) => number): number {
+    const now = new Date();
+    const phase = moonPhase(now);
+    const size = px(64);
+    const key = `moon-${Math.round(phase * 100)}-${size}`;
+    if (!this.textures.exists(key)) {
+      const tex = this.textures.createCanvas(key, size, size)!;
+      const ctx = tex.getContext();
+      const img = ctx.createImageData(size, size);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const nx = ((x + 0.5) / size) * 2 - 1;
+          const ny = ((y + 0.5) / size) * 2 - 1;
+          if (nx * nx + ny * ny > 1) continue;
+          const lit = isLit(nx, ny, phase);
+          // Lit: warm moonlight with a soft limb; dark side: faint earthshine.
+          const shade = 1 - 0.18 * (nx * nx + ny * ny);
+          const i = (y * size + x) * 4;
+          img.data[i] = lit ? 246 * shade : 52;
+          img.data[i + 1] = lit ? 233 * shade : 42;
+          img.data[i + 2] = lit ? 190 * shade : 96;
+          img.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      tex.refresh();
+    }
+    const h = px(132);
+    // Stars: the same pattern all day (seeded by the date), different tomorrow.
+    // Keyed by the local date, so the sky changes at the player's midnight.
+    let seed =
+      Math.imul(now.getFullYear() * 400 + now.getMonth() * 32 + now.getDate(), 2654435761) >>> 0;
+    const rand = () => {
+      seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+      return seed / 2 ** 32;
+    };
+    const dots = this.add.blitter(0, 0, this.dotTexture(px(1.5)));
+    for (let i = 0; i < 28; i++) {
+      dots
+        .create(cx - frameW / 2 + rand() * frameW, top + rand() * h)
+        .setAlpha(0.25 + rand() * 0.6)
+        .setTint(rand() < 0.2 ? theme.glow : 0xffffff);
+    }
+    const moonY = top + px(48);
+    const glow = this.add
+      .image(cx, moonY, TEX.glow)
+      .setTint(0xf6e9be)
+      .setDisplaySize(size * 2.6, size * 2.6)
+      .setAlpha(0.15 + 0.35 * illumination(phase));
+    const moon = this.add.image(cx, moonY, key);
+    const caption = this.add
+      .text(
+        cx,
+        top + px(100),
+        `Tonight · ${phaseName(phase)} · ${Math.round(illumination(phase) * 100)}% lit`,
+        { fontFamily: theme.font, fontSize: `${px(13)}px`, color: theme.textDim },
+      )
+      .setOrigin(0.5);
+    this.objects.push(dots, glow, moon, caption);
+    return top + h;
   }
 
   /** A filled white dot texture of radius `r`, tinted per Blitter bob. */

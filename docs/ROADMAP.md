@@ -53,7 +53,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 - [x] **M6.2** Juice: particles, screen transitions, combo sparkle, win celebration, idle hints.
 - [x] **M6.3** Onboarding: interactive first-level tutorial, contextual tips for slots/boosters.
 - [x] **M6.4** PWA: manifest, icons, offline caching, install prompt, update toast; performance budget check.
-- [ ] **M6.5** Accessibility & settings: colorblind symbols, reduced motion, haptics toggle, real-world moon-phase sky on the map.
+- [x] **M6.5** Accessibility & settings: colorblind symbols, reduced motion, haptics toggle, real-world moon-phase sky on the map.
 
 ## M7 — Website, analytics & launch
 

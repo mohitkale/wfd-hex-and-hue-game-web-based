@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { EMPTY, type Level } from "@hexhue/core";
+import { paintSymbol } from "../a11y";
 import type { Layout } from "../layout";
+import { inkFor } from "../theme";
 
 let nextKey = 0;
 
@@ -28,6 +30,8 @@ export class MosaicView {
     private readonly layout: Layout,
     private readonly level: Level,
     cells: readonly number[],
+    /** Colorblind mode: each fragment shows its color's symbol. */
+    private readonly symbols = false,
   ) {
     const { cell } = layout;
     this.texture = scene.textures.createCanvas(this.key, level.width * cell, level.height * cell)!;
@@ -43,9 +47,9 @@ export class MosaicView {
     this.dirty = true;
   }
 
-  /** Paints a cell (used by the win reveal). Takes effect on `flush`. */
+  /** Paints a cell of the finished artwork (the win reveal: no symbols). Takes effect on `flush`. */
   paintCell(index: number, color: number): void {
-    this.paint(index, color);
+    this.paint(index, color, false);
     this.dirty = true;
   }
 
@@ -69,7 +73,7 @@ export class MosaicView {
     this.scene.textures.remove(this.key);
   }
 
-  private paint(index: number, color: number): void {
+  private paint(index: number, color: number, symbols = this.symbols): void {
     const { cell } = this.layout;
     const ctx = this.ctx;
     const x = (index % this.level.width) * cell;
@@ -99,6 +103,12 @@ export class MosaicView {
         size - radius,
         Math.max(1, size * 0.14),
       );
+    }
+    // Symbols only where they stay legible (tiles of at least 9 CSS px).
+    if (symbols && cell >= 9 * this.layout.dpr) {
+      // Whichever ink contrasts more with the tile (see theme.inkFor).
+      ctx.fillStyle = inkFor(this.level.palette[color]!);
+      paintSymbol(ctx, color, x + cell / 2, y + cell / 2, cell * 0.52);
     }
   }
 }

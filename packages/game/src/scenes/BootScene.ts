@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { isReducedMotion } from "../a11y";
 import { whenSaveReady } from "../save";
 import { theme } from "../theme";
 import { ensureTextures, TEX } from "../view/textures";
@@ -54,8 +55,10 @@ export class BootScene extends Phaser.Scene {
         color: theme.text,
       })
       .setOrigin(0.5);
-    this.tweens.add({ targets: halo, alpha: 0.4, duration: 1400, yoyo: true, repeat: -1 });
-    this.tweens.add({ targets: hint, alpha: 0.35, duration: 900, yoyo: true, repeat: -1 });
+    if (!isReducedMotion(this)) {
+      this.tweens.add({ targets: halo, alpha: 0.4, duration: 1400, yoyo: true, repeat: -1 });
+      this.tweens.add({ targets: hint, alpha: 0.35, duration: 900, yoyo: true, repeat: -1 });
+    }
     this.objects = [halo, wisp, title, tagline, hint];
   }
 }

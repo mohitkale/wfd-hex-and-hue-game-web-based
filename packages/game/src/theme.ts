@@ -22,3 +22,17 @@ export function luminance(hex: string): number {
   }) as [number, number, number];
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
+
+/** WCAG contrast ratio between two relative luminances. */
+export function contrast(a: number, b: number): number {
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+/** Dark ink for symbols and numbers drawn on colored shapes. */
+export const DARK_INK = "#1a0f33";
+
+/** The ink (dark or white) with the higher contrast on `hex`. */
+export function inkFor(hex: string): "#1a0f33" | "#ffffff" {
+  const l = luminance(hex);
+  return contrast(l, luminance(DARK_INK)) >= contrast(l, 1) ? DARK_INK : "#ffffff";
+}
