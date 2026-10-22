@@ -183,16 +183,27 @@ export class WorldMapScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(11)
       .setInteractive({ useHandCursor: true });
+    const iconX = left + px(4) + touch / 2;
+    const iconY = insets.top + px(28);
     const title = this.add
-      .text(left + px(4) + touch / 2, insets.top + px(28), soundOn() ? "♪" : "♪̸", {
+      .text(iconX, iconY, "♪", {
         fontFamily: theme.font,
         fontStyle: "bold",
         fontSize: `${px(22)}px`,
-        color: soundOn() ? theme.text : theme.textDim,
+        color: theme.text,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(11);
+    // Muted: a drawn slash (font-independent) and a dimmer note.
+    const slash = this.add.graphics().setScrollFactor(0).setDepth(12);
+    slash.lineStyle(Math.max(2, 2 * dpr), 0xff8fa3, 1);
+    slash.lineBetween(iconX - px(11), iconY + px(11), iconX + px(11), iconY - px(11));
+    const showSound = (on: boolean) => {
+      title.setColor(on ? theme.text : theme.textDim);
+      slash.setVisible(!on);
+    };
+    showSound(soundOn());
     let soundPressed = false;
     soundZone
       .on("pointerdown", () => (soundPressed = true))
@@ -204,7 +215,7 @@ export class WorldMapScene extends Phaser.Scene {
           d.settings.sound = next;
           d.settings.music = next;
         });
-        title.setText(next ? "♪" : "♪̸").setColor(next ? theme.text : theme.textDim);
+        showSound(next);
         if (next) getAudio(this).play("ui");
       });
     const stars = this.add
@@ -236,7 +247,7 @@ export class WorldMapScene extends Phaser.Scene {
       .on("pointerdown", () => (bookPressed = true))
       .on("pointerout", () => (bookPressed = false))
       .on("pointerup", () => bookPressed && this.scene.start("spellbook"));
-    this.objects.push(bar, soundZone, title, stars, book);
+    this.objects.push(bar, soundZone, title, slash, stars, book);
   }
 
   private node(

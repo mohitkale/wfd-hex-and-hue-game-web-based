@@ -50,6 +50,8 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     height: h,
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr },
     input: { activePointers: 2 },
+    // All sound comes from our own Web Audio engine; Phaser's would be a second, unused context.
+    audio: { noAudio: true },
     disableContextMenu: true,
     scene: [BootScene, WorldMapScene, SpellbookScene, PlayScene],
   });
@@ -58,19 +60,24 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   // Audio stays silent until the first tap or key (browser rule), then follows the saved settings.
   const audio = new AudioEngine(audioSettings(defaultSave().settings));
   game.registry.set("audio", audio);
+  // Several gesture types, because browsers differ on which ones may start audio (iOS prefers
+  // touchend / pointerup).
   const unlock = () => audio.unlock();
-  window.addEventListener("pointerdown", unlock, { capture: true });
-  window.addEventListener("keydown", unlock, { capture: true });
+  const gestures = ["pointerdown", "pointerup", "touchend", "keydown"] as const;
+  for (const g of gestures) window.addEventListener(g, unlock, { capture: true });
   const onVisibility = () => audio.setHidden(document.visibilityState === "hidden");
   document.addEventListener("visibilitychange", onVisibility);
+  let unsubscribe = () => {};
   game.events.once(Phaser.Core.Events.DESTROY, () => {
-    window.removeEventListener("pointerdown", unlock, { capture: true });
-    window.removeEventListener("keydown", unlock, { capture: true });
+    for (const g of gestures) window.removeEventListener(g, unlock, { capture: true });
     document.removeEventListener("visibilitychange", onVisibility);
+    unsubscribe();
+    audio.dispose();
   });
   void loadSave(game).then((save) => {
     audio.configure(audioSettings(save.data.settings));
-    save.subscribe((d) => audio.configure(audioSettings(d.settings)));
+    const off = save.subscribe((d) => audio.configure(audioSettings(d.settings)));
+    unsubscribe = () => void off();
   });
   game.registry.set(
     "rewards",

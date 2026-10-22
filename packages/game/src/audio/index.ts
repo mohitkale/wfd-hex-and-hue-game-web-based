@@ -12,10 +12,12 @@ export const audioSettings = (s: SaveData["settings"]): AudioSettings => ({
   musicVolume: s.musicVolume,
 });
 
-/** The game's audio engine; a silent stand-in if none is registered. */
+const silent = new AudioEngine(
+  { sound: false, music: false, sfxVolume: 0, musicVolume: 0 },
+  () => null,
+);
+
+/** The game's audio engine; a shared silent stand-in if none is registered. */
 export function getAudio(scene: Phaser.Scene): AudioEngine {
-  return (
-    (scene.registry.get("audio") as AudioEngine | undefined) ??
-    new AudioEngine({ sound: false, music: false, sfxVolume: 0, musicVolume: 0 }, () => null)
-  );
+  return (scene.registry.get("audio") as AudioEngine | undefined) ?? silent;
 }
