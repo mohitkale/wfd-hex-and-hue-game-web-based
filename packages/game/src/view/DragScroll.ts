@@ -50,3 +50,15 @@ export class DragScroll {
     this.scene.cameras.main.setScroll(0, Math.max(0, Math.min(this.max, y)));
   }
 }
+
+/**
+ * The scroll position (in device pixels) a scene was restarted with after a pixel-ratio change
+ * (`{ scrollCss }`, see index.ts), or `null`. Cleared once read: Phaser keeps start data around
+ * for later starts that pass none.
+ */
+export function takeRestoredScroll(scene: Phaser.Scene, dpr: number): number | null {
+  const data = scene.sys.settings.data as { scrollCss?: unknown } | undefined;
+  const css = data?.scrollCss;
+  scene.sys.settings.data = {};
+  return typeof css === "number" && Number.isFinite(css) ? css * dpr : null;
+}

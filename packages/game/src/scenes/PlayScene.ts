@@ -151,6 +151,7 @@ export class PlayScene extends Phaser.Scene {
   /** Fragment bursts and portal rings; rebuilt with the layout (sizes follow the cell). */
   private burst: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private confetti: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private confettiDpr = 0;
   private readonly combo = new ComboTracker();
   /** How long the board has sat idle and waiting for the player. */
   private idleMs = 0;
@@ -323,6 +324,9 @@ export class PlayScene extends Phaser.Scene {
     this.mosaic = new MosaicView(this, this.layout, level, this.session.state.cells);
     this.mosaic.image.setDepth(DEPTH.mosaic);
     this.createEmitters();
+    // Sized for the pixel ratio: recreated on the next combo.
+    this.comboLabel?.destroy();
+    this.comboLabel = null;
     // Redrawn at the new spot by the next idle frame.
     this.hideHint();
     if (this.reveal) this.paintArtwork(this.reveal.shown);
@@ -978,7 +982,10 @@ export class PlayScene extends Phaser.Scene {
         maxAliveParticles: 240,
       })
       .setDepth(DEPTH.fx);
-    if (this.confetti) return;
+    // Confetti in flight survives a resize; it is rebuilt only for a new pixel ratio.
+    if (this.confetti && this.confettiDpr === dpr) return;
+    this.confetti?.destroy();
+    this.confettiDpr = dpr;
     this.confetti = this.add
       .particles(0, 0, TEX.spark, {
         emitting: false,

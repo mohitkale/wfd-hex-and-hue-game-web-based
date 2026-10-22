@@ -14,7 +14,7 @@ import { INSTALL_AFTER_WINS, canInstall, onInstallChange, promptInstall } from "
 import { getSave } from "../save";
 import type { SaveData } from "../save/schema";
 import { theme } from "../theme";
-import { DragScroll } from "../view/DragScroll";
+import { DragScroll, takeRestoredScroll } from "../view/DragScroll";
 import { ensureTextures, TEX } from "../view/textures";
 import { fadeIn, go } from "../view/transition";
 import { syncPlan } from "../view/virtual";
@@ -25,6 +25,27 @@ const TINTS = [0x2a1650, 0x123c3c, 0x1c1a4a];
 
 /** Margin-zone nodes built per frame while scrolling (viewport nodes are built at once). */
 const NODES_PER_FRAME = 3;
+
+/** "Not now" on the install offer hides it for this long (per device: install is per device). */
+const INSTALL_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
+const INSTALL_SNOOZE_KEY = "hexhue:installSnoozedAt";
+
+function installSnoozed(): boolean {
+  try {
+    const at = Number(localStorage.getItem(INSTALL_SNOOZE_KEY));
+    return Number.isFinite(at) && Date.now() - at < INSTALL_SNOOZE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function snoozeInstall(): void {
+  try {
+    localStorage.setItem(INSTALL_SNOOZE_KEY, String(Date.now()));
+  } catch {
+    // Storage blocked: the offer just comes back next visit.
+  }
+}
 
 interface NodeState {
   unlocked: boolean;
@@ -56,6 +77,10 @@ export class WorldMapScene extends Phaser.Scene {
   /** Level nodes are built lazily near the viewport (see view/virtual.ts). */
   private nodeSpecs: NodeSpec[] = [];
   private nodeObjects = new Map<number, Phaser.GameObjects.GameObject[]>();
+  /** `nodeSpecs` y positions (cached for the per-frame sync). */
+  private nodeYs: number[] = [];
+  /** The viewport the last sync settled for; nothing to do while it is unchanged. */
+  private syncedView = "";
   private readonly haptics = new Haptics();
   private scroller!: DragScroll;
   private focusY: number | null = null;
@@ -69,6 +94,8 @@ export class WorldMapScene extends Phaser.Scene {
     this.objects = [];
     this.nodeSpecs = [];
     this.nodeObjects = new Map();
+    this.nodeYs = [];
+    this.syncedView = "";
     this.toast = null;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
@@ -81,9 +108,13 @@ export class WorldMapScene extends Phaser.Scene {
       offInstall();
     });
     this.layout();
-    // Open on the level to play next.
+    // Open on the level to play next (or where the map was, after a pixel-ratio change).
     const { height } = this.scale.gameSize;
-    this.scroller.scrollTo(this.focusY !== null ? this.focusY - height * 0.45 : 0);
+    const restored = takeRestoredScroll(
+      this,
+      (this.registry.get("dpr") as number | undefined) ?? 1,
+    );
+    this.scroller.scrollTo(restored ?? (this.focusY !== null ? this.focusY - height * 0.45 : 0));
     fadeIn(this);
   }
 
@@ -95,8 +126,10 @@ export class WorldMapScene extends Phaser.Scene {
   private syncNodes(): void {
     const camera = this.cameras.main;
     const { height } = this.scale.gameSize;
+    const view = `${camera.scrollY}:${height}`;
+    if (view === this.syncedView) return;
     const plan = syncPlan(
-      this.nodeSpecs.map((n) => n.y),
+      this.nodeYs,
       new Set(this.nodeObjects.keys()),
       camera.scrollY,
       height,
@@ -114,6 +147,8 @@ export class WorldMapScene extends Phaser.Scene {
       const n = this.nodeSpecs[i]!;
       this.nodeObjects.set(i, this.node(n.x, n.y, n.r, n.number, n.name, n.data, n.state));
     }
+    // Settled once the margin is fully built (the budget left nothing for later frames).
+    if (plan.create.length < NODES_PER_FRAME) this.syncedView = view;
   }
 
   private save(): Pick<SaveData, "levels" | "skipped"> {
@@ -128,6 +163,10 @@ export class WorldMapScene extends Phaser.Scene {
     for (const list of this.nodeObjects.values()) for (const o of list) o.destroy();
     this.nodeObjects.clear();
     this.nodeSpecs = [];
+    this.syncedView = "";
+    // killAll above stopped the toast's fade: drop it rather than leave it stuck on screen.
+    this.toast?.destroy();
+    this.toast = null;
     const { width, height } = this.scale.gameSize;
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     const insets = (this.registry.get("insets") as { top: number; bottom: number } | undefined) ?? {
@@ -226,7 +265,14 @@ export class WorldMapScene extends Phaser.Scene {
       y += sectionH + px(16);
     });
 
-    this.scroller.setMax(y + insets.bottom + px(24) - height);
+    // Install offer (where the browser supports it), once the player has won a couple of levels.
+    const offerInstall =
+      canInstall() &&
+      !installSnoozed() &&
+      (getSave(this)?.data.stats.wins ?? 0) >= INSTALL_AFTER_WINS;
+    this.nodeYs = this.nodeSpecs.map((n) => n.y);
+    // Room at the end so the pinned install offer never covers the last line of the map.
+    this.scroller.setMax(y + insets.bottom + px(offerInstall ? 96 : 24) - height);
 
     // Sticky top bar with the title and total stars.
     // Interactive so taps on the bar never reach a node scrolled underneath it.
@@ -328,31 +374,42 @@ export class WorldMapScene extends Phaser.Scene {
       .on("pointerup", () => bookPressed && go(this, "spellbook"));
     this.objects.push(bar, soundZone, title, slash, stars, book);
 
-    // Install offer (where the browser supports it), once the player has won a couple of levels.
-    if (canInstall() && (getSave(this)?.data.stats.wins ?? 0) >= INSTALL_AFTER_WINS) {
-      let installPressed = false;
-      const install = this.add
-        .text(cx, height - insets.bottom - px(24), "⤓ Install Hex & Hue: play offline", {
+    if (offerInstall) this.drawInstallOffer(cx, height - insets.bottom - px(16), px);
+  }
+
+  /** "⤓ Install … · Not now", pinned above the bottom edge. */
+  private drawInstallOffer(cx: number, bottom: number, px: (v: number) => number): void {
+    const button = (label: string, primary: boolean, onPress: () => void) => {
+      let pressed = false;
+      return this.add
+        .text(0, bottom, label, {
           fontFamily: theme.font,
-          fontStyle: "bold",
+          fontStyle: primary ? "bold" : "normal",
           fontSize: `${px(14)}px`,
-          color: "#1a0f33",
-          backgroundColor: "#f6d97a",
-          padding: { x: px(16), y: px(12) },
+          color: primary ? "#1a0f33" : theme.text,
+          backgroundColor: primary ? "#f6d97a" : "#2a1650",
+          padding: { x: px(16), y: px(15) },
         })
-        .setOrigin(0.5, 1)
+        .setOrigin(0, 1)
         .setScrollFactor(0)
         .setDepth(11)
         .setInteractive({ useHandCursor: true })
-        .on("pointerdown", () => (installPressed = true))
-        .on("pointerout", () => (installPressed = false))
+        .on("pointerdown", () => (pressed = true))
+        .on("pointerout", () => (pressed = false))
         .on("pointerup", () => {
-          if (!installPressed || this.scroller.dragging) return;
-          install.destroy();
-          void promptInstall();
+          if (!pressed || this.scroller.dragging) return;
+          for (const o of offer) o.destroy();
+          onPress();
         });
-      this.objects.push(install);
-    }
+    };
+    const install = button("⤓ Install Hex & Hue", true, () => void promptInstall());
+    const later = button("Not now", false, snoozeInstall);
+    const gap = px(8);
+    const total = install.width + gap + later.width;
+    install.setX(cx - total / 2);
+    later.setX(cx - total / 2 + install.width + gap);
+    const offer = [install, later];
+    this.objects.push(...offer);
   }
 
   private node(

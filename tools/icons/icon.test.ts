@@ -21,14 +21,16 @@ describe("app icon", () => {
     expect(tileColor(10, 6)).not.toEqual([0xf6, 0xd9, 0x7a]);
   });
 
-  it("maskable icons keep the art inside the central 80% safe zone", () => {
+  it("maskable icons keep the art inside the safe zone (a centered circle, radius 40%)", () => {
     const size = 512;
     const data = renderIcon(size, true);
-    const margin = Math.ceil(size * 0.1);
-    for (let y = 0; y < size; y += 3) {
-      for (let x = 0; x < size; x += 3) {
-        if (x >= margin && x < size - margin && y >= margin && y < size - margin) continue;
-        expect(pixel(data, size, x, y)).toEqual([0x14, 0x0b, 0x2e, 255]);
+    const c = size / 2;
+    for (let y = 0; y < size; y += 2) {
+      for (let x = 0; x < size; x += 2) {
+        if (Math.hypot(x + 0.5 - c, y + 0.5 - c) <= size * 0.4) continue;
+        const [r, g, b] = pixel(data, size, x, y);
+        // Outside the circle: only the night sky or the dim background tiles, never moon or stars.
+        expect(r! < 0x40 && g! < 0x40 && b! < 0x60, `(${x}, ${y})`).toBe(true);
       }
     }
   });

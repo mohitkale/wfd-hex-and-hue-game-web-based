@@ -4,10 +4,13 @@ interface Props {
   description?: string;
   /** Pinch-zoom stays on for content pages; only the game disables it. */
   zoomable?: boolean;
+  /** Registers the offline service worker (the game page only; see pwa/client.ts). */
+  offline?: boolean;
 }
 const {
   title,
   zoomable = true,
+  offline = false,
   description = "A free magical color-sorting pixel puzzle. A Little Magic in Every Color.",
 } = Astro.props;
 ---
@@ -30,7 +33,7 @@ const {
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>{title}</title>
   </head>
-  <body>
+  <body data-offline={offline ? "" : undefined}>
     <slot />
     <script>
       import { setupPwa } from "../pwa/client";
@@ -57,7 +60,7 @@ const {
   .hh-toast {
     position: fixed;
     z-index: 100;
-    top: max(12px, env(safe-area-inset-top));
+    top: calc(env(safe-area-inset-top) + 12px);
     left: 50%;
     transform: translateX(-50%);
     display: flex;

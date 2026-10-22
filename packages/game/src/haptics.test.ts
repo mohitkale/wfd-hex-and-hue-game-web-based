@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { COLLECT_THROTTLE_MS, Haptics, PATTERNS } from "./haptics";
 
 function setup() {
@@ -35,5 +35,28 @@ describe("Haptics", () => {
     h.play("tap");
     expect(calls).toEqual([]);
     expect(() => new Haptics(null).play("tap")).not.toThrow();
+  });
+
+  describe("browser vibration", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("waits for the first user gesture (Chrome rejects and logs earlier calls)", () => {
+      const vibrate = vi.fn();
+      const activation = { hasBeenActive: false };
+      vi.stubGlobal("navigator", { vibrate, userActivation: activation });
+      const h = new Haptics();
+      h.play("tap");
+      expect(vibrate).not.toHaveBeenCalled();
+      activation.hasBeenActive = true;
+      h.play("tap");
+      expect(vibrate).toHaveBeenCalledWith([...PATTERNS.tap]);
+    });
+
+    it("vibrates where user activation isn't reported", () => {
+      const vibrate = vi.fn();
+      vi.stubGlobal("navigator", { vibrate });
+      new Haptics().play("win");
+      expect(vibrate).toHaveBeenCalledOnce();
+    });
   });
 });

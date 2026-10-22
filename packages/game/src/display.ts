@@ -14,3 +14,25 @@ export function renderDpr(deviceDpr: number, cssWidth: number, cssHeight: number
   // Rounded so tiny window-size changes don't flip the ratio back and forth.
   return Math.max(1, Math.min(device, Math.floor(capped * 4) / 4));
 }
+
+/**
+ * The ratio to switch to after a resize, with hysteresis: near the pixel budget (±15%) the
+ * current ratio stays, so dragging a window edge across a quarter-step boundary doesn't flip the
+ * ratio (and rebuild the menus) back and forth. A device ratio that dropped below the current one
+ * (window moved to a lower-density screen) always applies.
+ */
+export function nextRenderDpr(
+  current: number,
+  deviceDpr: number,
+  cssWidth: number,
+  cssHeight: number,
+): number {
+  const target = renderDpr(deviceDpr, cssWidth, cssHeight);
+  if (target === current) return current;
+  const device = Math.min(Math.max(deviceDpr || 1, 1), 3);
+  if (current > device) return target;
+  const pixels = (dpr: number) => cssWidth * dpr * cssHeight * dpr;
+  if (target < current && pixels(current) <= MAX_CANVAS_PIXELS * 1.15) return current;
+  if (target > current && pixels(target) > MAX_CANVAS_PIXELS * 0.85) return current;
+  return target;
+}

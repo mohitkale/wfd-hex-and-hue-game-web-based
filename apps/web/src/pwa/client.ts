@@ -1,7 +1,10 @@
+import { watchUpdates } from "./updates";
+
 /**
- * Page side of the PWA: registers the service worker (production builds only), offers a refresh
- * when a new version is ready, and keeps the browser's install prompt for the game to show at a
- * good moment (window.__hexhueInstall, read by packages/game/src/pwa.ts).
+ * Page side of the PWA: registers the service worker (production builds, on pages that opt in
+ * with `<body data-offline>`: the game), offers a refresh when a new version is ready, and keeps
+ * the browser's install prompt for the game to show at a good moment (window.__hexhueInstall,
+ * read by packages/game/src/pwa.ts).
  */
 
 interface InstallPrompt extends Event {
@@ -20,7 +23,17 @@ const UPDATE_CHECK_MS = 30 * 60 * 1000;
 
 export function setupPwa(): void {
   captureInstallPrompt();
-  if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
+  if (!("serviceWorker" in navigator)) return;
+  if (!import.meta.env.PROD) {
+    // A worker left over from `astro preview` (same localhost origin) would serve stale builds
+    // to the dev server: remove it.
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((all) => all.forEach((r) => void r.unregister()));
+    return;
+  }
+  // Only the game registers the worker, so landing / blog visitors don't download the game.
+  if (!("offline" in document.body.dataset)) return;
   window.addEventListener("load", () => void register());
 }
 
@@ -44,23 +57,11 @@ async function register(): Promise<void> {
   } catch {
     return; // Offline play is a bonus: the game works without a service worker.
   }
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // Only reload when the player asked for the new version (not on the very first install).
-    if (refreshing) window.location.reload();
-  });
-  const offer = (worker: ServiceWorker) =>
-    showUpdateToast(() => {
-      refreshing = true;
-      worker.postMessage("skipWaiting");
-    });
-  // An update is only "new" if a previous version controls this page.
-  if (registration.waiting && navigator.serviceWorker.controller) offer(registration.waiting);
-  registration.addEventListener("updatefound", () => {
-    const worker = registration.installing;
-    worker?.addEventListener("statechange", () => {
-      if (worker.state === "installed" && navigator.serviceWorker.controller) offer(worker);
-    });
+  watchUpdates({
+    registration,
+    container: navigator.serviceWorker,
+    showToast: showUpdateToast,
+    reload: () => window.location.reload(),
   });
   const check = () => void registration.update().catch(() => {});
   document.addEventListener("visibilitychange", () => {
