@@ -1,27 +1,26 @@
 /**
  * Machine-readable difficulty bands for v2 levels (docs/DIFFICULTY_V2.md). M12.3 fills `LevelMetrics`
- * by running the eight simulated players and the solver; M12.6 fails CI on any `checkLevel` or
- * `checkWorld` failure. Numbers are provisional (calibrated in M12.4) and must stay in step with the
- * doc: the tests in difficulty.test.ts pin the ones the doc states in prose.
+ * by running the simulated players and the solver; M12.6 fails CI on any `checkLevel` or
+ * `checkWorld` failure. Numbers are provisional (calibrated in M12.4). `difficulty.test.ts` parses
+ * the doc's tier table and fails if it differs from `BANDS`.
  */
 
-export const STRATEGY_IDS = [
-  "first-front", // S1
+export const DETERMINISTIC_IDS = [
+  "first-front", // S1a column-spam, left to right
+  "last-front", // S1b column-spam, right to left
+  "round-robin", // S1c one from each column in turn
   "tidy-left", // S2
   "tidy-right", // S3
   "largest", // S4
   "smallest", // S5
-  "random", // S6 (a rate, not a win/loss)
   "most-delivered", // S7
   "clears-capacity", // S8
 ] as const;
-export type StrategyId = (typeof STRATEGY_IDS)[number];
+export type DeterministicId = (typeof DETERMINISTIC_IDS)[number];
 
-/** The seven deterministic players; `simpleWins` counts how many of them win. */
-export type DeterministicId = Exclude<StrategyId, "random">;
-export const DETERMINISTIC_IDS: readonly DeterministicId[] = STRATEGY_IDS.filter(
-  (s): s is DeterministicId => s !== "random",
-);
+/** All players: the nine deterministic ones plus `random` (S6), which reports a win rate. */
+export const STRATEGY_IDS = [...DETERMINISTIC_IDS, "random"] as const;
+export type StrategyId = (typeof STRATEGY_IDS)[number];
 
 export type Tier = "tutorial" | "easy" | "medium" | "hard";
 export const TIERS: readonly Tier[] = ["tutorial", "easy", "medium", "hard"];
@@ -34,39 +33,42 @@ export interface Range {
 
 export interface TierBand {
   simpleWins: Range;
-  /** Deterministic players that must win. */
   mustWin: readonly DeterministicId[];
-  /** Deterministic players that must lose. */
   mustLose: readonly DeterministicId[];
   /** Pairs that must not both win. */
   notBothWin: readonly (readonly [DeterministicId, DeterministicId])[];
-  /** `random` win rate over the seeded runs. */
   randomRate: Range;
-  /** `never`: no loss may be reachable. `required`: at least one must be. */
-  reachableLoss: "never" | "allowed" | "required";
   doomedFirstShare: Range;
-  /** Distinct winning settled-sequential lines found (capped at 64). */
+  deadEndShare: Range;
+  freeStepShare: Range;
   solutions: Range;
   winningShare: Range;
-  /** `slots − minSlots`. */
   slack: Range;
-  /** 95th percentile of Undos needed to recover from a loss reached by cheap play. */
   recoveryDepth: Range;
   planningDepth: Range;
 }
 
-/** Tutorial levels 1..LOSSLESS_TUTORIAL_LEVELS may have no reachable loss at all. */
+/** Tutorial levels 1..LOSSLESS_TUTORIAL_LEVELS have no reachable loss; later ones need one. */
 export const LOSSLESS_TUTORIAL_LEVELS = 3;
+
+/** Most of a world's levels of a tier that any single deterministic player may win. */
+export const WORLD_WIN_SHARE_CAP: Readonly<Partial<Record<Tier, number>>> = {
+  medium: 0.5,
+  hard: 0.25,
+};
+
+const SPAM = ["first-front", "last-front", "round-robin"] as const;
 
 export const BANDS: Readonly<Record<Tier, TierBand>> = {
   tutorial: {
-    simpleWins: { min: 5 },
+    simpleWins: { min: 6 },
     mustWin: ["first-front"],
     mustLose: [],
     notBothWin: [],
     randomRate: { min: 0.8 },
-    reachableLoss: "allowed",
     doomedFirstShare: { max: 0 },
+    deadEndShare: { max: 0.25 },
+    freeStepShare: { min: 0.8 },
     solutions: { min: 2 },
     winningShare: {},
     slack: { min: 2 },
@@ -74,13 +76,14 @@ export const BANDS: Readonly<Record<Tier, TierBand>> = {
     planningDepth: { max: 1 },
   },
   easy: {
-    simpleWins: { min: 3, max: 6 },
+    simpleWins: { min: 3, max: 7 },
     mustWin: [],
     mustLose: [],
     notBothWin: [],
     randomRate: { min: 0.4, max: 0.9 },
-    reachableLoss: "required",
     doomedFirstShare: { max: 0.2 },
+    deadEndShare: { min: 0.02, max: 0.3 },
+    freeStepShare: { max: 0.7 },
     solutions: { min: 2 },
     winningShare: {},
     slack: { min: 1 },
@@ -90,11 +93,12 @@ export const BANDS: Readonly<Record<Tier, TierBand>> = {
   medium: {
     simpleWins: { max: 3 },
     mustWin: [],
-    mustLose: ["first-front"],
+    mustLose: [...SPAM],
     notBothWin: [["most-delivered", "clears-capacity"]],
-    randomRate: { min: 0.05, max: 0.6 },
-    reachableLoss: "required",
+    randomRate: { min: 0.05, max: 0.45 },
     doomedFirstShare: { max: 0.35 },
+    deadEndShare: { min: 0.05, max: 0.5 },
+    freeStepShare: { max: 0.5 },
     solutions: { min: 2 },
     winningShare: { max: 0.5 },
     slack: { min: 1 },
@@ -104,20 +108,24 @@ export const BANDS: Readonly<Record<Tier, TierBand>> = {
   hard: {
     simpleWins: { max: 1 },
     mustWin: [],
-    mustLose: ["first-front", "tidy-left", "tidy-right", "most-delivered", "clears-capacity"],
+    mustLose: [...SPAM, "tidy-left", "tidy-right", "most-delivered", "clears-capacity"],
     notBothWin: [],
     randomRate: { max: 0.25 },
-    reachableLoss: "required",
     doomedFirstShare: { min: 0.2, max: 0.7 },
+    deadEndShare: { min: 0.15, max: 0.7 },
+    freeStepShare: { max: 0.3 },
     solutions: { min: 1 },
     winningShare: { max: 0.25 },
     slack: { max: 1 },
-    recoveryDepth: { max: 5 },
+    recoveryDepth: { max: 4 },
     planningDepth: { min: 3, max: 5 },
   },
 };
 
-/** Tier by 1-based global level number (M12.5): 1–5 tutorial, 6–15 easy, 16–30 medium, 31+ hard. */
+/**
+ * Tier by 1-based global level number: 1–5 tutorial, 6–15 easy, 16–30 medium, 31+ hard.
+ * Provisional until the M12.5 curve is final.
+ */
 export function tierForLevel(level: number): Tier {
   if (!Number.isInteger(level) || level < 1) throw new Error(`invalid level number ${level}`);
   if (level <= 5) return "tutorial";
@@ -128,14 +136,17 @@ export function tierForLevel(level: number): Tier {
 
 /** Everything the report measures for one level (docs/DIFFICULTY_V2.md §2–§3). */
 export interface LevelMetrics {
-  /** Win/loss of each deterministic player. */
   wins: Readonly<Record<DeterministicId, boolean>>;
+  /** Fraction of the 200 seeded `random` runs that win. */
   randomRate: number;
   reachableLoss: boolean;
   doomedFirstShare: number;
+  deadEndShare: number;
+  freeStepShare: number;
   solutions: number;
   winningShare: number;
   slack: number;
+  /** 0 when no loss is reached. */
   recoveryDepth: number;
   /** `Infinity` when no depth up to 5 wins. */
   planningDepth: number;
@@ -145,13 +156,13 @@ export const simpleWins = (m: Pick<LevelMetrics, "wins">): number =>
   DETERMINISTIC_IDS.filter((id) => m.wins[id]).length;
 
 const inRange = (v: number, r: Range): boolean =>
-  (r.min === undefined || v >= r.min) && (r.max === undefined || v <= r.max);
+  !Number.isNaN(v) && (r.min === undefined || v >= r.min) && (r.max === undefined || v <= r.max);
 
 const show = (r: Range): string => `${r.min ?? "−∞"}..${r.max ?? "∞"}`;
 
 /**
- * Every way `m` violates the band of `tier` (empty = acceptable). `level` is the 1-based global
- * level number, used for the lossless-tutorial rule.
+ * Every way `m` violates the band of `tier` (empty = acceptable). A tutorial level must be given its
+ * 1-based `level` number: levels 1–3 may have no reachable loss, levels 4–5 need one.
  */
 export function checkLevel(m: LevelMetrics, tier: Tier, level?: number): string[] {
   const band = BANDS[tier];
@@ -166,18 +177,20 @@ export function checkLevel(m: LevelMetrics, tier: Tier, level?: number): string[
     if (m.wins[a] && m.wins[b]) out.push(`${a} and ${b} must not both win ${tier} levels`);
   }
   range("randomRate", m.randomRate, band.randomRate);
-  if (band.reachableLoss === "required" && !m.reachableLoss) {
+  if (tier === "tutorial") {
+    if (level === undefined) {
+      out.push("tutorial levels must be checked with their level number");
+    } else if (level <= LOSSLESS_TUTORIAL_LEVELS && m.reachableLoss) {
+      out.push(`tutorial level ${level} must have no reachable loss`);
+    } else if (level > LOSSLESS_TUTORIAL_LEVELS && !m.reachableLoss) {
+      out.push(`tutorial level ${level} needs a reachable loss (to teach slots)`);
+    }
+  } else if (!m.reachableLoss) {
     out.push(`${tier} levels need a reachable loss (a poor choice must cost something)`);
   }
-  if (
-    tier === "tutorial" &&
-    level !== undefined &&
-    level <= LOSSLESS_TUTORIAL_LEVELS &&
-    m.reachableLoss
-  ) {
-    out.push(`tutorial level ${level} must have no reachable loss`);
-  }
   range("doomedFirstShare", m.doomedFirstShare, band.doomedFirstShare);
+  range("deadEndShare", m.deadEndShare, band.deadEndShare);
+  range("freeStepShare", m.freeStepShare, band.freeStepShare);
   range("solutions", m.solutions, band.solutions);
   range("winningShare", m.winningShare, band.winningShare);
   range("slack", m.slack, band.slack);
@@ -187,14 +200,20 @@ export function checkLevel(m: LevelMetrics, tier: Tier, level?: number): string[
 }
 
 /**
- * World-level repetition check: `largest` and `smallest` may not both win more than half of a
- * world's medium levels (one lucky level is tolerated). Returns failures, empty if fine.
+ * World-level repetition check over one world's measured levels: for tiers with a cap, no single
+ * deterministic player may win more than that share of the world's levels of the tier.
  */
 export function checkWorld(levels: readonly { tier: Tier; metrics: LevelMetrics }[]): string[] {
-  const medium = levels.filter((l) => l.tier === "medium");
-  if (medium.length === 0) return [];
-  const both = medium.filter((l) => l.metrics.wins.largest && l.metrics.wins.smallest).length;
-  return both / medium.length > 0.5
-    ? [`largest and smallest both win ${both} of ${medium.length} medium levels`]
-    : [];
+  const out: string[] = [];
+  for (const [tier, cap] of Object.entries(WORLD_WIN_SHARE_CAP) as [Tier, number][]) {
+    const inTier = levels.filter((l) => l.tier === tier);
+    if (inTier.length === 0) continue;
+    for (const id of DETERMINISTIC_IDS) {
+      const wins = inTier.filter((l) => l.metrics.wins[id]).length;
+      if (wins / inTier.length > cap) {
+        out.push(`${id} wins ${wins} of ${inTier.length} ${tier} levels (cap ${cap * 100}%)`);
+      }
+    }
+  }
+  return out;
 }
