@@ -50,7 +50,7 @@ import { Button } from "../view/Button";
 import { MosaicView } from "../view/MosaicView";
 import { WispView } from "../view/WispView";
 import { TEX, ensureTextures } from "../view/textures";
-import { fadeIn, go } from "../view/transition";
+import { fadeIn, go, isLeaving } from "../view/transition";
 
 export interface PlayData {
   world: number;
@@ -149,6 +149,8 @@ export class PlayScene extends Phaser.Scene {
   /** The hint's answer, shown once the board has been idle for `IDLE_HINT_MS`. */
   private hintMove: LaunchSource | null = null;
   private hintView: Phaser.GameObjects.Image | null = null;
+  /** One reused "Combo ×n" label (a new Text per combo would mean a texture upload each time). */
+  private comboLabel: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super("play");
@@ -197,6 +199,7 @@ export class PlayScene extends Phaser.Scene {
     this.hintAsked = false;
     this.hintMove = null;
     this.hintView = null;
+    this.comboLabel = null;
     this.runId++;
     const save = getSave(this);
     const unsubscribeSave = save?.subscribe((d) => this.boosterBar?.update(d));
@@ -233,6 +236,8 @@ export class PlayScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    // Leaving (fading out): the board freezes, so nothing can win, lose or launch behind the fade.
+    if (isLeaving(this)) return;
     const s = this.session.state;
     if (s.status === "playing" && (s.track.length > 0 || this.session.pending.length > 0)) {
       const { steps, acc } = accumulate(this.acc, delta, this.speed);
@@ -655,7 +660,7 @@ export class PlayScene extends Phaser.Scene {
           const at = this.mosaic.cellCenter(e.cell);
           this.burst?.setParticleTint(hexToNumber(this.built.level.palette[e.color]!));
           this.burst?.explode(5, at.x, at.y);
-          const chain = this.combo.hit(this.session.state.step);
+          const chain = this.combo.hit(e.wispId, this.session.state.step);
           if (isComboMilestone(chain)) this.showCombo(chain, view ?? at);
         }
         break;
@@ -666,11 +671,13 @@ export class PlayScene extends Phaser.Scene {
         const { x, y } = this.layout.portal;
         this.burst?.setParticleTint(theme.glow);
         this.burst?.explode(10, x, y);
+        this.combo.end(e.wispId);
         this.departToPortal(e.wispId);
         break;
       }
       case "parked":
         this.haptics.play("park");
+        this.combo.end(e.wispId);
         getAudio(this).play("park");
         break;
       case "won":
@@ -916,10 +923,12 @@ export class PlayScene extends Phaser.Scene {
 
   // ── Juice & hints ───────────────────────────────────────────────────────
 
-  /** Particle emitters sized to the current cell; rebuilt with the layout. */
+  /**
+   * Particle emitters. The burst is sized to the cell, so it is rebuilt with the layout; confetti
+   * depends only on dpr and the palette, so flakes in flight survive a resize.
+   */
   private createEmitters(): void {
     this.burst?.destroy();
-    this.confetti?.destroy();
     const { cell, dpr } = this.layout;
     // The spark texture is 16px; particles are scaled from that.
     const flake = 16;
@@ -932,9 +941,11 @@ export class PlayScene extends Phaser.Scene {
         scale: { start: (cell * 0.32) / flake, end: 0 },
         alpha: { start: 1, end: 0 },
         blendMode: Phaser.BlendModes.ADD,
-        maxParticles: 240,
+        // Caps particles alive at once (`maxParticles` would cap all ever created, pool included).
+        maxAliveParticles: 240,
       })
       .setDepth(DEPTH.fx);
+    if (this.confetti) return;
     this.confetti = this.add
       .particles(0, 0, TEX.spark, {
         emitting: false,
@@ -946,7 +957,7 @@ export class PlayScene extends Phaser.Scene {
         scale: { min: (7 * dpr) / flake, max: (12 * dpr) / flake },
         alpha: { start: 1, end: 0, ease: "Quad.easeIn" },
         tint: confettiColors(this.built.level.palette),
-        maxParticles: 160,
+        maxAliveParticles: 160,
       })
       .setDepth(DEPTH.confetti);
   }
@@ -965,8 +976,8 @@ export class PlayScene extends Phaser.Scene {
     const margin = 60 * dpr;
     const x = Math.min(frame.x + frame.w - margin, Math.max(frame.x + margin, at.x));
     const y = Math.max(frame.y + 24 * dpr, at.y - cell * 1.4);
-    const label = this.add
-      .text(x, y, `Combo ×${length}`, {
+    this.comboLabel ??= this.add
+      .text(0, 0, "", {
         fontFamily: theme.font,
         fontStyle: "bold",
         fontSize: `${Math.round(16 * dpr)}px`,
@@ -975,8 +986,10 @@ export class PlayScene extends Phaser.Scene {
         strokeThickness: Math.round(4 * dpr),
       })
       .setOrigin(0.5)
-      .setDepth(DEPTH.fx)
-      .setScale(0.6);
+      .setDepth(DEPTH.fx);
+    const label = this.comboLabel;
+    this.tweens.killTweensOf(label);
+    label.setText(`Combo ×${length}`).setPosition(x, y).setAlpha(1).setScale(0.6).setVisible(true);
     this.tweens.add({ targets: label, scale: 1, duration: 200, ease: "Back.easeOut" });
     this.tweens.add({
       targets: label,
@@ -985,7 +998,7 @@ export class PlayScene extends Phaser.Scene {
       delay: 450,
       duration: 500,
       ease: "Quad.easeIn",
-      onComplete: () => label.destroy(),
+      onComplete: () => label.setVisible(false),
     });
     this.burst?.setParticleTint(theme.glow);
     this.burst?.explode(12, at.x, at.y);

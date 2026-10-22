@@ -1,30 +1,34 @@
 import { hexToNumber, luminance, theme } from "./theme";
 
 /**
- * Collections at most this many simulation steps apart belong to one chain. A wisp sweeping a
- * same-colored row collects every step, so a chain is a run of back-to-back collections (by any
- * wisps). Steps, not milliseconds, so 1× and 2× chain alike.
+ * Collections by one wisp at most this many simulation steps apart belong to one chain: a wisp
+ * sweeping a same-colored row collects every step. Chains are per wisp (with several wisps on the
+ * track a shared chain would never break), and counted in steps, so 1× and 2× chain alike.
  */
 export const COMBO_GAP_STEPS = 3;
 
 /** Chain lengths that earn a combo sparkle: 8, 16, 24, … (shorter runs are too common to cheer). */
 export const COMBO_EVERY = 8;
 
-/** Counts back-to-back collections. Pure, deterministic: fed with simulation step numbers. */
+/** Counts each wisp's back-to-back collections. Pure, deterministic: fed with step numbers. */
 export class ComboTracker {
-  private last = -Infinity;
-  private length = 0;
+  private chains = new Map<number, { last: number; length: number }>();
 
-  /** Records a collection at `step`; returns the chain length including it. */
-  hit(step: number): number {
-    this.length = step - this.last <= COMBO_GAP_STEPS ? this.length + 1 : 1;
-    this.last = step;
-    return this.length;
+  /** Records a collection by `wispId` at `step`; returns that wisp's chain length including it. */
+  hit(wispId: number, step: number): number {
+    const chain = this.chains.get(wispId);
+    const length = chain && step - chain.last <= COMBO_GAP_STEPS ? chain.length + 1 : 1;
+    this.chains.set(wispId, { last: step, length });
+    return length;
+  }
+
+  /** The wisp left the track (portal or parked); its chain ends. */
+  end(wispId: number): void {
+    this.chains.delete(wispId);
   }
 
   reset(): void {
-    this.last = -Infinity;
-    this.length = 0;
+    this.chains.clear();
   }
 }
 

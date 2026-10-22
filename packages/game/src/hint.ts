@@ -4,8 +4,9 @@ import { solveState, type LaunchSource, type SimState } from "@hexhue/core";
 export const IDLE_HINT_MS = 8000;
 
 /**
- * Solver budget for a hint. Small enough to finish in a few milliseconds on a phone (typical
- * boards solve almost greedily in far fewer nodes); when it runs out, no hint is shown.
+ * Solver budget for a hint, which bounds the worst case (tens of milliseconds on desktop; the
+ * search runs in a worker, off the main thread). Shipped boards solve almost greedily in far
+ * fewer nodes; when the budget runs out, no hint is shown.
  */
 export const HINT_BUDGET = 1500;
 

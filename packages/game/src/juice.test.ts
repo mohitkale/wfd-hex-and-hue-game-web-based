@@ -9,22 +9,32 @@ import {
 import { theme } from "./theme";
 
 describe("combo tracker", () => {
-  it("chains collections at most COMBO_GAP_STEPS apart", () => {
+  it("chains one wisp's collections at most COMBO_GAP_STEPS apart", () => {
     const combo = new ComboTracker();
-    expect(combo.hit(10)).toBe(1);
-    expect(combo.hit(11)).toBe(2);
-    expect(combo.hit(11)).toBe(3); // two wisps collecting in the same step
-    expect(combo.hit(11 + COMBO_GAP_STEPS)).toBe(4);
+    expect(combo.hit(7, 10)).toBe(1);
+    expect(combo.hit(7, 11)).toBe(2);
+    expect(combo.hit(7, 11 + COMBO_GAP_STEPS)).toBe(3);
   });
 
-  it("breaks the chain after a longer gap, and on reset", () => {
+  it("keeps each wisp's chain separate, so many wisps don't make one endless chain", () => {
     const combo = new ComboTracker();
-    combo.hit(1);
-    combo.hit(2);
-    expect(combo.hit(3 + COMBO_GAP_STEPS)).toBe(1);
-    combo.hit(4 + COMBO_GAP_STEPS);
+    expect(combo.hit(1, 10)).toBe(1);
+    expect(combo.hit(2, 10)).toBe(1);
+    expect(combo.hit(1, 11)).toBe(2);
+    expect(combo.hit(2, 12)).toBe(2);
+  });
+
+  it("breaks a chain after a longer gap, when the wisp leaves, and on reset", () => {
+    const combo = new ComboTracker();
+    combo.hit(1, 1);
+    combo.hit(1, 2);
+    expect(combo.hit(1, 3 + COMBO_GAP_STEPS)).toBe(1);
+    combo.hit(1, 4 + COMBO_GAP_STEPS);
+    combo.end(1);
+    expect(combo.hit(1, 5 + COMBO_GAP_STEPS)).toBe(1);
+    combo.hit(1, 6 + COMBO_GAP_STEPS);
     combo.reset();
-    expect(combo.hit(5 + COMBO_GAP_STEPS)).toBe(1);
+    expect(combo.hit(1, 7 + COMBO_GAP_STEPS)).toBe(1);
   });
 
   it("celebrates every COMBO_EVERY collections in a chain", () => {

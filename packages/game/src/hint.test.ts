@@ -45,4 +45,11 @@ describe("idle hints", () => {
     stuck.columns = stuck.columns.map(() => []);
     expect(hintMove(stuck)).toBeNull();
   });
+
+  it("give no hint when the search budget runs out", () => {
+    // Any board needing several launches can't be solved by expanding a single state.
+    const level = worlds[2]!.levels[10]!;
+    expect(level.solution.length).toBeGreaterThan(1);
+    expect(hintMove(createState(level.level), 1)).toBeNull();
+  });
 });
