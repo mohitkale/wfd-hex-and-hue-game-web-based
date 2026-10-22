@@ -24,12 +24,24 @@ describe("deploy headers", () => {
     expect(headersFor(netlify, "/manifest.webmanifest")["Cache-Control"]).toBe("no-cache");
     expect(nginxSite).toMatch(/location \/_astro\/ \{[^}]*max-age=31536000, immutable/);
     expect(nginxSite).toMatch(/location = \/sw\.js \{[^}]*no-cache/);
+    expect(nginxSite).toMatch(/location = \/manifest\.webmanifest \{[^}]*no-cache/);
+  });
+
+  it("every nginx location that sets headers also sends the security headers", () => {
+    // nginx drops inherited add_header in a location that adds its own: each needs the include.
+    const blocks = [...nginxSite.matchAll(/location [^{]+\{[^}]*\}/g)].map((m) => m[0]);
+    const withHeaders = blocks.filter((b) => b.includes("add_header"));
+    expect(withHeaders.length).toBeGreaterThanOrEqual(4);
+    for (const b of withHeaders) {
+      expect(b, b.split("{")[0]).toContain("include /etc/nginx/snippets/security-headers.conf;");
+    }
   });
 
   it("the CSP allows what the game needs and nothing broad", () => {
     const csp = headersFor(netlify, "/")["Content-Security-Policy"]!;
     expect(csp).toContain("default-src 'self'");
-    expect(csp).toContain("worker-src 'self' blob:"); // hint worker
+    expect(csp).toContain("script-src 'self';"); // no inline scripts (the build check enforces it)
+    expect(csp).toContain("worker-src 'self';"); // the hint worker is a same-origin file
     expect(csp).toContain("connect-src 'self' https://*.posthog.com"); // analytics (opt-in)
     expect(csp).toContain("object-src 'none'");
     expect(csp).not.toContain("unsafe-eval");

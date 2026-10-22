@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BUDGETS, checkBudgets, scriptClosure, scriptLeaks, type BuiltFile } from "./budget";
+import {
+  BUDGETS,
+  checkBudgets,
+  inlineScripts,
+  scriptClosure,
+  scriptLeaks,
+  type BuiltFile,
+} from "./budget";
 
 const file = (path: string, gzip: number, bytes = gzip * 3): BuiltFile => ({ path, gzip, bytes });
 
@@ -33,6 +40,19 @@ describe("performance budget", () => {
   it("keeps the hint worker out of the play JS total", () => {
     const [js] = checkBudgets([file("_astro/hint.worker-x.js", 500_000)]);
     expect(js!.value).toBe(0);
+  });
+});
+
+describe("inline scripts", () => {
+  it("flags executable inline scripts (blocked by the CSP), not files or JSON-LD", () => {
+    expect(
+      inlineScripts([
+        { path: "a.html", html: '<script type="module" src="/_astro/x.js"></script>' },
+        { path: "b.html", html: '<script type="application/ld+json">{}</script>' },
+        { path: "c.html", html: "<script>alert(1)</script>" },
+        { path: "d.html", html: '<script type="module">import "./x.js"</script>' },
+      ]),
+    ).toEqual(["c.html", "d.html"]);
   });
 });
 

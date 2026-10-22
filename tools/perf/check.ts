@@ -6,7 +6,13 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
-import { CONTENT_SCRIPT_MAX, checkBudgets, scriptLeaks, type BuiltFile } from "./budget";
+import {
+  CONTENT_SCRIPT_MAX,
+  checkBudgets,
+  inlineScripts,
+  scriptLeaks,
+  type BuiltFile,
+} from "./budget";
 
 const root = fileURLToPath(new URL("../../apps/web/dist/", import.meta.url));
 
@@ -45,12 +51,14 @@ const bundles = new Map(
     .filter((f) => f.path.startsWith("_astro/") && f.path.endsWith(".js"))
     .map((f) => [f.path, { gzip: f.gzip, code: readFileSync(join(root, f.path), "utf8") }]),
 );
-const leaks = scriptLeaks(
-  files
-    .filter((f) => f.path.endsWith(".html"))
-    .map((f) => ({ path: f.path, html: readFileSync(join(root, f.path), "utf8") })),
-  bundles,
-);
+const pages = files
+  .filter((f) => f.path.endsWith(".html"))
+  .map((f) => ({ path: f.path, html: readFileSync(join(root, f.path), "utf8") }));
+const leaks = scriptLeaks(pages, bundles);
+for (const page of inlineScripts(pages)) {
+  console.log(`✗ ${page} has an inline script (the CSP allows script files only)`);
+  failed = true;
+}
 for (const l of leaks) {
   console.log(
     `✗ ${l.page} loads ${kb(l.gzip)} of script (content pages: ${kb(CONTENT_SCRIPT_MAX)})`,

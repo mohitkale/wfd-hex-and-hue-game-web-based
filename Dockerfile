@@ -25,7 +25,8 @@ ENV SITE_URL=$SITE_URL \
     NODE_ENV=production
 RUN npm run build -w @hexhue/web && npm run budget
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+# The maintained stable nginx line (security fixes), non-root, listening on 8080.
+FROM nginxinc/nginx-unprivileged:stable-alpine
 COPY deploy/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY deploy/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html

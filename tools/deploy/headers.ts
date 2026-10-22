@@ -35,7 +35,10 @@ export function parseNginxAddHeaders(text: string): Record<string, string> {
   return out;
 }
 
-/** The headers Netlify would send for `pathname` (later rules add to earlier ones). */
+/**
+ * The headers Netlify would send for `pathname`: every matching rule applies. (Netlify combines a
+ * header repeated by overlapping rules; here a later rule overwrites it, so don't repeat headers.)
+ */
 export function headersFor(rules: readonly HeaderRule[], pathname: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const r of rules) {

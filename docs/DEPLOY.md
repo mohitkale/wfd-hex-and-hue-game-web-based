@@ -34,7 +34,8 @@ docker compose up -d --build
 ```
 
 This builds the site inside the image and serves it with nginx (unprivileged, port 8080) on
-`127.0.0.1:8080`. Put a TLS-terminating proxy in front, for example Caddy:
+`127.0.0.1:8080`. Put a TLS-terminating proxy in front, for example Caddy running on the host
+(in a container, point it at the `web` service on the Compose network instead of 127.0.0.1):
 
 ```
 play.example.com {
@@ -58,8 +59,9 @@ nginx config: `deploy/nginx/default.conf` (routing, gzip, caching) and
 
 ## Security headers
 
-A strict Content-Security-Policy (same-origin only; inline scripts for Astro's small page
-scripts; workers for idle hints; PostHog for opt-in analytics), `nosniff`, a referrer policy and a
+A strict Content-Security-Policy (same-origin scripts only, no inline scripts: `npm run budget`
+fails the build if one appears; the idle-hint worker is a same-origin file; PostHog for opt-in
+analytics), `nosniff`, a referrer policy and a
 permissions policy that turns off camera, microphone, location and payments. The two header files
 must stay identical; `tools/deploy/headers.test.ts` fails CI if they drift.
 
@@ -70,7 +72,7 @@ game in an iframe, change `frame-ancestors 'self'` to list them.
 ## Checklist before going live
 
 - [ ] `SITE_URL` (or Netlify's primary domain) is the real address: open `/sitemap.xml` to check.
-- [ ] HTTPS works (service workers and installs need it).
+- [ ] HTTPS works (service workers and installs need it); on a VPS, enable HSTS at the TLS proxy.
 - [ ] `/play/` loads, plays offline after one visit, and shows "A new version is ready" after the
       next deploy.
 - [ ] Optional analytics: the consent banner appears once, and events reach PostHog after "Allow".
