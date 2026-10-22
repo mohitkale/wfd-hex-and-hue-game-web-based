@@ -53,6 +53,13 @@ describe("progress", () => {
     expect(gatingLevel(worlds, { world: 1, level: 0 })?.id).toBe("a-3");
   });
 
+  it("only completed levels count as collected; skipped ones don't, and a full world is complete", () => {
+    const partial = worldProgress(worlds[1]!, save({ "b-1": 2 }, ["b-2"]));
+    expect(partial.completed).toBe(1);
+    const full = worldProgress(worlds[1]!, save({ "b-1": 2, "b-2": 1 }));
+    expect(full.completed).toBe(full.total);
+  });
+
   it("ignores inherited keys in progress lookups", () => {
     expect(worldProgress(world("toString", 1), save()).completed).toBe(0);
   });

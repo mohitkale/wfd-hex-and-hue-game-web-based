@@ -45,7 +45,7 @@ The autonomous delivery loop that works through this file is defined in `CLAUDE.
 - [x] **M5.2** World map & level select with stars/completion, next-level auto-advance.
 - [x] **M5.3** Coins & boosters: Undo, Shuffle, Extra Slot, Magic Wand, Revive; generous earn rates.
 - [x] **M5.4** Rewards interface (provider-agnostic) with mock + "none" providers; 2× alternating free/ad policy; double-coins offer. Never blocks play.
-- [ ] **M5.5** Spellbook: collected illustrations, lore cards, world completion; win card says "Added to your Spellbook" once this exists.
+- [x] **M5.5** Spellbook: collected illustrations, lore cards, world completion; win card says "Added to your Spellbook".
 
 ## M6 — Polish & native feel
 
