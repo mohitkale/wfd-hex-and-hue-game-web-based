@@ -7,6 +7,7 @@
  *   │ ┌ track ring ───────┐ │
  *   │ │      mosaic       │ │
  *   │ └───────────────────┘ │
+ *   │  ↶   ⇄   +▢   ✦   ◉ │  boosters + coins
  *   │ [ ] [ ] [ ] [ ] [ ]   │  holding slots
  *   │  col    col    col    │  summon columns (thumb zone)
  *   └───────────────────────┘
@@ -52,6 +53,8 @@ export interface Layout {
   originY: number;
   /** Cell size in whole device pixels. */
   cell: number;
+  /** Row of booster buttons and the coin counter, between the board and the slots. */
+  boosters: Rect;
   slots: Rect[];
   /** Full-height tap zones, one per summon column. */
   columns: Rect[];
@@ -65,6 +68,7 @@ export const CSS = {
   gap: 10,
   sidePad: 16,
   slot: 54,
+  boosterBar: 50,
   columnsMin: 132,
   columnsMax: 210,
 } as const;
@@ -116,9 +120,17 @@ export function computeLayout(input: LayoutInput): Layout {
     h: slotSize,
   }));
 
+  const boosterH = px(CSS.boosterBar);
+  const boosters: Rect = {
+    x: frame.x + pad,
+    y: slotsY - gap - boosterH,
+    w: frame.w - 2 * pad,
+    h: boosterH,
+  };
+
   const portalSpace = px(CSS.portalSpace);
   const boardTop = hud.y + hud.h + portalSpace;
-  const boardBottom = slotsY - gap;
+  const boardBottom = boosters.y - gap;
   const ringW = input.boardWidth + 2;
   const ringH = input.boardHeight + 2;
   const cell = Math.max(
@@ -155,6 +167,7 @@ export function computeLayout(input: LayoutInput): Layout {
     originX: boardRect.x + cell,
     originY: boardRect.y + cell,
     cell,
+    boosters,
     slots,
     columns,
   };

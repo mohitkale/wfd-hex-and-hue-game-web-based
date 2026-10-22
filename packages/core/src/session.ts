@@ -1,4 +1,7 @@
+import { addSlot, applyWand } from "./boosters";
 import type { Level } from "./level";
+import type { Rng } from "./rng";
+import { shuffleColumns } from "./shuffle";
 import {
   cloneState,
   createState,
@@ -8,10 +11,17 @@ import {
   type LaunchSource,
   type SimEvent,
   type SimState,
+  type Status,
 } from "./sim";
 
 export type SessionEvent =
-  SimEvent | { type: "queued"; wispId: number } | { type: "undone" } | { type: "restarted" };
+  | SimEvent
+  | { type: "queued"; wispId: number }
+  | { type: "undone" }
+  | { type: "restarted" }
+  | { type: "wand"; color: number; cells: number[]; spent: number[] }
+  | { type: "slotAdded"; slot: number; revivedWispId: number | null }
+  | { type: "shuffled" };
 
 export type SessionListener = (event: SessionEvent) => void;
 
@@ -112,6 +122,44 @@ export class GameSession {
     this.current = snap.state;
     this.queue = snap.queue;
     this.emit([{ type: "undone" }]);
+    return true;
+  }
+
+  /** Magic Wand on `color`. Undoable. Returns false (and changes nothing) if it would do nothing. */
+  wand(color: number): boolean {
+    if (this.current.status !== "playing") return false;
+    const snapshot = { state: cloneState(this.current), queue: this.queue.slice() };
+    const result = applyWand(this.current, color);
+    if (result.cells.length === 0) return false;
+    this.history.push(snapshot);
+    if (this.history.length > this.maxUndo) this.history.shift();
+    this.queue = this.queue.filter((id) => !result.spent.includes(id));
+    const events: SessionEvent[] = [{ type: "wand", color, ...result }];
+    // `applyWand` may finish the level (status is re-read, not the narrowed "playing").
+    if ((this.current.status as Status) === "won") events.push({ type: "won" });
+    this.emit(events);
+    return true;
+  }
+
+  /** Extra Slot: one more holding slot; revives a lost level. Undoable. */
+  extraSlot(): boolean {
+    if (this.current.status === "won") return false;
+    this.pushHistory();
+    const revived = addSlot(this.current);
+    this.emit([{ type: "slotAdded", slot: this.current.slots.length - 1, revivedWispId: revived }]);
+    return true;
+  }
+
+  /** Shuffle: re-deals the summon columns into a still-solvable order. Undoable. */
+  shuffle(rng: Rng): boolean {
+    if (this.current.status !== "playing") return false;
+    const next = shuffleColumns(this.current, rng);
+    if (!next) return false;
+    this.pushHistory();
+    this.current = next;
+    // Queued taps referred to the old order.
+    this.queue = [];
+    this.emit([{ type: "shuffled" }]);
     return true;
   }
 

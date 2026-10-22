@@ -56,3 +56,4 @@ export {
 export { parseAsciiArt, type AsciiArt } from "./art";
 export { shuffleColumns } from "./shuffle";
 export type { BuiltLevel, BuiltWorld } from "./content";
+export { addSlot, applyWand, exposedCells, wandColors, type WandResult } from "./boosters";

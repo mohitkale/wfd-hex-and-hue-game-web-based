@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Level, WispSpec } from "./level";
+import { createRng } from "./rng";
 import { GameSession, type SessionEvent } from "./session";
 
 const col0 = { kind: "column", index: 0 } as const;
@@ -295,5 +296,60 @@ describe("undo and restart", () => {
     off();
     s.tap(col0);
     expect(seen).toEqual([]);
+  });
+});
+
+describe("booster actions", () => {
+  it("wand collects, emits, and is undoable", () => {
+    const s = ringFirst();
+    const seen: string[] = [];
+    s.subscribe((e) => seen.push(e.type));
+    expect(s.wand(0)).toBe(false); // center not exposed
+    expect(s.wand(1)).toBe(true);
+    expect(seen).toEqual(["wand"]);
+    expect(s.state.remaining).toBe(1);
+    s.undo();
+    expect(s.state.remaining).toBe(9);
+  });
+
+  it("extra slot revives a lost game, and the player can then win", () => {
+    const s = new GameSession(
+      hiddenCenter(
+        [[{ color: 0, charge: 1 }], [{ color: 0, charge: 1 }], [{ color: 1, charge: 8 }]],
+        1,
+      ),
+    );
+    s.tap(col0);
+    tickUntilIdle(s);
+    s.tap(col1);
+    tickUntilIdle(s);
+    expect(s.state.status).toBe("lost");
+    expect(s.extraSlot()).toBe(true);
+    expect(s.state.status).toBe("playing");
+    s.tap({ kind: "column", index: 2 });
+    tickUntilIdle(s);
+    s.tap(slot0);
+    tickUntilIdle(s);
+    expect(s.state.status).toBe("won");
+  });
+
+  it("shuffle re-deals columns, clears the queue and is undoable", () => {
+    const s = new GameSession(
+      hiddenCenter([
+        [
+          { color: 1, charge: 4 },
+          { color: 0, charge: 1 },
+        ],
+        [{ color: 1, charge: 4 }],
+      ]),
+    );
+    s.tap(col0);
+    s.tap(col1); // queued
+    const before = JSON.stringify(s.state.columns);
+    expect(s.shuffle(createRng(3))).toBe(true);
+    expect(s.pending).toEqual([]);
+    expect(JSON.stringify(s.state.columns)).not.toEqual(before);
+    s.undo();
+    expect(JSON.stringify(s.state.columns)).toEqual(before);
   });
 });
