@@ -12,5 +12,8 @@
   "dependencies": {
     "@hexhue/core": "*",
     "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.6"
   }
 }

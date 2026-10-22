@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { Haptics } from "../haptics";
+import { getSave } from "../save";
 import { worlds } from "../levels";
 import { theme } from "../theme";
 import { ensureTextures, TEX } from "../view/textures";
@@ -73,7 +74,15 @@ export class LevelSelectScene extends Phaser.Scene {
         const cx = left + px(16) + (i % cols) * (tile + px(14)) + tile / 2;
         const cy = y + Math.floor(i / cols) * (tile + px(30)) + tile / 2;
         this.objects.push(
-          ...this.levelTile(cx, cy, tile, i + 1, built.level.name, { world: w, level: i }),
+          ...this.levelTile(
+            cx,
+            cy,
+            tile,
+            i + 1,
+            built.level.name,
+            { world: w, level: i },
+            getSave(this)?.data.levels[built.level.id]?.stars ?? 0,
+          ),
         );
       });
       y += Math.ceil(world.levels.length / cols) * (tile + px(30)) + px(16);
@@ -127,12 +136,13 @@ export class LevelSelectScene extends Phaser.Scene {
     number: number,
     name: string,
     data: PlayData,
+    stars: number,
   ): Phaser.GameObjects.GameObject[] {
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     const halo = this.add.image(cx, cy, TEX.glow).setTint(theme.mist).setAlpha(0.35);
     halo.setDisplaySize(size * 1.5, size * 1.5);
     const disc = this.add
-      .circle(cx, cy, size * 0.4, theme.dusk)
+      .circle(cx, cy, size * 0.4, stars > 0 ? 0x4a2f7a : theme.dusk)
       .setStrokeStyle(Math.max(1, 2 * dpr), theme.glow, 0.9)
       .setInteractive({ useHandCursor: true });
     const label = this.add
@@ -168,6 +178,13 @@ export class LevelSelectScene extends Phaser.Scene {
         onComplete: () => this.scene.start("play", data),
       });
     });
-    return [halo, disc, label, caption];
+    const starText = this.add
+      .text(cx, cy - size * 0.48, stars > 0 ? "★".repeat(stars) + "☆".repeat(3 - stars) : "", {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(10 * dpr)}px`,
+        color: "#f6d97a",
+      })
+      .setOrigin(0.5, 1);
+    return [halo, disc, label, caption, starText];
   }
 }
