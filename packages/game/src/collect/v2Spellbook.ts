@@ -34,7 +34,7 @@ export function parseSpellbook(json: unknown): V2Spellbook {
   for (const [id, raw] of Object.entries(entries)) {
     const e = raw as Partial<SpellbookEntry> | null;
     if (!e || typeof e !== "object") continue;
-    if (id === "" || e.id !== id) continue;
+    if (id === "" || id === "__proto__" || e.id !== id) continue;
     if (typeof e.unlockedAt !== "number" || !Number.isFinite(e.unlockedAt)) continue;
     if (!isCount(e.wins)) continue;
     book.entries[id] = { id, unlockedAt: e.unlockedAt, wins: e.wins };
@@ -73,14 +73,21 @@ export interface KeyValueStore {
   setItem(key: string, value: string): void;
 }
 
-export function loadSpellbook(store: KeyValueStore | null): V2Spellbook {
+/**
+ * Reads the book and says whether the read can be trusted: `ok` is false when storage threw or the
+ * stored text was not JSON, so the caller can avoid overwriting a collection it merely failed to read.
+ */
+export function readSpellbook(store: KeyValueStore | null): { book: V2Spellbook; ok: boolean } {
   try {
     const raw = store?.getItem(SPELLBOOK_KEY);
-    return raw ? parseSpellbook(JSON.parse(raw)) : emptySpellbook();
+    return { book: raw ? parseSpellbook(JSON.parse(raw)) : emptySpellbook(), ok: store != null };
   } catch {
-    return emptySpellbook();
+    return { book: emptySpellbook(), ok: false };
   }
 }
+
+export const loadSpellbook = (store: KeyValueStore | null): V2Spellbook =>
+  readSpellbook(store).book;
 
 /** Returns whether the book was stored; never throws. */
 export function saveSpellbook(store: KeyValueStore | null, book: V2Spellbook): boolean {

@@ -24,8 +24,8 @@ export interface CompletionOptions {
   isNew: boolean;
   /** The win could be written to storage. */
   saved: boolean;
-  /** Cubes delivered, for the caption. */
-  delivered: number;
+  /** Show the finished picture at once (a relayout after the reveal was already seen or skipped). */
+  instant: boolean;
   onSpellbook: () => void;
   onAgain: () => void;
 }
@@ -50,12 +50,15 @@ export class CompletionOverlay {
   private readonly particleLayer: ParticleLayer;
   private readonly seeds;
   private readonly later: Phaser.GameObjects.GameObject[] = [];
+  private readonly zone: Phaser.GameObjects.Zone;
+  private readonly buttons: Phaser.GameObjects.Container[];
   private readonly cell: number;
   private readonly x0: number;
   private readonly y0: number;
   private startedAt = -1;
-  private skipped = false;
+  private skipped: boolean;
   private finished = false;
+  private finishedAt = 0;
   private emitted = 0;
 
   constructor(
@@ -63,6 +66,7 @@ export class CompletionOverlay {
     private readonly o: CompletionOptions,
   ) {
     const { layout: l, level, dpr } = o;
+    this.skipped = o.instant;
     this.spec = effectForTheme(level.subject.theme);
     this.times = revealTimes(level.width, level.height, this.spec.order);
     this.seeds = particleSeeds(this.spec, level.width, level.height);
@@ -145,9 +149,6 @@ export class CompletionOverlay {
     this.buttons = [spellbook, again];
   }
 
-  private readonly zone: Phaser.GameObjects.Zone;
-  private readonly buttons: Phaser.GameObjects.Container[];
-
   /** Jumps to the finished picture; the text and buttons follow. */
   skip(): void {
     this.skipped = true;
@@ -159,7 +160,15 @@ export class CompletionOverlay {
 
   /** Call every frame with the scene time. */
   update(now: number): void {
-    if (this.finished) return;
+    if (this.finished) {
+      // Let the last particles fade out instead of cutting them off.
+      if (now - this.finishedAt <= this.spec.particle.lifeMs) this.particleLayer.update(now);
+      else if (this.finishedAt >= 0) {
+        this.particleLayer.update(-1e9);
+        this.finishedAt = -1;
+      }
+      return;
+    }
     if (this.startedAt < 0) this.startedAt = now;
     const elapsed = now - this.startedAt;
     const progress = revealProgress(elapsed, this.spec, {
@@ -174,7 +183,7 @@ export class CompletionOverlay {
     );
     this.emitDue(elapsed);
     this.particleLayer.update(now);
-    if (progress >= 1) this.finish();
+    if (progress >= 1) this.finish(now);
   }
 
   private emitDue(elapsed: number): void {
@@ -198,15 +207,18 @@ export class CompletionOverlay {
     }
   }
 
-  private finish(): void {
+  private finish(now: number): void {
     this.finished = true;
+    this.finishedAt = now;
     this.zone.destroy();
-    this.particleLayer.update(-1e9);
-    for (const b of this.buttons) b.setInteractive({ useHandCursor: true });
     this.scene.tweens.add({
       targets: this.later,
       alpha: 1,
-      duration: this.o.reduced ? 1 : 300,
+      duration: this.o.reduced || this.o.instant ? 1 : 300,
+      // Pressable only once visible, so a second tap after a skip cannot hit an invisible button.
+      onComplete: () => {
+        for (const b of this.buttons) b.setInteractive({ useHandCursor: true });
+      },
     });
   }
 }

@@ -58,13 +58,21 @@ the v2 chunk stays at 26 of 40 KB). Core gained an optional display-only `subjec
 
 ## Verified, and not
 
-Verified in the browser pane: a bot played `art-witchs-cauldron` to a win; the reveal and end card
-appeared with the lore and "Added to your Spellbook"; the Spellbook showed 1 of 6 collected and its
-page. Covered by unit tests: effect choice per theme, the reveal schedule, reduced motion and skip
-giving the finished picture, Spellbook unlock on a win (and not otherwise), corrupt and unavailable
-storage, the preview levels being valid, winnable and current.
+Verified in the browser pane (a bot played the preview levels at `&speed=2`): `art-witchs-cauldron`
+(390×800) and `art-triple-moon` (375×667, a short phone). The reveal and end card appeared with the
+lore; **Spellbook** showed the grid with the cards fitted above the button; **Back to the board**
+returned to a live board (a review found that, before a fix, the board stayed dead after this path,
+because Phaser reuses the scene instance and its leftover overlay swallowed every tap); a second win
+was recorded as win 2, not a new unlock; resizing the window while the card was up did not replay
+the reveal or count the win twice.
+
+Covered by unit tests: effect choice per theme, the reveal schedule, reduced motion and skip giving
+the finished picture, Spellbook unlock on a win (and not otherwise), corrupt, unreadable and
+unavailable storage (an unreadable book is never overwritten), and the preview levels being valid,
+**bot-winnable** (not solver-verified: that is M12.1), and current.
 
 **Not exercised by a person or in the browser:** the skip tap itself and the reduced-motion path in
-the running game (their logic is tested, the wiring is not clicked through), the other five reveals,
-and anything on a real phone. The reveals are a first pass at the effect designs, not tuned.
+the running game (their logic is tested, the wiring is not clicked through), the other four reveals,
+and anything on a real phone. The Phaser scene lifecycle (the restart cycle above) has no automated
+test, only the browser check. The reveals are a first pass at the effect designs, not tuned.
 The full Spellbook gallery with replay is M13.2; world-specific completion moments are M13.3.

@@ -25,7 +25,7 @@ import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
-import { browserStore, loadSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
+import { browserStore, readSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
 import { VisualModel } from "./visuals";
 
 type CollectState = collect.CollectState;
@@ -80,6 +80,8 @@ export class CollectScene extends Phaser.Scene {
   private reveal: CompletionOverlay | null = null;
   /** What recording this win in the Spellbook did, so a relayout does not count it twice. */
   private winRecord: { isNew: boolean; saved: boolean } | null = null;
+  /** The reveal has finished or been skipped once for this win: a relayout must not replay it. */
+  private revealSeen = false;
   private portalGlow: Phaser.GameObjects.Image | null = null;
   private speedLabel: Phaser.GameObjects.Text | null = null;
   private unsubscribe: (() => void)[] = [];
@@ -98,6 +100,18 @@ export class CollectScene extends Phaser.Scene {
 
   create(): void {
     if (typeof window !== "undefined") window.dispatchEvent(new Event("hexhue:ready"));
+    // Phaser reuses this instance when the scene is started again (Spellbook, then "Back to the
+    // board"): field initialisers do not re-run, so anything left from the last session is reset.
+    this.overlayTimer?.remove();
+    this.overlayTimer = null;
+    this.overlay = [];
+    this.reveal = null;
+    this.winRecord = null;
+    this.revealSeen = false;
+    this.demo = null;
+    this.marks = new Map();
+    this.toastText = null;
+    this.frameTime = 0;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
     const search = typeof window !== "undefined" ? window.location.search : "";
@@ -118,6 +132,7 @@ export class CollectScene extends Phaser.Scene {
       this.session.onReplace(() => {
         this.demo = null;
         this.winRecord = null;
+        this.revealSeen = false;
         this.rebuild();
       }),
     );
@@ -559,6 +574,7 @@ export class CollectScene extends Phaser.Scene {
     this.ambient.update(time);
     this.particleLayer.update(time);
     this.reveal?.update(time);
+    if (this.reveal?.done) this.revealSeen = true;
     this.cubes.flush();
     this.profile?.update.push(performance.now() - profileStart);
   }
@@ -620,8 +636,13 @@ export class CollectScene extends Phaser.Scene {
     if (!level.shades) return false;
     if (!this.winRecord) {
       const store = browserStore();
-      const result = recordWin(loadSpellbook(store), subject.id, Date.now());
-      this.winRecord = { isNew: result.isNew, saved: saveSpellbook(store, result.book) };
+      const read = readSpellbook(store);
+      const result = recordWin(read.book, subject.id, Date.now());
+      // An unreadable book is never overwritten: better to forget one win than the collection.
+      this.winRecord = {
+        isNew: result.isNew,
+        saved: read.ok && saveSpellbook(store, result.book),
+      };
     }
     const { isNew, saved } = this.winRecord;
     const overlay = new CompletionOverlay(this, {
@@ -631,7 +652,7 @@ export class CollectScene extends Phaser.Scene {
       reduced: isReducedMotion(this),
       isNew,
       saved,
-      delivered: this.session.state.deliveredTotal,
+      instant: this.revealSeen,
       onSpellbook: () => this.openSpellbook(),
       onAgain: () => this.session.restart(),
     });

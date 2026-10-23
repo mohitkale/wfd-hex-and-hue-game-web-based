@@ -12,6 +12,7 @@ import {
   emptySpellbook,
   isUnlocked,
   loadSpellbook,
+  readSpellbook,
   parseSpellbook,
   recordWin,
   saveSpellbook,
@@ -177,5 +178,16 @@ describe("the v2 Spellbook", () => {
     const corrupt = memory();
     corrupt.data.set(SPELLBOOK_KEY, "{not json");
     expect(loadSpellbook(corrupt)).toEqual(emptySpellbook());
+
+    // A book that could not be read is flagged, so the caller never overwrites what it failed to read.
+    expect(readSpellbook(corrupt).ok).toBe(false);
+    expect(readSpellbook(broken).ok).toBe(false);
+    expect(readSpellbook(null).ok).toBe(false);
+    expect(readSpellbook(memory()).ok).toBe(true);
+    expect(
+      parseSpellbook(
+        JSON.parse('{"entries":{"__proto__":{"id":"__proto__","unlockedAt":1,"wins":1}}}'),
+      ).entries,
+    ).toEqual({});
   });
 });

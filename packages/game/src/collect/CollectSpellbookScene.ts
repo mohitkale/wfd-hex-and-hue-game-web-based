@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-import { isReducedMotion } from "../a11y";
 import { theme } from "../theme";
 import { Button } from "../view/Button";
 import { fadeIn } from "../view/transition";
@@ -74,9 +73,15 @@ export class CollectSpellbookScene extends Phaser.Scene {
 
     const cols = 2;
     const gap = 12 * dpr;
-    const cardW = Math.floor((frame.w - 2 * 16 * dpr - (cols - 1) * gap) / cols);
-    const cardH = Math.round(cardW * 1.1);
     const top = frame.y + 90 * dpr;
+    const rows = Math.ceil(ART_PIECE_IDS.length / cols);
+    const cardW = Math.floor((frame.w - 2 * 16 * dpr - (cols - 1) * gap) / cols);
+    // Cards shrink to fit between the heading and the button on a short screen.
+    const room = frame.y + frame.h - 84 * dpr - top - (rows - 1) * gap;
+    const cardH = Math.max(
+      Math.round(60 * dpr),
+      Math.min(Math.round(cardW * 1.1), Math.floor(room / rows)),
+    );
     ART_PIECE_IDS.forEach((id, n) => {
       const level = artLevelForPiece(id);
       if (!level) return;
@@ -131,6 +136,7 @@ export class CollectSpellbookScene extends Phaser.Scene {
     this.open = id;
     const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
     const { width, height } = this.scale.gameSize;
+    const insetTop = (this.registry.get("insets") as { top: number } | undefined)?.top ?? 0;
     const book = loadSpellbook(browserStore());
     const wins = book.entries[id]?.wins ?? 0;
     const parts: Phaser.GameObjects.GameObject[] = [];
@@ -140,7 +146,7 @@ export class CollectSpellbookScene extends Phaser.Scene {
     const cell = fitCell(level, Math.min(width, 480 * dpr) * 0.84, height * 0.42);
     const g = this.add.graphics().setDepth(11);
     const x0 = Math.round((width - level.width * cell) / 2);
-    const y0 = Math.round(height * 0.08);
+    const y0 = Math.round(insetTop + height * 0.06);
     paintPicture(g, level, x0, y0, cell);
     parts.push(g);
     const add = (y: number, s: string, size: number, color: string, bold = false) =>
@@ -178,6 +184,5 @@ export class CollectSpellbookScene extends Phaser.Scene {
       .setInteractive();
     zone.on("pointerdown", close);
     parts.push(zone);
-    if (isReducedMotion(this)) return;
   }
 }
