@@ -199,6 +199,38 @@ export function checkLevel(m: LevelMetrics, tier: Tier, level?: number): string[
   return out;
 }
 
+/** What the simulated players did on a level (the part of `LevelMetrics` M12.3 measures). */
+export interface StrategyOutcome {
+  wins: Readonly<Record<DeterministicId, boolean>>;
+  randomRate: number;
+}
+
+/**
+ * The simple-player rules of a tier's band (docs/DIFFICULTY_V2.md §5): how many of the nine cheap
+ * players may win, which must win or lose, which pairs may not both win, and the random win rate.
+ * Empty = acceptable. The tree measures (dead ends, slack, planning depth) are M12.4 and are
+ * checked by `checkLevel`, which includes these rules.
+ */
+export function checkStrategies(m: StrategyOutcome, tier: Tier): string[] {
+  const band = BANDS[tier];
+  const out: string[] = [];
+  const range = (name: string, v: number, r: Range) => {
+    if (!inRange(v, r)) out.push(`${name} ${v} outside ${show(r)} for ${tier}`);
+  };
+  range("simpleWins", simpleWins(m), band.simpleWins);
+  for (const id of band.mustWin) if (!m.wins[id]) out.push(`${id} must win ${tier} levels`);
+  for (const id of band.mustLose) if (m.wins[id]) out.push(`${id} must lose ${tier} levels`);
+  for (const [a, b] of band.notBothWin) {
+    if (m.wins[a] && m.wins[b]) out.push(`${a} and ${b} must not both win ${tier} levels`);
+  }
+  range("randomRate", m.randomRate, band.randomRate);
+  return out;
+}
+
+/** The tiers whose simple-player rules a level satisfies (a level may fit none, or several). */
+export const tiersSatisfied = (m: StrategyOutcome): Tier[] =>
+  TIERS.filter((t) => checkStrategies(m, t).length === 0);
+
 /**
  * World-level repetition check over one world's measured levels: for tiers with a cap, no single
  * deterministic player may win more than that share of the world's levels of the tier.

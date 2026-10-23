@@ -84,6 +84,7 @@ npm run art:preview  # dist/art-preview.html: all levels, stats and difficulty c
 npm run art:check    # v2 art library: art-bible rules + provenance/review (in verify/CI)
 npm run art:sheet    # dist/art-sheet.html: v2 pieces at full and phone size with rule results
 npm run art:levels    # playable preview level per v2 art piece (committed JSON; test fails if stale)
+npm run strategy:report # simulated players per level and tiers satisfied (docs/V2_STRATEGIES.md)
 npm run solver:report # solver over the slice and art preview levels (docs/V2_SOLVER.md)
 npm run density      # cube size per phone and bot play time per board size (docs/V2_ART_DENSITY.md)
 npm run audit:v1      # v1 audit: simple-strategy win rates per level (add -- --decisions for decision profile)

@@ -90,6 +90,13 @@ export interface GenerateOptions {
   budget?: number;
   /** Hill-climbing steps for profiles that ask for pitfalls (default 24; 0 turns refinement off). */
   refineSteps?: number;
+  /**
+   * Extra acceptance test (M12.3): returns the reasons a level is not acceptable, empty if it is.
+   * The hill climb then works to remove them (fewest reasons first, then more random failures), and
+   * a level with any reason left is never returned. Costly (it runs the simulated players), so only
+   * the best candidate is refined and checked.
+   */
+  gate?: (level: CollectLevel) => string[];
 }
 
 /** What the structure of a generated level is, so it can be inspected and gated. */
@@ -293,14 +300,17 @@ export function generateLevel(
   // 2. Profiles that ask for pitfalls refine the best few: a solver-guided search over the column
   //    order that raises how often random play fails, never leaving a level the solver cannot win.
   let best: Generated | null = null;
-  const pool = spec.minRandomLoss > 0 ? found.slice(0, 3) : found.slice(0, 1);
+  const gate = options.gate;
+  const refining = (spec.minRandomLoss > 0 || gate !== undefined) && refineSteps > 0;
+  // The gate runs the simulated players, which is slow: only the single best candidate is refined.
+  const pool = gate ? found.slice(0, 1) : refining ? found.slice(0, 3) : found.slice(0, 1);
   for (const c of pool) {
-    const level =
-      spec.minRandomLoss > 0
-        ? refine(c.level, budget, refineSteps, createRng(attemptSeed(seed, 1000 + c.attempt)))
-        : c.level;
+    const level = refining
+      ? refine(c.level, budget, refineSteps, createRng(attemptSeed(seed, 1000 + c.attempt)), gate)
+      : c.level;
     const result = evaluate({ ...level, slots: 8 }, spec, budget, true);
     if (!result) continue;
+    if (gate && gate(result.level).length > 0) continue;
     const s = score(result.metrics);
     if (!best || s > best.score) best = { ...result, attempt: c.attempt, acceptable, score: s };
   }
@@ -327,11 +337,20 @@ export function randomLossRate(level: CollectLevel, runs = 12): number {
 /**
  * Hill-climbs on the deal (swap or move groups; shift cubes between, or merge, groups of one colour), keeping a change
  * only when the solver can still win the level and random play fails at least as often. The slot
- * count is held fixed, so pressure comes from the order and the group sizes. Returns the input if nothing helped.
+ * count is held fixed, so pressure comes from the order and the group sizes. Returns the input if nothing helped. With a `gate`, fewer reasons to reject come first.
  */
-function refine(level: CollectLevel, budget: number, steps: number, rng: Rng): CollectLevel {
+function refine(
+  level: CollectLevel,
+  budget: number,
+  steps: number,
+  rng: Rng,
+  gate?: (level: CollectLevel) => string[],
+): CollectLevel {
   let current = level;
   let best = randomLossRate(current);
+  let bestProblems = gate ? gate(current).length : 0;
+  // Nothing to fix: the gate already accepts the candidate, so there is no need to change it.
+  if (gate && bestProblems === 0) return current;
   for (let step = 0; step < steps; step++) {
     const columns = current.columns.map((c) => c.map((g) => ({ ...g })));
     const places: [number, number][] = columns.flatMap((c, ci) =>
@@ -371,8 +390,11 @@ function refine(level: CollectLevel, budget: number, steps: number, rng: Rng): C
     const candidate: CollectLevel = { ...current, columns };
     if (columns.some((c) => c.length === 0) || validateCollectLevel(candidate).length > 0) continue;
     if (new CollectSolver(candidate, budget).solve().status !== "solved") continue;
+    const problems = gate ? gate(candidate).length : 0;
+    if (problems > bestProblems) continue;
     const loss = randomLossRate(candidate);
-    if (loss >= best) {
+    if (problems < bestProblems || loss >= best) {
+      bestProblems = problems;
       best = loss;
       current = candidate;
     }

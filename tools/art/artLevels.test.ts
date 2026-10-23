@@ -1,6 +1,7 @@
 import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { checkStrategies, type Tier } from "../../content/difficulty";
 import { pieces } from "../../content/v2art";
 import {
   decodeArtLevel,
@@ -74,6 +75,15 @@ describe("the art library's preview levels", () => {
       expect(level.slots, level.id).toBe(Math.min(8, m.minSlots + spec.slack));
       expect(collect.minSlots(level, 200_000).slots, level.id).toBe(m.minSlots);
       expect(m.cubes).toBe(level.cells.filter((c) => c >= 0).length);
+    }
+  });
+
+  it("the pipeline enforces the tier: every level's recorded player results are true and meet its band", () => {
+    for (const { level, generated: record } of generated) {
+      const report = collect.strategyReport(level);
+      expect(record.strategies.wins, level.id).toEqual(report.wins);
+      expect(record.strategies.randomRate, level.id).toBe(report.randomRate);
+      expect(checkStrategies(report, record.tier as Tier), level.id).toEqual([]);
     }
   });
 
