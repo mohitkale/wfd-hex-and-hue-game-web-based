@@ -5,6 +5,8 @@ import { DragScroll, takeRestoredScroll } from "../view/DragScroll";
 import { fadeIn } from "../view/transition";
 import { artLevelForPiece } from "./artLevels";
 import { computeCollectLayout } from "./collectLayout";
+import { utcDate } from "./daily";
+import { dailyStatus, readDailyBook } from "./dailyBook";
 import { buildGallery, pageFor } from "./gallery";
 import { fitCell, paintPicture, paintSilhouette } from "./pictureView";
 import { browserStore, loadSpellbook } from "./v2Spellbook";
@@ -64,7 +66,7 @@ export class CollectSpellbookScene extends Phaser.Scene {
     }).frame;
     const gallery = buildGallery(loadSpellbook(browserStore()));
     const cx = frame.x + frame.w / 2;
-    const headerH = frame.y + 80 * dpr;
+    const headerH = frame.y + 98 * dpr;
     const footerH = 84 * dpr;
 
     // Scrolling content: sections of two-column cards under the sticky header.
@@ -173,14 +175,57 @@ export class CollectSpellbookScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
       .setDepth(6);
-    const bw = Math.min(frame.w * 0.6, 220 * dpr);
-    const back = new Button(this, cx, height - footerH / 2, bw, "Back to the board", {
-      dpr,
-      primary: true,
-      onPress: () => this.scene.start("collect"),
-    });
-    this.add.existing(back);
-    back.setScrollFactor(0).setDepth(6);
+    this.add
+      .text(
+        cx,
+        frame.y + 72 * dpr,
+        dailyStatus(readDailyBook(browserStore()).book, utcDate(Date.now())),
+        {
+          fontFamily: theme.font,
+          fontSize: `${Math.round(13 * dpr)}px`,
+          color: "#f6d97a",
+          align: "center",
+          wordWrap: { width: frame.w - 2 * side },
+        },
+      )
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(6);
+    // Footer: the daily challenge beside the way back to the board (both free, both always there).
+    const gapX = 10 * dpr;
+    const total = Math.min(frame.w - 2 * side, 360 * dpr);
+    const dailyW = total * 0.38;
+    const backW = total - dailyW - gapX;
+    const dailyBtn = new Button(
+      this,
+      cx - total / 2 + dailyW / 2,
+      height - footerH / 2,
+      dailyW,
+      "Daily",
+      {
+        dpr,
+        onPress: () => {
+          this.registry.set("v2.level", "daily");
+          this.scene.start("collect");
+        },
+      },
+    );
+    const back = new Button(
+      this,
+      cx + total / 2 - backW / 2,
+      height - footerH / 2,
+      backW,
+      "Back to board",
+      {
+        dpr,
+        primary: true,
+        onPress: () => this.scene.start("collect"),
+      },
+    );
+    for (const b of [dailyBtn, back]) {
+      this.add.existing(b);
+      b.setScrollFactor(0).setDepth(6);
+    }
     if (this.open) this.showPage(this.open);
   }
 

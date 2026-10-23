@@ -150,7 +150,7 @@ _Give players meaningful reasons to continue._
 - [x] **M13.2** Spellbook as a collectible gallery — Show completed illustrations, names and lore, with replay. _Needs M11.5 and the world structure (M13.1 part one); the world slots need not be filled first._
 - [x] **M13.3** Meaningful completion moments — World-specific, skippable completion effects. _Needs M11.5 and the world structure (M13.1 part one); the world slots need not be filled first._
 - [x] **M13.4** Introduce selected puzzle variety — Evaluate and add at most one new mechanic at a time (locked fragments, barriers, order constraints, timed portals, limited assistance). _Needs M12.6._
-- [ ] **M13.5** Daily challenges — Deterministic daily puzzle with completion tracking and spoiler-free sharing. _Needs M12.6._
+- [x] **M13.5** Daily challenges — Deterministic daily puzzle with completion tracking and spoiler-free sharing. _Needs M12.6._
 
 ### M14 — Player experience, rewards and retention
 

@@ -27,6 +27,9 @@ export interface CompletionOptions {
   saved: boolean;
   /** The picture's world: its line, seal and backdrop (null if no world claims it, or it was not saved). */
   world: WorldMoment | null;
+  /** Today's daily challenge (M13.5): its line and the text to share; null on any other level. */
+  daily: { line: string; shareText: string | null } | null;
+  onShare: (text: string) => void;
   /** Show the finished picture at once (a relayout after the reveal was already seen or skipped). */
   instant: boolean;
   onSpellbook: () => void;
@@ -59,6 +62,8 @@ export class CompletionOverlay {
   private readonly x0: number;
   private readonly y0: number;
   private readonly ring: Phaser.GameObjects.Graphics;
+  private dailyLine: Phaser.GameObjects.Text | null = null;
+  private noteTimer: Phaser.Time.TimerEvent | null = null;
   private pulseOn = false;
   private pulseStart = 0;
   private startedAt = -1;
@@ -76,8 +81,12 @@ export class CompletionOverlay {
     this.spec = effectForTheme(level.subject.theme);
     this.times = revealTimes(level.width, level.height, this.spec.order);
     this.seeds = particleSeeds(this.spec, level.width, level.height);
-    // A world line adds a row of text, so the picture gives it a little room.
-    this.cell = fitCell(level, l.frame.w * 0.84, l.frame.h * (o.world ? 0.35 : 0.4));
+    // The world line and the daily line each add a row of text, so the picture gives them room.
+    this.cell = fitCell(
+      level,
+      l.frame.w * 0.84,
+      l.frame.h * (0.4 - 0.05 * ((o.world ? 1 : 0) + (o.daily ? 1 : 0))),
+    );
     this.x0 = Math.round(l.frame.x + (l.frame.w - level.width * this.cell) / 2);
     this.y0 = Math.round(l.frame.y + l.frame.h * 0.07);
 
@@ -133,6 +142,11 @@ export class CompletionOverlay {
       this.later.push(worldLine, seal);
       belowLore += worldLine.height + 8 * dpr;
     }
+    if (o.daily) {
+      this.dailyLine = text(belowLore, o.daily.line, 13, "#f6d97a", true);
+      this.later.push(this.dailyLine);
+      belowLore += this.dailyLine.height + 8 * dpr;
+    }
     const book = text(
       belowLore,
       !o.saved
@@ -149,9 +163,27 @@ export class CompletionOverlay {
       l.frame.y + l.frame.h - 70 * dpr,
       book.y + book.height + 24 * dpr + 24 * dpr,
     );
-    const spellbook = new Button(scene, cx, by, bw, "Spellbook", { dpr, onPress: o.onSpellbook })
+    // On a daily the Spellbook button shares its row with Share.
+    const half = o.daily?.shareText ? Math.min(l.frame.w * 0.84, 340 * dpr) / 2 - 5 * dpr : bw;
+    const spellbook = new Button(
+      scene,
+      o.daily?.shareText ? cx - half / 2 - 5 * dpr : cx,
+      by,
+      half,
+      "Spellbook",
+      { dpr, onPress: o.onSpellbook },
+    )
       .setDepth(54)
       .setAlpha(0);
+    // A practice run has nothing to share.
+    const share = o.daily?.shareText
+      ? new Button(scene, cx + half / 2 + 5 * dpr, by, half, "Share", {
+          dpr,
+          onPress: () => o.onShare(o.daily!.shareText!),
+        })
+          .setDepth(54)
+          .setAlpha(0)
+      : null;
     const again = new Button(scene, cx, by + 58 * dpr, bw, "Play again", {
       dpr,
       primary: true,
@@ -161,11 +193,13 @@ export class CompletionOverlay {
       .setAlpha(0);
     scene.add.existing(spellbook);
     scene.add.existing(again);
-    this.later.push(name, caption, lore, book, spellbook, again);
+    if (share) scene.add.existing(share);
+    this.later.push(name, caption, lore, book, spellbook, again, ...(share ? [share] : []));
     this.objects.push(...this.later);
 
     // Disabled until the reveal is done so a stray tap cannot press them while they fade in.
-    for (const b of [spellbook, again]) b.disableInteractive();
+    const all = share ? [spellbook, share, again] : [spellbook, again];
+    for (const b of all) b.disableInteractive();
     const zone = scene.add
       .zone(l.frame.x + l.frame.w / 2, l.frame.y + l.frame.h / 2, l.frame.w, l.frame.h)
       .setDepth(55)
@@ -173,7 +207,18 @@ export class CompletionOverlay {
     zone.on("pointerdown", () => this.skip());
     this.objects.push(zone);
     this.zone = zone;
-    this.buttons = [spellbook, again];
+    this.buttons = all;
+  }
+
+  /** Replaces the daily line for a moment ("Copied to clipboard"), then puts it back. */
+  note(message: string, ms = 2200): void {
+    const line = this.dailyLine;
+    const original = this.o.daily?.line;
+    if (!line || !line.active || original === undefined) return;
+    line.setText(message);
+    // A newer note takes over: only the latest timer puts the line back.
+    this.noteTimer?.remove();
+    this.noteTimer = this.scene.time.delayedCall(ms, () => line.active && line.setText(original));
   }
 
   /** Jumps to the finished picture; the text and buttons follow. */
