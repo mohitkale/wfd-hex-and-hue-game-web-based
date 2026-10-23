@@ -43,14 +43,24 @@ from the sheet, and the checks would stay the same.
 
 ## What I think is weak
 
+Most likely to be rejected, in my view: the **Black Cat** and the **Crescent Moon**.
+
+- **Black Cat:** the ears, green eyes and nose read, but at phone size the body and head are a
+  low-contrast dark blob. The "moon" behind it does not read as a moon: it shows as a gold arc on the
+  left, a bar across the top and a strip on the right, so it looks more like a frame than a moon and
+  it fragments the head outline. The whiskers are two faint lavender cells and the striped tail is
+  not visible in either sheet. This piece needs a redraw, not a polish.
+- **Crescent Moon:** recognisable, but the gold crescent has a fat belly (it can read as a boat) and
+  the purple outer arc is a detached ring, so the two together look like a double crescent.
 - **Amethyst Cluster:** three clear points, but the rock base is a flat slab and the crystals have
-  few facet details. The weakest piece.
-- **Black Cat:** reads as a cat (ears, green eyes, whiskers, the moon behind), but the body and
-  tail are large, fairly flat areas of one dark family. A fur texture pass would help.
-- **Triple Moon:** the symbol reads at once, but the craters on the full moon are faint.
-- **Witch's Cauldron:** the flames are chunky and the bubbles are small blocks.
+  few facet details. The weakest of the rest.
+- **Libra, the Scales:** clearly scales, but the pans hang on plain vertical bars, so they read a
+  little like hollow boxes; no chain detail.
+- **Witch's Cauldron:** the flames are chunky, the legs stubby and the bubbles small blocks.
+- **Triple Moon:** the strongest, reads at once; the craters on the full moon are faint.
 - **Palette:** Night (dark violet) is the family for every dark thing and sits close to the board
-  colour. It passes the contrast floor (1.7:1 or better) but feels muted next to Gold and Amethyst.
+  colour. It passes the contrast floor (the lowest shade is 1.69:1 against the board) but feels
+  muted next to Gold and Amethyst.
 - **Size:** at 30 per side and 300-575 cubes these are modest. The density work says 32 is the
   practical default; bigger "hero" pieces (36-40) are untested as art.
 
@@ -65,9 +75,12 @@ from the sheet, and the checks would stay the same.
 4. Is **30 per side / 300-575 cubes** the right feel for a standard piece (M11.2's bots took 40-90 s for 430-770 cubes
    when tapping eagerly and 2.5-6 minutes when waiting for the board each time; real pacing is set
    by squad and spawn gap), or should pictures be bigger or smaller?
-5. Is a **moon behind the cat** (a backdrop vignette) the right way to show a dark subject, or would
-   you rather the dark pieces sit on the bare board with a lit rim?
-6. Do you accept the drafting-aid workflow above, or must pieces be redrawn by hand?
+5. The black cat shows the problem of a dark subject on a dark board. My attempt (a gold moon behind
+   it) did not work. Would you rather dark subjects get a clearer backdrop shape, or sit on the bare
+   board with a lit rim?
+6. Do you accept the drafting-aid workflow above, or must pieces be redrawn by hand? Until you
+   answer, the `source: "hand-drawn"` label on these pieces is **not settled**: it is generous for a
+   workflow that generated the silhouettes and base shading.
 7. Please also run the 32×32 density board (`npm run dev`, then `/play/?engine=v2&level=dense`) on
    your phone and tell me whether it stays smooth: this is the on-device check deferred from M11.2.
 
