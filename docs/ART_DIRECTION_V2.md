@@ -228,12 +228,13 @@ caps families at 8 for readability, so the engine ceiling is never the binding l
 holds a palette of plain colours with no shade; carrying shades alongside families is the engine
 and pipeline work in M11.2 and M11.4.
 
-**What the later tasks inherit** (also recorded in the roadmap): M11.2 adds the per-cell shade to
-the level model and renderer (family still decides gameplay) alongside the larger grids. M11.4 adds
-`npm run art:check` implementing every rule marked **[check]** with the section 5a definitions,
-reports A-17 as a warning, enforces the provenance fields of section 6, and **replaces** the single
-distance-90 rule in `tools/art/check.ts`, which would otherwise reject every multi-shade ramp
-(shade steps are 44-164). Until then v1 art keeps using `check.ts` unchanged.
+**Where each part landed:** M11.2 added the per-cell shade to the level model and renderer
+(family still decides gameplay). M11.4 implemented every rule marked **[check]** in
+`tools/art/rules.ts` with the section 5a definitions (`npm run art:check`, part of `npm run
+verify`), reports A-17 as a warning, enforces the provenance fields of section 6, and uses the
+families-and-ramps rules for v2 art instead of the single distance-90 rule in `tools/art/check.ts`,
+which would reject every multi-shade ramp (steps are 44-164) and stays in place for v1 art. See
+[ART_PIPELINE.md](ART_PIPELINE.md).
 
 ## 8. Worked before / after
 

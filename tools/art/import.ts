@@ -5,10 +5,17 @@
  *
  * Transparent pixels become empty cells. Upscaled art is detected automatically (or pass --block).
  * Prints the snippet plus any readability problems (colors too dark or too similar).
+ *
+ * Production art (docs/ART_DIRECTION_V2.md): add `--families` to snap colours to the house families
+ * and print a v2 piece for content/v2art plus the art-rule report:
+ *
+ *   npm run art:import -- art.png candle --families --author "Name" [--max-families 6] [--max-error 45]
  */
 import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 import { artProblems } from "./check";
+import { importFamilies, toPieceSource } from "./importFamilies";
+import { checkPiece } from "./rules";
 import { MAX_IMPORT_COLORS, quantize, toAsciiSource } from "./quantize";
 
 const USAGE = `usage: npm run art:import -- <file.png> <name> [--max-colors 1..${MAX_IMPORT_COLORS}] [--block N]`;
@@ -34,8 +41,8 @@ const int = (name: string, fallback: number, min: number, max: number): number =
     fail(`--${name} must be an integer ${min}..${max}`);
   return n;
 };
-for (const k of flags.keys())
-  if (k !== "max-colors" && k !== "block") fail(`unknown option --${k}`);
+const KNOWN = ["max-colors", "block", "families", "author", "max-families", "max-error"];
+for (const k of flags.keys()) if (!KNOWN.includes(k)) fail(`unknown option --${k}`);
 
 const [file, name = "art"] = positional;
 if (!file) fail("missing PNG file");
@@ -43,6 +50,38 @@ if (!/^[A-Za-z_$][\w$]*$/.test(name)) fail(`"${name}" is not a valid identifier`
 
 try {
   const png = PNG.sync.read(readFileSync(file!));
+  if (flags.has("families")) {
+    if (!/^[a-z][a-z0-9-]*$/.test(name)) fail(`--families needs a kebab-case id, got "${name}"`);
+    const result = importFamilies(new Uint8Array(png.data), png.width, png.height, {
+      block: int("block", 0, 0, Math.min(png.width, png.height)),
+      maxFamilies: int("max-families", 8, 1, 8),
+      maxMeanError: int("max-error", 45, 1, 400),
+    });
+    const author = flags.get("author") || "unknown";
+    console.log(toPieceSource(name, result, author));
+    console.error(
+      `${result.width}×${result.height}, ${Object.keys(result.legend).length} shades; ` +
+        `mean error ${result.error.mean}, worst ${result.error.max}`,
+    );
+    const piece = {
+      id: name,
+      name: name,
+      theme: "other" as const,
+      lore: "imported",
+      rows: result.rows,
+      legend: result.legend,
+      provenance: {
+        author,
+        source: "imported-png" as const,
+        licence: "original-owner-pending" as const,
+        reviewed: false,
+      },
+    };
+    for (const f of checkPiece(piece).findings)
+      if (!f.ok && !f.id.startsWith("PR-"))
+        console.error(`${f.severity === "error" ? "✗" : "⚠"} ${f.id}: ${f.measured}`);
+    process.exit(0);
+  }
   const block = int("block", 0, 0, Math.min(png.width, png.height));
   const art = quantize(new Uint8Array(png.data), png.width, png.height, {
     maxColors: int("max-colors", 8, 1, MAX_IMPORT_COLORS),

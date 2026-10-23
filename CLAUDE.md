@@ -81,6 +81,9 @@ npm test             # vitest (includes the shipped-level check)
 npm run levels       # rebuild stale levels after editing content/ or core engine files (commit the JSON)
 npm run art:import -- art.png name   # PNG pixel art → AsciiArt snippet for content/art
 npm run art:preview  # dist/art-preview.html: all levels, stats and difficulty curve
+npm run art:check    # v2 art library: art-bible rules + provenance/review (in verify/CI)
+npm run art:sheet    # dist/art-sheet.html: v2 pieces at full and phone size with rule results
+npm run density      # cube size per phone and bot play time per board size (docs/V2_ART_DENSITY.md)
 npm run audit:v1      # v1 audit: simple-strategy win rates per level (add -- --decisions for decision profile)
 npm run icons        # regenerate PWA icons (apps/web/public/icons) from tools/icons/icon.ts
 npm run budget       # check the production build against the performance budget (in verify/CI)
