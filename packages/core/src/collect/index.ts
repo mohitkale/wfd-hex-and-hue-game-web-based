@@ -33,3 +33,4 @@ export { nearestTarget, hasAssignable, type Target } from "./targeting";
 export { computeDist, paddedIndex, topologyFor } from "./grid";
 export type { CollectEvent, LossReason, TickBatch } from "./events";
 export { groupViews, remaining, uncommitted, type GroupView } from "./groups";
+export { firstFreeSlot, freeSlots, slotViews, type SlotView } from "./slots";
