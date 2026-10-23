@@ -39,6 +39,14 @@ export class TickClock {
     return Math.max(0, Math.min(1, this.acc / this.tickMs));
   }
 
+  /**
+   * Drops whole ticks that are due while nothing is ticking (the game is settled or over), keeping
+   * `alpha` continuous so nothing snaps back mid-step and the next action starts within a tick.
+   */
+  drain(): void {
+    this.acc = Math.min(this.acc, this.tickMs * 0.999);
+  }
+
   /** Starts the next tick from zero (e.g. after a pause or an undo). */
   reset(): void {
     this.acc = 0;

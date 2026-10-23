@@ -6,6 +6,7 @@ import {
   spriteScaleForCell,
   type CollectLayoutInput,
 } from "./collectLayout";
+import { createRng } from "@hexhue/core";
 import { TickClock } from "./tickClock";
 import { VisualModel, frameFor, lerpPoint } from "./visuals";
 
@@ -167,6 +168,19 @@ describe("tick clock", () => {
     expect(c.advance(16, 1)).toBeLessThanOrEqual(1);
   });
 
+  it("drain drops due ticks but keeps the position inside the tick (no snap-back)", () => {
+    const c = new TickClock(10);
+    c.advance(30, 1);
+    const before = c.alpha;
+    c.drain();
+    expect(c.alpha).toBeCloseTo(before);
+    c.advance(1_000, 1); // a long idle period nobody ticked
+    c.drain();
+    expect(c.alpha).toBeLessThan(1);
+    expect(c.alpha).toBeGreaterThan(0.9); // the next action starts within a tick
+    expect(c.advance(5, 1)).toBe(1);
+  });
+
   it("ignores zero or negative frame time and can be reset", () => {
     const c = new TickClock();
     expect(c.advance(0, 1)).toBe(0);
@@ -278,5 +292,49 @@ describe("visual model", () => {
     expect(frameFor(v("deliver"), 5)).toBe("deliver");
     expect(frameFor(v("idle"), 0)).toBe("idle0");
     expect(frameFor(v("retiring"), 1)).toBe("idle1");
+  });
+});
+
+describe("visual model stays consistent through mid-flight taps, undo and restart", () => {
+  it("matches a rebuild from the state at every tick of random sessions", () => {
+    let ticks = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const rng = createRng(seed);
+      const session = new collect.CollectSession(levelB());
+      const portal = session.state.params.portal;
+      const groupColor = (g: number) => session.state.groups[g]!.color;
+      let model = new VisualModel(portal, groupColor);
+      session.subscribe((b) => {
+        for (const e of b.events) model.apply(e, b.tick);
+      });
+      // The scene rebuilds its model from the state after an undo or restart; do the same.
+      session.onReplace(() => {
+        model = new VisualModel(portal, groupColor);
+        model.resync(session.state as collect.CollectState);
+      });
+      for (let i = 0; i < 1_500; i++) {
+        const r = rng.next();
+        if (r < 0.2) {
+          const legal = collect.legalActions(session.state as collect.CollectState);
+          if (legal.length > 0) session.tap(legal[rng.int(0, legal.length - 1)]!);
+        } else if (r < 0.215) session.undo();
+        else if (r < 0.22) session.restart();
+        session.tick();
+        ticks++;
+        const rebuilt = new VisualModel(portal, groupColor);
+        rebuilt.resync(session.state as collect.CollectState);
+        const live = [...model.familiars.values()].filter((v) => v.mode !== "retiring");
+        expect(live.map((v) => v.id).sort(), `seed ${seed} step ${i}`).toEqual(
+          [...rebuilt.familiars.keys()].sort(),
+        );
+        for (const v of live) {
+          const w = rebuilt.familiars.get(v.id)!;
+          expect(v.to).toBe(w.to);
+          expect(v.carried === null).toBe(w.carried === null);
+        }
+        for (const [id, v] of [...model.familiars]) if (v.mode === "retiring") model.remove(id);
+      }
+    }
+    expect(ticks).toBe(45_000);
   });
 });

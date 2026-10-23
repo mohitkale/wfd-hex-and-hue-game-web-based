@@ -3,6 +3,7 @@ import {
   BUDGETS,
   checkBudgets,
   inlineScripts,
+  v2ChunkProblems,
   scriptClosure,
   scriptLeaks,
   type BuiltFile,
@@ -39,16 +40,16 @@ describe("performance budget", () => {
     expect(html).toMatchObject({ ok: false, file: "blog/big/index.html" });
   });
 
-  it("counts the v2 review chunk against its own limit, not the play JS total", () => {
+  it("counts the v2 review chunk (v2/CollectScene.js) against its own limit, not the play JS total", () => {
     const results = checkBudgets([
       file("_astro/play.abc.js", 100_000),
-      file("_astro/CollectScene.xyz.js", 120_000),
+      file("v2/CollectScene.js", 120_000),
     ]);
     const play = results.find((r) => r.label === "play page JS")!;
     const v2 = results.find((r) => r.label === "v2 collect chunk")!;
     expect(play.value).toBe(100_000);
     expect(v2.value).toBe(120_000);
-    expect(v2.ok).toBe(false); // 120,000 bytes gzip-equivalent is over its 40 KB allowance
+    expect(v2.ok).toBe(false);
     expect(play.ok).toBe(true);
   });
 
@@ -100,5 +101,26 @@ describe("content page scripts", () => {
         bundles,
       ),
     ).toEqual([{ page: "blog/x/index.html", gzip: 397_000 + 900 + 1_000 }]);
+  });
+});
+
+describe("v2 review chunk build check", () => {
+  const ok = ["_astro/play.abc.js", "v2/CollectScene.js"];
+  const play = { path: "_astro/play.abc.js", text: 'import("../v2/CollectScene.js")' };
+
+  it("passes when the chunk keeps its stable name and the play bundle references only that", () => {
+    expect(v2ChunkProblems(ok, [play])).toEqual([]);
+  });
+
+  it("fails when the chunk is missing, hashed, precached, or referenced by a hashed name", () => {
+    expect(v2ChunkProblems(["_astro/play.abc.js"], [play]).join()).toContain("missing");
+    expect(v2ChunkProblems([...ok, "_astro/CollectScene.xyz123.js"], [play]).join()).toContain(
+      "landed in _astro/",
+    );
+    expect(
+      v2ChunkProblems(ok, [
+        { path: "_astro/play.abc.js", text: 'import("./CollectScene.DYf-WGoq.js")' },
+      ]).join(),
+    ).toContain("hashed v2 chunk name");
   });
 });

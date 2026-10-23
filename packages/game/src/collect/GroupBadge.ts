@@ -93,10 +93,6 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.setSize(w, h);
   }
 
-  get number(): number {
-    return this.shown;
-  }
-
   /** Shows a new remaining number, with a small pop when it changes. */
   setNumber(n: number): void {
     if (n === this.shown) return;
@@ -108,8 +104,11 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.scene.tweens.add({ targets: this.label, scale: 1, duration: 160, ease: "Back.easeOut" });
   }
 
-  /** Dims a group that cannot be used right now. */
-  setDim(dim: boolean): void {
-    this.setAlpha(dim ? 0.55 : 1);
+  /** A small bump when a cube lands in the portal (decorative: the number itself already shows the truth). */
+  pulse(): void {
+    if (isReducedMotion(this.scene)) return;
+    this.scene.tweens.killTweensOf(this);
+    this.setScale(1.08);
+    this.scene.tweens.add({ targets: this, scale: 1, duration: 150, ease: "Back.easeOut" });
   }
 }

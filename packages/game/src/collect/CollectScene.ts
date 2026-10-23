@@ -4,7 +4,7 @@ import { isReducedMotion } from "../a11y";
 import type { Insets } from "../layout";
 import { theme } from "../theme";
 import { Button } from "../view/Button";
-import { getSave } from "../save";
+import { whenSaveReady } from "../save";
 import { ensureTextures, TEX } from "../view/textures";
 import { fadeIn } from "../view/transition";
 import { CubeLayer } from "./CubeLayer";
@@ -68,8 +68,7 @@ export class CollectScene extends Phaser.Scene {
     const level = levelFromSearch(search);
     const params = new URLSearchParams(search);
     if (params.get("speed") === "2") this.speed = 2;
-    this.colorblind =
-      params.get("cb") === "1" || (getSave(this)?.data.settings.colorblind ?? false);
+    this.colorblind = params.get("cb") === "1";
     this.session = new collect.CollectSession(level);
     this.unsubscribe.push(
       this.session.subscribe((batch) => this.onBatch(batch)),
@@ -82,6 +81,20 @@ export class CollectScene extends Phaser.Scene {
       this.unsubscribe = [];
     });
     this.build();
+    // Saved settings arrive after the scene starts: pick up the colour-blind setting (and a changed
+    // reduced-motion setting) when they do, rebuilding once if they differ from what was drawn.
+    whenSaveReady(this, (save) => {
+      const wanted = params.get("cb") === "1" || (save?.data.settings.colorblind ?? false);
+      if (wanted !== this.colorblind) {
+        this.colorblind = wanted;
+        this.rebuild();
+      }
+    });
+    const onMotion = () => this.rebuild();
+    this.registry.events.on("changedata-reducedMotion", onMotion);
+    this.events.once("shutdown", () =>
+      this.registry.events.off("changedata-reducedMotion", onMotion),
+    );
     fadeIn(this);
     // Dev handle for browser-driven checks of the review build.
     if (import.meta.env?.DEV) (window as unknown as { __collect?: CollectScene }).__collect = this;
@@ -154,7 +167,7 @@ export class CollectScene extends Phaser.Scene {
     );
     this.familiars.onDelivered = (_color, group) => {
       this.pulsePortal();
-      this.panels.badge(group)?.setNumber(this.remainingOf(group));
+      this.panels.badge(group)?.pulse();
     };
     this.panels = new PanelsView(
       this,
@@ -170,11 +183,6 @@ export class CollectScene extends Phaser.Scene {
     this.buildInput();
     this.clock.reset();
     if (state.status !== "playing") this.showEnd(0);
-  }
-
-  private remainingOf(group: number): number {
-    const g = this.session.state.groups[group]!;
-    return g.capacity - g.delivered;
   }
 
   private drawBoardBackground(): void {
@@ -306,7 +314,6 @@ export class CollectScene extends Phaser.Scene {
       if (reason !== "ok" && reason !== "unavailable") this.toast(REASON_TEXT[reason]);
       return;
     }
-    this.clock.reset();
     this.panels.sync(this.session.state);
   }
 
@@ -354,18 +361,22 @@ export class CollectScene extends Phaser.Scene {
   private onBatch(batch: collect.TickBatch): void {
     // The scene may be rebuilding (undo/restart notify first): views are rebuilt from state then.
     if (!this.model || !this.cubes) return;
+    let marksChanged = false;
     for (const e of batch.events) {
       this.model.apply(e, batch.tick);
       if (e.type === "cubeReserved") {
         const v = this.model.familiars.get(e.familiar);
-        if (v) this.marks.set(e.cube, v.colorIndex);
+        if (v) {
+          this.marks.set(e.cube, v.colorIndex);
+          marksChanged = true;
+        }
       } else if (e.type === "cubePickedUp") {
         this.cubes.remove(e.cube);
-        this.marks.delete(e.cube);
+        marksChanged = this.marks.delete(e.cube) || marksChanged;
       }
       this.familiars.handle(e);
     }
-    this.cubes.setMarks(this.marks);
+    if (marksChanged) this.cubes.setMarks(this.marks);
     this.panels.sync(this.session.state);
     const status = this.session.state.status;
     if (status !== "playing" && this.overlay.length === 0 && !this.overlayTimer) {
@@ -378,11 +389,19 @@ export class CollectScene extends Phaser.Scene {
     const due = this.clock.advance(delta, this.speed);
     for (let i = 0; i < due; i++) {
       if (this.session.tick() === null) {
-        this.clock.reset();
+        // Nothing is ticking (settled or over): drop the backlog but keep the position inside the
+        // current tick, so familiars never snap back.
+        this.clock.drain();
         break;
       }
     }
-    this.familiars.update(this.session.state.tick, this.clock.alpha, time);
+    if (due === 0 && this.session.state.status !== "playing") this.clock.drain();
+    this.familiars.update(
+      this.session.state.tick,
+      this.clock.alpha,
+      time,
+      this.clock.tickMs / this.speed,
+    );
     this.cubes.flush();
   }
 

@@ -30,7 +30,7 @@ export class PanelsView {
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private layout: CollectLayout,
+    private readonly layout: CollectLayout,
     private readonly palette: readonly string[],
     private readonly atlas: string,
     private readonly dpr: number,
@@ -46,16 +46,16 @@ export class PanelsView {
     g.lineStyle(Math.max(1, this.dpr * 1.5), theme.mist, 0.28);
     for (const r of [...l.field, ...l.slots]) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.2);
     this.extra.push(g);
-    const label = (text: string, r: { x: number; y: number; h: number }) => {
+    const label = (text: string, r: { x: number; y: number }) => {
       const t = this.scene.add
-        .text(r.x, r.y - Math.round(this.dpr * 1), text, {
+        .text(r.x + 6 * this.dpr, r.y + 4 * this.dpr, text, {
           fontFamily: theme.font,
-          fontSize: `${Math.round(10 * this.dpr)}px`,
+          fontSize: `${Math.round(9 * this.dpr)}px`,
           color: theme.textDim,
         })
-        .setOrigin(0, 1)
+        .setOrigin(0, 0)
         .setDepth(9)
-        .setAlpha(0.75);
+        .setAlpha(0.7);
       this.extra.push(t);
     };
     if (l.field[0]) label("WORKING", l.field[0]);
@@ -74,12 +74,13 @@ export class PanelsView {
     s: Readonly<CollectState>,
     id: number,
     working: number[],
+    views: readonly collect.GroupView[],
   ): { place: Place; index: number; depth: number } | null {
     const g = s.groups[id]!;
     if (g.status === "working") return { place: "field", index: working.indexOf(id), depth: 0 };
     if (g.status === "waiting") return { place: "slot", index: s.slots.indexOf(id), depth: 0 };
     if (g.status === "queued") {
-      const view = collect.groupViews(s)[id]!;
+      const view = views[id]!;
       if (view.column === null || view.depth === null || view.depth > PEEK) return null;
       return { place: "column", index: view.column, depth: view.depth };
     }
@@ -115,12 +116,17 @@ export class PanelsView {
   /** Re-places every badge for `state`. Call after each tick batch, tap, undo or resize. */
   sync(state: Readonly<CollectState>): void {
     const working = state.groups.filter((g) => g.status === "working").map((g) => g.id);
+    const views = collect.groupViews(state);
     for (const g of state.groups) {
-      const target = this.target(state, g.id, working);
+      const target = this.target(state, g.id, working, views);
       const t = this.tracked.get(g.id);
       const remaining = g.capacity - g.delivered;
       if (!target) {
-        if (t && !t.completing) this.finish(g.id, t, g.status === "completed");
+        if (t && !t.completing) {
+          // Show the engine's number (0 for a finished group) before it leaves, never a stale one.
+          t.badge.setNumber(remaining);
+          this.finish(g.id, t, g.status === "completed");
+        }
         continue;
       }
       if (
@@ -180,17 +186,6 @@ export class PanelsView {
         if (this.tracked.get(id) === t) this.tracked.delete(id);
       },
     });
-  }
-
-  /** Re-lays everything out for a new layout (resize). */
-  relayout(layout: CollectLayout, state: Readonly<CollectState>): void {
-    this.layout = layout;
-    for (const t of this.tracked.values()) t.badge.destroy();
-    this.tracked.clear();
-    for (const o of this.extra) o.destroy();
-    this.extra.length = 0;
-    this.drawFrames();
-    this.sync(state);
   }
 
   /** The badge of group `id` (for pop effects), if drawn. */

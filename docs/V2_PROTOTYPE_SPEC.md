@@ -273,7 +273,7 @@ index). **`collect/` must not edit `level.ts`, `track.ts`, `sim.ts`, `rng.ts`, `
   `groups[familiar.group].color`. Nothing in the game package mutates `CollectState` or `params`
   (`squad`, `spawnGap` and `fieldCap` are level constants and the renderer only receives
   `Readonly` state).
-- **Speed.** `ticksPerSecond` ≈ 10 at 1× (tuned in M10.4); 2× doubles `speed`.
+- **Speed.** `ticksPerSecond` is **24 at 1×** (set in M10.2 after watching a 20-cell board cross at 10 per second: too slow; further tuning in M10.3–M10.4); 2× doubles `speed`.
 - **Reduced motion** removes decorative motion (trails, bobbing, shake) but keeps ticks and
   deliveries.
 - **Input.** Tap targets are column fronts and filled slots. The scene calls `session.tap`; on
@@ -286,19 +286,27 @@ This needs a small, listed set of v1 edits, because the build, service worker an
 shared:
 
 1. **Flag.** `?engine=v2` on `/play/` (or `PUBLIC_ENGINE=v2` at build time for review builds)
-   selects v2. In `packages/game/src/index.ts`, after the boot sequence, the flag branch loads
-   `collect/CollectScene` with a dynamic `import()` and starts it instead of the title. Without the
+   selects v2. In `packages/game/src/index.ts`, the flag branch loads `collect/CollectScene` with a
+   dynamic `import()` (with a `.catch` for an offline or stale chunk) and, once the **scene manager**
+   has booted (`game.scene.isBooted`, not `game.isBooted`, which is set earlier), stops the title and
+   starts it. Without the
    flag the code path is unchanged. The existing DPR-change handler restarts every non-`play` scene
    and would restart the v2 scene mid-game, so that one `continue` is extended to the v2 scene key.
-2. **Chunk name and budget.** The v2 chunk is named `collect` (`_astro/collect.*.js`). The existing
-   line "play page JS" (all `_astro/*.js` except workers, ≤ 450 KB gzip, 391.5 KB at M7.4) excludes
-   it; `tools/perf/budget.ts` gets a **separate line for `collect*.js`: ≤ 40 KB gzip** (M10.1), so
-   the allowance is enforced, not just stated. Unused v1 headroom stays v1's.
-3. **Service worker.** `serviceWorker.ts` precaches every `_astro/*` file and hashes them into the
-   cache version, so a v2 chunk would be downloaded by every v1 player and change the version (the
-   "update available" prompt) on every v2 deploy. `isShell` therefore skips `_astro/collect.*` (and
-   the cache-version hash ignores it); v2 loads over the network when the flag is used. A test pins
-   this. After the switch (M15.5) the exclusion is removed.
+2. **Chunk name, location and budget (as built in M10.2).** The v2 scene is the lazily loaded
+   `v2/CollectScene.js`: a **stable, unhashed name, outside `_astro/`**. (A hashed name is embedded
+   in the play bundle that imports it, so every v2-only change would also change the shipped bundle
+   and the service worker version; the first attempt, a hashed chunk in `_astro/`, did exactly that
+   and was caught in review.) It is served `no-cache` (`/v2/*` in `public/_headers`, `location /v2/`
+   in nginx, tested), is not part of "play page JS", and has its own line in `tools/perf/budget.ts`:
+   **≤ 40 KB gzip** (13.5 KB when built). `tools/perf/check.ts` fails the build if the chunk is
+   missing, moves into `_astro/`, or any play bundle references a hashed name. A build experiment is
+   documented in `docs/V2_REVIEW_BUILD.md`: changing only v2 code leaves `play*.js` and `sw.js`
+   byte-identical. The engine is imported from the `@hexhue/core/collect` subpath so it is not
+   reachable through the barrel the shipped game uses; none of it is in the main bundle.
+3. **Service worker.** It precaches only the shell (`play/index.html`, `_astro/*`, icons,
+   manifest); `v2/` is outside that rule, so v1 players never download the chunk and a v2 deploy
+   never changes the worker version (a test pins this). After the switch (M15.5) the chunk moves
+   into the normal build and the special cases are removed.
 4. **Core index.** One export line, `export * as collect from "./collect"`.
 5. **Services.** The v2 scene may use audio, haptics, display and layout helpers. It does **not**
    write the save, award coins or progress, or send analytics until the switch (v2 progress is a

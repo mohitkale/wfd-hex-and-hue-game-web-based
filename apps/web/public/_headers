@@ -11,6 +11,11 @@
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
 
+# The v2 review board has a stable (unhashed) name so shipping it never changes the main bundle;
+# it is outside /_astro/ (immutable, precached) and always revalidated.
+/v2/*
+  Cache-Control: no-cache
+
 # The service worker and pages must always be revalidated, so updates arrive.
 /sw.js
   Cache-Control: no-cache

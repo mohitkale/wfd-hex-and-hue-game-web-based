@@ -29,11 +29,9 @@ describe("service worker build", () => {
     ]);
   });
 
-  it("never precaches the v2 review board chunk, so shipped-game players neither download it nor see its deploys as updates", () => {
-    const files = ["play/index.html", "_astro/play.abc.js", "_astro/CollectScene.9xYz.js"];
+  it("never precaches the v2 review board chunk (it lives in v2/, outside the shell)", () => {
+    const files = ["play/index.html", "_astro/play.abc.js", "v2/CollectScene.js"];
     expect(shellFiles(files)).toEqual(["_astro/play.abc.js", "play/index.html"]);
-    // Changing only the v2 chunk leaves the shell (and so the worker's version hash input) the same.
-    expect(shellFiles(files)).toEqual(shellFiles(files.map((f) => f.replace("9xYz", "Qq12"))));
   });
 
   it("maps navigations to their page keys", () => {
