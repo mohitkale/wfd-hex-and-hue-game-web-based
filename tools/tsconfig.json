@@ -3,5 +3,15 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["levels", "art", "icons", "perf", "deploy", "audit", "collect", "../content"]
+  "include": [
+    "levels",
+    "art",
+    "icons",
+    "perf",
+    "deploy",
+    "audit",
+    "collect",
+    "familiar",
+    "../content"
+  ]
 }
