@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { isReducedMotion } from "../a11y";
 import { hexToNumber, inkFor, theme } from "../theme";
 import { symbolTexture } from "../view/textures";
+import { iconScale, isHorizontal, numberLayout } from "./badgeBox";
 import { bake } from "./bake";
 import { tonesFor } from "./cubePaint";
 
@@ -50,15 +51,11 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     const bg = scene.add.image(0, 0, key).setOrigin(0.5);
     this.add(bg);
 
-    const horizontal = w >= h * 1.25;
-    const fontPx = Math.round(
-      opts.mini ? Math.min(h * 0.62, w * 0.7) : Math.min(h * 0.36, w * 0.34),
-    );
+    const horizontal = isHorizontal(w, h);
+    const numberAt = numberLayout(w, h, opts.mini === true);
+    const fontPx = numberAt.fontPx;
     if (!opts.mini) {
-      const scale = Math.max(
-        1,
-        Math.floor(Math.min((h * 0.62) / 14, (w * (horizontal ? 0.4 : 0.7)) / 16)),
-      );
+      const scale = iconScale(w, h);
       const icon = scene.add
         .image(
           horizontal ? -w / 2 + w * 0.3 : 0,
@@ -71,19 +68,14 @@ export class GroupBadge extends Phaser.GameObjects.Container {
       this.add(icon);
     }
     this.label = scene.add
-      .text(
-        opts.mini ? 0 : horizontal ? w * 0.2 : 0,
-        opts.mini ? 0 : horizontal ? 0 : h * 0.3,
-        String(opts.number),
-        {
-          fontFamily: theme.font,
-          fontStyle: "bold",
-          fontSize: `${Math.max(8, fontPx)}px`,
-          color: "#ffffff",
-          stroke: "#140b2e",
-          strokeThickness: Math.max(2, Math.round(dpr * 2)),
-        },
-      )
+      .text(numberAt.x, numberAt.y, String(opts.number), {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${Math.max(8, fontPx)}px`,
+        color: "#ffffff",
+        stroke: "#140b2e",
+        strokeThickness: Math.max(2, Math.round(dpr * 2)),
+      })
       .setOrigin(0.5);
     this.add(this.label);
     if (opts.symbol) {

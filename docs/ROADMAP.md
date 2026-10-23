@@ -156,7 +156,7 @@ _Give players meaningful reasons to continue._
 
 _Polish the complete loop while keeping monetization fair._
 
-- [ ] **M14.1** Redesign the gameplay interface — Portrait-first, uncluttered play screen. _Needs M10.5, M12.6._
+- [x] **M14.1** Redesign the gameplay interface — Portrait-first, uncluttered play screen. _Needs M10.5, M12.6._
 - [ ] **M14.2** Improve onboarding — Teach by interaction. _Needs M14.1._
 - [ ] **M14.3** Correct the 2× speed rule — 2× unlocks only through an optional rewarded ad for the current level; replace the alternating free/ad policy. _Needs M9.4._
 - [ ] **M14.4** Rebalance boosters and economy — Define and test each booster under the new rules. _Needs M9.5, M12.6._
