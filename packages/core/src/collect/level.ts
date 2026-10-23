@@ -9,6 +9,20 @@ export interface GroupSpec {
   capacity: number;
 }
 
+/**
+ * How each cube looks, on top of the colour family it belongs to (docs/ART_DIRECTION_V2.md §1).
+ * Gameplay uses only `cells`/`palette` (the family); shades are display only, so the engine, the
+ * solver and every rule ignore them.
+ */
+export interface CellShades {
+  /** `#rrggbb` display colours (one per shade). */
+  colors: string[];
+  /** `family[s]`: the palette index of the colour family shade `s` belongs to. */
+  family: number[];
+  /** Same layout as `CollectLevel.cells`: shade index or `EMPTY` (exactly where `cells` is `EMPTY`). */
+  cells: number[];
+}
+
 /** A v2 level as authored and shipped (docs/V2_PROTOTYPE_SPEC.md §2). */
 export interface CollectLevel {
   id: string;
@@ -32,11 +46,15 @@ export interface CollectLevel {
   fieldCap: number;
   /** Portal column in `[0, width - 1]`; default `floor((width - 1) / 2)`. */
   portalX?: number;
+  /** Optional per-cube look within each family; absent means every cube is its family colour. */
+  shades?: CellShades;
 }
 
 export const COLLECT_LIMITS = {
   maxSize: 40,
   maxColors: 16,
+  /** Display shades per level (5 per family at most, ART_DIRECTION_V2 A-11). */
+  maxShades: 80,
   maxColumns: 6,
   maxSlots: 8,
   maxSquad: 6,
@@ -47,6 +65,42 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
 
 export const defaultPortalX = (width: number): number => Math.floor((width - 1) / 2);
+
+/** Problems with a level's optional shades (shape only; they never affect gameplay). */
+function shadeErrors(shades: CellShades, families: number, cells: number[]): string[] {
+  const errors: string[] = [];
+  const { colors, family, cells: look } = shades;
+  const max = COLLECT_LIMITS.maxShades;
+  // Shades per family (1-5) is an art rule (ART_DIRECTION_V2 A-11) checked by the art pipeline,
+  // not here: the level model only bounds the total.
+  if (colors.length < 1 || colors.length > max) errors.push(`shades must have 1..${max} colors`);
+  colors.forEach((c, i) => {
+    if (!HEX_COLOR.test(c)) errors.push(`shades.colors[${i}] "${c}" is not #rrggbb`);
+  });
+  if (family.length !== colors.length)
+    errors.push(`shades.family has ${family.length} entries, expected ${colors.length}`);
+  family.forEach((f, i) => {
+    if (!isInt(f) || f < 0 || f >= families)
+      errors.push(`shades.family[${i}] = ${f} is not a palette index`);
+  });
+  if (look.length !== cells.length) {
+    errors.push(`shades.cells has ${look.length} entries, expected ${cells.length}`);
+    return errors;
+  }
+  look.forEach((s, i) => {
+    const c = cells[i]!;
+    if (c === EMPTY || !isInt(c)) {
+      if (s !== EMPTY) errors.push(`shades.cells[${i}] = ${s} but the cell is empty`);
+    } else if (!isInt(s) || s < 0 || s >= colors.length) {
+      errors.push(`shades.cells[${i}] = ${s} is not a shade index`);
+    } else if (family[s] !== c) {
+      errors.push(
+        `shades.cells[${i}]: shade ${s} belongs to family ${family[s]}, the cube is ${c}`,
+      );
+    }
+  });
+  return errors;
+}
 
 /**
  * Every rule a level must satisfy (GAME_DESIGN_V2 §3): shape and limits, colours, the per-colour
@@ -88,6 +142,7 @@ export function validateCollectLevel(level: CollectLevel): string[] {
       errors.push(`cells[${i}] = ${c} is not EMPTY or a palette index`);
   });
   if (!cells.some((c) => c !== EMPTY)) errors.push("mosaic has no cubes");
+  if (level.shades) errors.push(...shadeErrors(level.shades, palette.length, cells));
 
   if (columns.length < 1 || columns.length > L.maxColumns)
     errors.push(`columns must have 1..${L.maxColumns} entries`);
@@ -161,6 +216,22 @@ export function parseCollectLevel(json: unknown): CollectLevel {
     fieldCap: num("fieldCap"),
   };
   if (o.portalX !== undefined) level.portalX = num("portalX");
+  if (o.shades !== undefined) {
+    const sh = o.shades as Record<string, unknown> | null;
+    const nums = (v: unknown, k: string) =>
+      Array.isArray(v) && v.every((x) => typeof x === "number")
+        ? (v as number[])
+        : fail(`shades.${k} must be an array of numbers`);
+    if (!sh || typeof sh !== "object") fail("shades must be an object");
+    const colors = sh!.colors;
+    if (!Array.isArray(colors) || !colors.every((x) => typeof x === "string"))
+      fail("shades.colors must be an array of strings");
+    level.shades = {
+      colors: colors as string[],
+      family: nums(sh!.family, "family"),
+      cells: nums(sh!.cells, "cells"),
+    };
+  }
   const errors = validateCollectLevel(level);
   if (errors.length > 0) fail(errors.join("; "));
   return level;

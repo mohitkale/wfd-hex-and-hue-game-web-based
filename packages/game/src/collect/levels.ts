@@ -1,5 +1,6 @@
 import * as collect from "@hexhue/core/collect";
 import { createRng } from "@hexhue/core";
+import { layeredOrb } from "./denseBoard";
 import { LOSE_LINES, SLICE_ID, WIN_LINE, moonlitHat } from "./slice";
 
 /**
@@ -163,6 +164,11 @@ export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
   moon: demoMoon,
   /** 24×24, a mid-size picture with big squads (worst case for swarm clutter). */
   swarm: () => stripes("dev-swarm", "Swarm (dev)", 24, 4, 70),
+  /** 32×32 shaded orb (~800 cubes, 24 shades): the M11.2 density test board (not shipped art). */
+  dense: () => layeredOrb(32),
+  /** 24×24 and 40×40 shaded orbs, to compare sizes. */
+  dense24: () => layeredOrb(24),
+  dense40: () => layeredOrb(40),
   /** 40×40 = 1,600 cubes and up to 36 familiars: the renderer's worst case (the board size limit). */
   big: () => stripes("dev-big", "Big 40×40 (dev)", 40, 5, 130),
 };

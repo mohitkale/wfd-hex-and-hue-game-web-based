@@ -27,7 +27,8 @@
     "audit:v1": "tsx tools/audit/run.ts",
     "familiar:sheet": "tsx tools/familiar/sheet.ts",
     "icons": "tsx tools/icons/build.ts",
-    "budget": "tsx tools/perf/check.ts"
+    "budget": "tsx tools/perf/check.ts",
+    "density": "tsx tools/collect/density.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

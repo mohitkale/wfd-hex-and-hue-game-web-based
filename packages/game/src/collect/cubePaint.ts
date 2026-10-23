@@ -16,9 +16,35 @@ function mix(color: number, target: number, t: number): number {
   return (r << 16) | (g << 8) | b;
 }
 
-export function tonesFor(hex: string): CubeTones {
+export function tonesFor(hex: string, bevel = 0.38): CubeTones {
   const base = hexToNumber(hex);
-  return { base, light: mix(base, 0xffffff, 0.38), dark: mix(base, 0x140b2e, 0.38) };
+  return { base, light: mix(base, 0xffffff, bevel), dark: mix(base, 0x140b2e, bevel) };
+}
+
+/** A gentler bevel for shaded art, so the cube edge does not blur the steps of a shading ramp. */
+export const SHADED_BEVEL = 0.2;
+
+/**
+ * Per padded-grid cell tones for a level with shades (ART_DIRECTION_V2 §1), or null when the level
+ * has none. The padded grid is `(width + 2)` wide (a one-cell ring), the same layout the board uses.
+ */
+export function shadeTonesGrid(level: {
+  width: number;
+  height: number;
+  shades?: { colors: string[]; cells: number[] };
+}): (CubeTones | undefined)[] | null {
+  const { shades, width, height } = level;
+  if (!shades) return null;
+  const tones = shades.colors.map((hex) => tonesFor(hex, SHADED_BEVEL));
+  const stride = width + 2;
+  const grid = new Array<CubeTones | undefined>(stride * (height + 2)).fill(undefined);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const shade = shades.cells[y * width + x]!;
+      if (shade >= 0) grid[(y + 1) * stride + (x + 1)] = tones[shade];
+    }
+  }
+  return grid;
 }
 
 /** Minimal drawing surface (a Phaser Graphics satisfies it), so the maths can be tested. */

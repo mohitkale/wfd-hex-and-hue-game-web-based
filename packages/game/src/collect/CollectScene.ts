@@ -19,7 +19,7 @@ import { planCues, playCues, rejectionCue, type CueSinks } from "./cues";
 import { Emitter, Particles } from "./particles";
 import { cellCenter, computeCollectLayout, hudButtonX, type CollectLayout } from "./collectLayout";
 import { RingStats } from "./profile";
-import { tonesFor } from "./cubePaint";
+import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
@@ -218,7 +218,13 @@ export class CollectScene extends Phaser.Scene {
     this.model.resync(state);
     this.emitter = new Emitter(new Particles(160), this.layout.cell, reduced);
     this.ambient = new AmbientLayer(this, this.layout.frame, TEX.glow, reduced, this.layout.cell);
-    this.cubes = new CubeLayer(this, this.layout, level.palette, state.grid.slice());
+    this.cubes = new CubeLayer(
+      this,
+      this.layout,
+      level.palette,
+      state.grid.slice(),
+      shadeTonesGrid(level),
+    );
     this.familiars = new FamiliarLayer(
       this,
       this.layout,

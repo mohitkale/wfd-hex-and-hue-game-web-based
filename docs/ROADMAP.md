@@ -126,7 +126,7 @@ _Make collecting cubes enjoyable to watch; deliver one polished playable level. 
 _Replace simplistic patterns with rich, meaningful magical illustrations. Contains art gate G2._
 
 - [x] **M11.1** Visual art bible (ART_DIRECTION_V2) — Write `docs/ART_DIRECTION_V2.md`. _Needs M10.5._
-- [ ] **M11.2** Increase puzzle art density — Support roughly 24×24–40×40 art with hundreds of meaningful cells, sized by mobile testing. Includes the per-cell shade (family = gameplay colour, shade = look) in the level model and renderer (ART_DIRECTION_V2 §1). _Needs M11.1._
+- [x] **M11.2** Increase puzzle art density — Support roughly 24×24–40×40 art with hundreds of meaningful cells, sized by mobile testing. Includes the per-cell shade (family = gameplay colour, shade = look) in the level model and renderer (ART_DIRECTION_V2 §1). _Needs M11.1._
 - [ ] **M11.3** Representative magical art set **(human gate)** — Hand-craft a small representative set across the themes and stop for art review before any catalogue work. _Needs M11.1, M11.2, M11.4._ Box ticked only after the user approves the art (G2).
 - [ ] **M11.4** Improve the art pipeline — Extend the PNG import and preview tooling for production art. Implements the **[check]** rules of ART_DIRECTION_V2 as `npm run art:check`, replacing the single distance rule, plus provenance enforcement. _Needs M11.1._
 - [ ] **M11.5** Connect artwork to gameplay rewards — Make winning reveal and animate the artwork, and store it in the Spellbook with a lore card. _Needs M11.3, M11.4._
@@ -168,7 +168,7 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 
 - [ ] **M15.1** Comprehensive gameplay tests — Test every rule and the save/resume path. _Needs M14.5._
 - [ ] **M15.2** Gameplay regression and strategy testing — Validate every production level. _Needs M15.1._
-- [ ] **M15.3** Performance and compatibility — Measure frame time and compatibility. _Needs M15.1._
+- [ ] **M15.3** Performance and compatibility — Measure frame time and compatibility. Includes the on-device 60 fps measurement of the 32×32 shaded board (`?engine=v2&level=dense`) deferred from M11.2, which had no reference phone. _Needs M15.1._
 - [ ] **M15.4** Human playability validation **(human gate)** — Run and record a small session with first-time players. _Needs M15.2, M15.3._ Box ticked only when real findings are recorded (G3); stays unticked while awaiting humans.
 - [ ] **M15.5** Production readiness and release candidate **(human gate)** — Prepare v2.0.0 and stop for explicit approval before tagging or publishing. _Needs M15.4._ PR is not merged, and the box not ticked, until the user approves (G4).
 
