@@ -54,12 +54,40 @@ export function badgeBox(
 /** A badge wide enough to put the creature beside the number rather than above it. */
 export const isHorizontal = (w: number, h: number): boolean => w >= h * 1.25;
 
-/**
- * The number's font size in device pixels. A wide badge (the field strip) has the creature on the
- * left and the whole right half for the number, so it can be bigger than in a square one.
- */
-export function badgeFontPx(w: number, h: number, mini: boolean): number {
-  if (mini) return Math.round(Math.min(h * 0.62, w * 0.7));
-  if (isHorizontal(w, h)) return Math.round(Math.min(h * 0.5, w * 0.26));
-  return Math.round(Math.min(h * 0.36, w * 0.34));
+/** The creature's whole-number sprite scale in a badge (16×14 px art). */
+export function iconScale(w: number, h: number): number {
+  const horizontal = isHorizontal(w, h);
+  return Math.max(1, Math.floor(Math.min((h * 0.62) / 14, (w * (horizontal ? 0.4 : 0.7)) / 16)));
 }
+
+/** Widest a bold digit gets, in ems (a little over the usual 0.6). */
+export const DIGIT_EM = 0.64;
+
+/**
+ * Where the number sits in a badge and how big it is, in device pixels from the badge centre. A wide
+ * badge (the field strip) puts the creature on the left and the number in the space to its right: the
+ * font is sized so even a three-digit number clears the creature and the edge.
+ */
+export function numberLayout(
+  w: number,
+  h: number,
+  mini: boolean,
+): { x: number; y: number; fontPx: number } {
+  if (mini) return { x: 0, y: 0, fontPx: Math.round(Math.min(h * 0.62, w * 0.7)) };
+  if (!isHorizontal(w, h))
+    return { x: 0, y: h * 0.3, fontPx: Math.round(Math.min(h * 0.36, w * 0.34)) };
+  const iconRight = -w * 0.2 + (16 * iconScale(w, h)) / 2; // the icon sits at -0.2 w
+  const gap = w * 0.04;
+  const left = iconRight + gap;
+  const right = w / 2 - gap;
+  const room = right - left;
+  return {
+    x: left + room / 2,
+    y: 0,
+    fontPx: Math.round(Math.min(h * 0.5, room / (3 * DIGIT_EM))),
+  };
+}
+
+/** The number's font size in device pixels. */
+export const badgeFontPx = (w: number, h: number, mini: boolean): number =>
+  numberLayout(w, h, mini).fontPx;

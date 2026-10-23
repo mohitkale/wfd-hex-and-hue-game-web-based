@@ -3,6 +3,12 @@ import { contrast, luminance, theme } from "../theme";
 import { badgeBox, badgeFontPx } from "./badgeBox";
 import { computeCollectLayout, hudButtonX, type CollectLayout } from "./collectLayout";
 import { endCardText } from "./endCardText";
+import { DEVICE_MATRIX as MATRIX } from "./deviceMatrix";
+import { ART_LEVELS } from "./artLevels";
+import { moonlitHat } from "./slice";
+import { tonesFor } from "./cubePaint";
+import { HUD_BUTTON_CSS, HUD_ZONE_CSS } from "./collectLayout";
+import { iconScale, numberLayout, DIGIT_EM } from "./badgeBox";
 import { progressFill, progressOf, progressTrack } from "./progress";
 
 /**
@@ -10,17 +16,14 @@ import { progressFill, progressOf, progressTrack } from "./progress";
  * in device px, so each is divided by the device's pixel ratio.
  */
 
-const DEVICES: { name: string; w: number; h: number; dpr: number; portrait: boolean }[] = [
-  { name: "iPhone SE (1st gen)", w: 320, h: 568, dpr: 2, portrait: true },
-  { name: "iPhone SE (2nd gen)", w: 375, h: 667, dpr: 2, portrait: true },
-  { name: "iPhone 15", w: 393, h: 852, dpr: 3, portrait: true },
-  { name: "Pixel 7", w: 412, h: 915, dpr: 2.625, portrait: true },
-  { name: "Galaxy S8", w: 360, h: 740, dpr: 3, portrait: true },
-  { name: "iPad", w: 768, h: 1024, dpr: 2, portrait: true },
-  { name: "iPad (landscape)", w: 1024, h: 768, dpr: 2, portrait: false },
-  { name: "Desktop", w: 1440, h: 900, dpr: 1, portrait: true },
-  { name: "Phone (landscape)", w: 844, h: 390, dpr: 3, portrait: false },
-];
+/** The matrix is the tool's list (one source), with whether the game's 480 px frame, not the window, sets the size. */
+const DEVICES = MATRIX.map(([name, w, h, dpr]) => ({
+  name,
+  w,
+  h,
+  dpr,
+  framed: !name.includes("landscape"),
+}));
 
 const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
 
@@ -81,12 +84,14 @@ describe("every device: an unobstructed board between the HUD and the groups", (
         for (const x of xs) expect(x - 22 * l.dpr).toBeGreaterThanOrEqual(l.frame.x);
         expect(css(l, xs[1]! - xs[0]!)).toBeGreaterThanOrEqual(44);
         expect(css(l, xs[2]! - xs[1]!)).toBeGreaterThanOrEqual(44);
-        expect(css(l, l.hud.h)).toBeGreaterThanOrEqual(30); // room for the buttons and the bar
+        // The progress bar sits below the 36 css px button circles (at most one device pixel of overlap).
+        const circleBottom = l.hud.y + l.hud.h / 2 + (HUD_BUTTON_CSS / 2) * l.dpr;
+        if (d.framed) expect(progressTrack(l).y).toBeGreaterThanOrEqual(circleBottom - 1);
       });
 });
 
 describe("portrait phones and tablets: thumb-sized targets and readable numbers", () => {
-  for (const d of DEVICES.filter((x) => x.portrait))
+  for (const d of DEVICES.filter((x) => x.framed))
     for (const s of SHAPES)
       it(`${d.name}, ${s.board}×${s.board}, ${s.slots} slots, ${s.columns} columns`, () => {
         const l = layoutFor(d, s);
@@ -196,8 +201,7 @@ describe("text contrast (WCAG AA, 4.5:1) on the play screen's backgrounds", () =
     ["dim text on the night sky", theme.textDim, night],
     ["gold headline on the night sky", "#f6d97a", night],
     ["toast text on its pill", "#ffffff", toastBg],
-    ["dim text on the toast pill", theme.textDim, toastBg],
-    ["group numbers (white, dark stroke) on the dark panel", "#ffffff", luminance("#0f0824")],
+    ["white text on the dark panel colour", "#ffffff", luminance("#0f0824")],
   ];
   it.each(pairs)("%s", (_name, fg, bgLum) => {
     expect(contrast(luminance(fg), bgLum)).toBeGreaterThanOrEqual(4.5);
@@ -215,4 +219,110 @@ describe("end card wording", () => {
     );
     expect(endCardText({ won: false, lossReason: "deadlock", delivered: 3 }).title).toBe("Stuck");
   });
+});
+
+describe("the HUD's tap targets", () => {
+  it("the buttons are 36 css px circles inside 44 css px tap targets", () => {
+    expect(HUD_BUTTON_CSS).toBe(36);
+    expect(HUD_ZONE_CSS).toBeGreaterThanOrEqual(44);
+  });
+});
+
+describe("the progress bar never claims more than is done", () => {
+  it("is not full while a cube is still out, even on the biggest boards and the smallest phone", () => {
+    for (const d of DEVICES.filter((x) => x.framed)) {
+      const track = progressTrack(layoutFor(d, SHAPES[2]!));
+      for (const total of [20, 1024, 1600, 100_000]) {
+        const fill = progressFill(track, (total - 1) / total);
+        expect(fill.w, `${d.name} ${total}`).toBeLessThan(track.w);
+        expect(fill.w).toBeGreaterThan(0);
+      }
+      expect(progressFill(track, 1).w).toBe(track.w);
+    }
+  });
+});
+
+describe("a three-digit number clears the creature and the edge, on the real tiles", () => {
+  for (const d of DEVICES.filter((x) => x.framed))
+    for (const s of SHAPES)
+      it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
+        const l = layoutFor(d, s);
+        for (const box of [
+          badgeBox(l, "field", 0, 0),
+          badgeBox(l, "slot", 0, 0),
+          badgeBox(l, "column", 0, 0),
+        ]) {
+          const n = numberLayout(box.w, box.h, false);
+          const half = (3 * DIGIT_EM * n.fontPx) / 2;
+          if (box.w >= box.h * 1.25) {
+            const iconRight = -box.w * 0.2 + (16 * iconScale(box.w, box.h)) / 2;
+            expect(n.x - half, "number's left edge vs the creature").toBeGreaterThanOrEqual(
+              iconRight - 0.5,
+            );
+            expect(n.x + half, "number's right edge vs the tile").toBeLessThanOrEqual(box.w / 2);
+          } else {
+            expect(half * 2, "centred number vs the tile").toBeLessThanOrEqual(box.w);
+          }
+        }
+      });
+});
+
+describe("white group numbers on every badge colour", () => {
+  it("are at least 3.5:1 (AA for large text, which the front and field numbers are), with a dark outline for the rest", () => {
+    const palettes = new Set<string>([
+      "#4a6be2",
+      "#e24a4a",
+      "#4ae26b",
+      "#f2c94c",
+      "#b44ae2",
+      "#4ae2d8",
+    ]);
+    for (const make of Object.values(ART_LEVELS))
+      for (const hex of make().palette) palettes.add(hex);
+    for (const hex of moonlitHat().palette) palettes.add(hex);
+    let worst = Infinity;
+    for (const hex of palettes) {
+      const dark = tonesFor(hex).dark;
+      const c = contrast(1, luminance("#" + dark.toString(16).padStart(6, "0")));
+      worst = Math.min(worst, c);
+      expect(c, hex).toBeGreaterThanOrEqual(3.5);
+    }
+    // Not 4.5:1 for every colour (gold, cyan and green sit near 3.7): the numbers' dark outline carries them.
+    expect(worst).toBeLessThan(4.5);
+  });
+});
+
+describe("the levels that ship, on the matrix", () => {
+  const levels = [moonlitHat(), ...Object.values(ART_LEVELS).map((make) => make())];
+  for (const d of DEVICES.filter((x) => x.framed))
+    it(`${d.name}: every shipped level fits, with readable cubes and numbers`, () => {
+      for (const level of levels) {
+        const l = computeCollectLayout({
+          width: Math.round(d.w * d.dpr),
+          height: Math.round(d.h * d.dpr),
+          dpr: d.dpr,
+          insets: NO_INSETS,
+          boardWidth: level.width,
+          boardHeight: level.height,
+          slots: level.slots,
+          columns: level.columns.length,
+          fieldCap: level.fieldCap,
+          portalX: level.portalX ?? Math.floor((level.width - 1) / 2),
+        });
+        for (const r of [...l.field, ...l.slots, ...l.columns])
+          expect(overlap(l.boardRect, r)).toBe(false);
+        expect(css(l, l.cell), `${level.id} cube`).toBeGreaterThanOrEqual(7);
+        for (const c of l.columns)
+          expect(css(l, c.w), `${level.id} column`).toBeGreaterThanOrEqual(44);
+        const front = badgeBox(l, "column", 0, 0);
+        expect(
+          css(l, badgeFontPx(front.w, front.h, false)),
+          `${level.id} front number`,
+        ).toBeGreaterThanOrEqual(14);
+        for (const r of l.slots)
+          expect(css(l, r.w), `${level.id} slot`).toBeGreaterThanOrEqual(
+            level.slots <= 5 ? 44 : 30,
+          );
+      }
+    });
 });

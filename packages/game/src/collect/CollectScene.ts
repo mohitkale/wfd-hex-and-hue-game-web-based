@@ -23,7 +23,13 @@ import { PortalView } from "./PortalView";
 import { buildEndCard } from "./EndCard";
 import { Toast } from "./Toast";
 import { progressOf } from "./progress";
-import { cellCenter, computeCollectLayout, hudButtonX, type CollectLayout } from "./collectLayout";
+import {
+  HUD_BUTTON_CSS,
+  cellCenter,
+  computeCollectLayout,
+  hudButtonX,
+  type CollectLayout,
+} from "./collectLayout";
 import { RingStats } from "./profile";
 import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
@@ -356,7 +362,7 @@ export class CollectScene extends Phaser.Scene {
     g.strokeRoundedRect(l.boardRect.x, l.boardRect.y, l.boardRect.w, l.boardRect.h, l.cell * 0.8);
     paintPanelFrames(g, l, dpr);
     const cy = l.hud.y + l.hud.h / 2;
-    const size = Math.round(36 * dpr);
+    const size = Math.round(HUD_BUTTON_CSS * dpr);
     for (let i = 0; i < HUD_BUTTONS; i++) {
       const x = hudButtonX(l, i, HUD_BUTTONS);
       g.fillStyle(theme.dusk, 1);

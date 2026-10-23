@@ -8,18 +8,7 @@
 import { pathToFileURL } from "node:url";
 import { badgeBox, badgeFontPx } from "../../packages/game/src/collect/badgeBox";
 import { computeCollectLayout } from "../../packages/game/src/collect/collectLayout";
-
-export const DEVICES: [string, number, number, number][] = [
-  ["iPhone SE (1st gen)", 320, 568, 2],
-  ["iPhone SE (2nd gen)", 375, 667, 2],
-  ["iPhone 15", 393, 852, 3],
-  ["Pixel 7", 412, 915, 2.625],
-  ["Galaxy S8", 360, 740, 3],
-  ["iPad", 768, 1024, 2],
-  ["iPad (landscape)", 1024, 768, 2],
-  ["Desktop", 1440, 900, 1],
-  ["Phone (landscape)", 844, 390, 3],
-];
+import { DEVICE_MATRIX } from "../../packages/game/src/collect/deviceMatrix";
 
 export function table(): string {
   const f = (n: number) => (Math.round(n * 10) / 10).toString();
@@ -27,7 +16,7 @@ export function table(): string {
     "| Device | Viewport @ dpr | Cube | Column | Slot | Front number | Field number |",
     "| --- | --- | --- | --- | --- | --- | --- |",
   ];
-  for (const [name, w, h, dpr] of DEVICES) {
+  for (const [name, w, h, dpr] of DEVICE_MATRIX) {
     const l = computeCollectLayout({
       width: Math.round(w * dpr),
       height: Math.round(h * dpr),

@@ -32,14 +32,18 @@ export interface BarRect {
 /** The bar's track: along the bottom edge of the HUD, inside the same side padding as the title. */
 export function progressTrack(layout: CollectLayout): BarRect {
   const { hud, frame, dpr } = layout;
-  const h = Math.max(2, Math.round(3.5 * dpr));
+  const h = Math.max(2, Math.round(3 * dpr));
   const pad = Math.round(14 * dpr);
-  return { x: frame.x + pad, y: hud.y + hud.h - h - Math.round(2 * dpr), w: frame.w - 2 * pad, h };
+  // Flush with the HUD's bottom edge, so it stays below the 36 css px buttons even on a short screen.
+  return { x: frame.x + pad, y: hud.y + hud.h - h, w: frame.w - 2 * pad, h };
 }
 
 /** The filled part of the track for a fraction (at least a sliver once anything is delivered). */
 export function progressFill(track: BarRect, fraction: number): BarRect {
   const f = Math.max(0, Math.min(1, fraction));
-  const w = f === 0 ? 0 : Math.max(track.h, Math.round(track.w * f));
-  return { x: track.x, y: track.y, w: Math.min(track.w, w), h: track.h };
+  if (f === 0) return { x: track.x, y: track.y, w: 0, h: track.h };
+  // Rounding must never fill the track while a cube is still out (a 1,600-cube board has 0.3 px per cube).
+  const most = f >= 1 ? track.w : track.w - 1;
+  const w = Math.min(most, Math.max(track.h, Math.round(track.w * f)));
+  return { x: track.x, y: track.y, w, h: track.h };
 }

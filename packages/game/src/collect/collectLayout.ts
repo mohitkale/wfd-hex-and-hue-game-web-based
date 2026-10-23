@@ -129,9 +129,13 @@ export function spriteScaleForCell(cell: number, spriteWidth = 16): number {
   return clamp(Math.round((cell * 1.6) / spriteWidth), 1, 6);
 }
 
+/** The HUD buttons: a 36 css px circle inside a 44 css px tap target. */
+export const HUD_BUTTON_CSS = 36;
+export const HUD_ZONE_CSS = 44;
+
 /** Centre x of HUD button `index` of `count` (right-aligned, 8 css px apart); shared by the baked circles and the tap zones. */
 export function hudButtonX(layout: CollectLayout, index: number, count: number): number {
-  const size = Math.round(36 * layout.dpr);
+  const size = Math.round(HUD_BUTTON_CSS * layout.dpr);
   return (
     layout.frame.x +
     layout.frame.w -

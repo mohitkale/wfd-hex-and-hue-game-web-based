@@ -6,16 +6,20 @@ the matrix of docs/QA.md.
 
 ## What changed
 
-- **A progress bar** along the bottom of the HUD (`progress.ts`, `CollectHud.ts`): delivered over
-  total, a gold fill on a faint track, no extra words. It never reads 100% until the last cube is
-  delivered, and shows a sliver as soon as one is.
+- **A progress bar** along the bottom edge of the HUD (`progress.ts`, `CollectHud.ts`): delivered over
+  total, a gold fill on a faint track, no extra words. It sits flush with the HUD's bottom edge, below
+  the button circles even on the smallest phone. The fill is never full until the last cube is
+  delivered (also on a 1,600-cube board, where one cube is under a pixel) and shows a sliver as soon as
+  one is.
 - **Bigger numbers in the field strip.** The "working" tiles are wide, with the creature on the left, so
-  their number now uses the height (about 19 to 23 css px instead of 13 to 17). Front groups are 22 to 35
+  their number now uses the height (about 19 to 23 css px instead of 13 to 17), sized so even a
+  three-digit number clears the creature and the tile's edge. Front groups are 22 to 35
   css px, slots about 15, peeks behind a front group 9 or more.
 - **`CollectScene` is split** (it was 847 lines, now about 670): `CollectHud` (title, buttons, progress),
   `Toast` (the one-line message, now wrapping to the board width), `PortalView`, `EndCard` (plain win and
   loss card) and the pure `badgeBox.ts` (where each badge sits and how big its number is) and
-  `endCardText.ts`. No behaviour moved except the above.
+  `endCardText.ts`. No behaviour moved except the above, and that the end card's one-line reason now
+  wraps to 86% of the frame width, so it fits a 320 px phone.
 - Nothing else was added: no new panels, labels or counters. The screen is still the HUD, the board,
   the field strip, the holding slots and the summon columns.
 
@@ -50,8 +54,15 @@ columns:
 - Cubes are not specks: at least 20 css px on a 10×10 board, 11 on 24×24 and 7 on 40×40.
 - Landscape phones still lay out, with a board you can see (the game is portrait-first and shows an
   "upright" hint there).
-- Text contrast on the play screen's backgrounds is at least 4.5:1 (WCAG AA) for body, dim and gold text,
-  the toast and the group numbers.
+- Text contrast on the play screen's backgrounds is at least 4.5:1 (WCAG AA) for body, dim and gold text
+  and the toast. White group numbers on every badge colour in the shipped levels are at least 3.5:1
+  (AA for large text, which the front and field numbers are): the lightest badges (gold, cyan, green)
+  sit near 3.7:1, below 4.5:1, so the smaller slot numbers rely on their dark outline.
+- Every shipped level (the slice and the six art pieces) on every framed device: nothing overlaps the
+  board, cubes at least 7 css px, columns at least 44 css px, front numbers at least 14.
+- A three-digit number clears the creature and the tile's edge on the real field, slot and column tiles.
+- The HUD buttons are 36 css px circles in 44 css px tap targets (shared constants), 44 apart.
+- The device table here equals what `npm run layout:matrix` prints (`tools/collect/layoutMatrix.test.ts`).
 - The progress numbers: never 100% early, survive no cubes, negative or too many delivered, and the bar
   sits inside the HUD on every device.
 
@@ -60,7 +71,8 @@ columns:
 Checked in the browser pane at 375×812: the progress bar filling as cubes are delivered, the larger
 field numbers, a loss card with Retry and Undo (Retry restarts cleanly) and the toast wrapping.
 
-**Not done:** the real-hardware pass of docs/QA.md (one iPhone, one mid-range Android: touch feel, frame
-rate); a screen-reader path for the canvas beyond what the page already has; an audit of every dialog on
-a 320×480 screen (the win cards were checked in M13). The group numbers' contrast is checked as white on
-the dark panel; the coloured badge behind each number was not measured per colour.
+**Not done, so the "accessibility checks" criterion is only partly met:** the real-hardware pass of
+docs/QA.md (one iPhone, one mid-range Android: touch feel, frame rate); a screen-reader path for the
+canvas beyond what the page already has; an audit of every dialog on a 320×480 screen (the win cards were
+checked in M13); and group numbers on the lightest badge colours are 3.7:1, not 4.5:1. The progress bar
+is purely visual (it has no text alternative).

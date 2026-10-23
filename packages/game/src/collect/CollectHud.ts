@@ -1,6 +1,6 @@
 import type Phaser from "phaser";
 import { theme } from "../theme";
-import { hudButtonX, type CollectLayout } from "./collectLayout";
+import { HUD_ZONE_CSS, hudButtonX, type CollectLayout } from "./collectLayout";
 import { progressFill, progressTrack } from "./progress";
 
 export interface HudHandlers {
@@ -38,7 +38,7 @@ export class CollectHud {
       })
       .setOrigin(0, 0.5)
       .setDepth(20);
-    const size = Math.round(36 * dpr);
+    const zone = Math.round(HUD_ZONE_CSS * dpr);
     const buttons: [string, () => void][] = [
       ["↶", handlers.onUndo],
       ["⟲", handlers.onRestart],
@@ -58,11 +58,11 @@ export class CollectHud {
         .setDepth(21);
       if (i === 2) speedLabel = text;
       // A 44 css px tap target around each 36 px button.
-      const zone = scene.add
-        .zone(x, cy, size + 8 * dpr, size + 8 * dpr)
+      const hit = scene.add
+        .zone(x, cy, zone, zone)
         .setDepth(22)
         .setInteractive({ useHandCursor: true });
-      zone.on("pointerdown", onPress);
+      hit.on("pointerdown", onPress);
     });
     this.speedLabel = speedLabel!;
     this.bar = scene.add.graphics().setDepth(20);
