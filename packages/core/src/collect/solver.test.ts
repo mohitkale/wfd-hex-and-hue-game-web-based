@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { apply, legalActions } from "./actions";
+import { apply, legalActions, type Action } from "./actions";
 import { board, fixtureA, fixtureB, fixtureC, fixtureD, fixtureE, randomLevel } from "./fixtures";
 import { validateCollectLevel, type CollectLevel } from "./level";
 import { CollectSolver, minSlots, replayLine, solve } from "./solver";
 import { runUntilSettled } from "./sim";
 import { cloneState, createCollectState } from "./state";
+import { createRng } from "../rng";
 import { bruteSolve } from "./testing";
 
 /** M12.1: the solver agrees with brute force, and every solution replays to a win in the live engine. */
@@ -197,6 +198,46 @@ describe("a solver belongs to one level", () => {
     expect(a.solve().status).toBe("unsolvable");
     expect(b.solve().status).toBe("solved");
     expect(a.solve().status).toBe("unsolvable");
+  });
+});
+
+describe("lines from intermediate states (a cache shared across queries)", () => {
+  /** Applies a line to a copy of `state` through the engine and returns the final status. */
+  const play = (state: ReturnType<typeof createCollectState>, line: readonly Action[]) => {
+    const s = cloneState(state);
+    for (const action of line) {
+      apply(s, action);
+      runUntilSettled(s);
+    }
+    return s.status;
+  };
+
+  it("every line returned for a state reached by play wins from that state (slot numbers differ)", () => {
+    let queries = 0;
+    for (let seed = 1; seed <= 600; seed++) {
+      const level = randomLevel(seed, seed % 2 === 0);
+      if (!level || validateCollectLevel(level).length > 0) continue;
+      const solver = new CollectSolver({ ...level, slots: 2 + (seed % 3) }, 20_000);
+      if (solver.solve().status !== "solved") continue;
+      // Walk several random settled paths and ask for a line from every state on them.
+      const rng = createRng(seed);
+      for (let walk = 0; walk < 4; walk++) {
+        let s = createCollectState({ ...level, slots: 2 + (seed % 3) });
+        for (let depth = 0; depth < 12 && s.status === "playing"; depth++) {
+          const result = solver.solveState(s);
+          if (result.status === "solved") {
+            expect(play(s, result.line!), `seed ${seed}`).toBe("won");
+            queries++;
+          }
+          const legal = legalActions(s);
+          if (legal.length === 0) break;
+          s = cloneState(s);
+          apply(s, legal[rng.int(0, legal.length - 1)]!);
+          runUntilSettled(s);
+        }
+      }
+    }
+    expect(queries).toBeGreaterThan(500);
   });
 });
 

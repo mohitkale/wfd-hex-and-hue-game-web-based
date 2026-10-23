@@ -40,8 +40,13 @@ export type Verdict = "winnable" | "doomed" | "unknown";
 
 export const DEFAULT_NODE_BUDGET = 20_000;
 
-/** The action that wins from a state (a cached winnable verdict) or `false` (cached doomed). */
-type Cached = Action | false;
+/**
+ * A cached verdict: how a winnable state wins (straight away, or through the settled child with this
+ * key) or `false` for a doomed state. The child is stored by key, not as an action, because
+ * `stateKey` ignores slot numbers: the same key can have its parked groups in different slots, so a
+ * stored `resume slot n` could be the wrong action. The action is re-derived when a line is read out.
+ */
+type Cached = { won: true } | { child: string } | false;
 
 export class CollectSolver {
   private readonly memo = new Map<string, Cached>();
@@ -114,7 +119,7 @@ export class CollectSolver {
       return cached !== false;
     }
     // Expand every legal action first, so promising children (more cubes delivered) are tried first.
-    const children: { action: Action; state: CollectState; key: string }[] = [];
+    const children: { action: Action; state: CollectState }[] = [];
     for (const action of legalActions(state)) {
       if (stats.nodes >= stats.budget) {
         stats.exhausted = true;
@@ -125,21 +130,21 @@ export class CollectSolver {
       apply(next, action);
       runUntilSettled(next);
       if (next.status === "won") {
-        this.memo.set(key, action);
+        this.memo.set(key, { won: true });
         return true;
       }
       if (next.status === "lost") {
         stats.losses++;
         continue;
       }
-      children.push({ action, state: next, key: stateKey(next) });
+      children.push({ action, state: next });
     }
     children.sort((a, b) => b.state.deliveredTotal - a.state.deliveredTotal);
     let unknown = false;
     for (const child of children) {
       const r = this.search(child.state, stats);
       if (r === true) {
-        this.memo.set(key, child.action);
+        this.memo.set(key, { child: stateKey(child.state) });
         return true;
       }
       if (r === undefined) {
@@ -152,18 +157,35 @@ export class CollectSolver {
     return false;
   }
 
-  /** Follows cached winning actions from a state that is known to be winnable. */
+  /**
+   * Reads a winning line out of the cache from a state known to be winnable, re-deriving each action
+   * against the live state: the legal action whose settled result is the cached winning child (or a
+   * win). Throws if the cache and the engine disagree, which would be a solver bug.
+   */
   private extractLine(root: CollectState): Action[] {
     const line: Action[] = [];
     let s = cloneState(root);
     for (let guard = 0; guard < 100_000; guard++) {
-      const action = this.memo.get(stateKey(s));
-      if (action === undefined || action === false) throw new Error("solver cache is inconsistent");
-      line.push(action);
-      apply(s, action);
-      runUntilSettled(s);
-      if (s.status === "won") return line;
-      s = cloneState(s);
+      const entry = this.memo.get(stateKey(s));
+      if (!entry) throw new Error("solver cache is inconsistent");
+      let step: { action: Action; state: CollectState } | null = null;
+      for (const action of legalActions(s)) {
+        const next = cloneState(s);
+        apply(next, action);
+        runUntilSettled(next);
+        const matches =
+          "won" in entry
+            ? next.status === "won"
+            : next.status === "playing" && stateKey(next) === entry.child;
+        if (matches) {
+          step = { action, state: next };
+          break;
+        }
+      }
+      if (!step) throw new Error("solver cache is inconsistent");
+      line.push(step.action);
+      if (step.state.status === "won") return line;
+      s = step.state;
     }
     throw new Error("solution line did not end");
   }

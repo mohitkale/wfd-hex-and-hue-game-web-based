@@ -46,6 +46,11 @@ finds the win).
 - Genuine unwinnable positions: a level that has only dead ends, a lost position, and "doomed but
   not over" positions found on random tight levels (a first move that neither loses nor wins now,
   yet no win remains), each checked against the root verdict.
+- Lines read out of a cache shared across queries: for states reached by random play on levels with
+  2-4 slots, every line returned by `solveState` wins when applied to that state. (A first version
+  stored a slot-indexed `resume` action under a key that ignores slot numbers and could return a
+  line that the engine refused; the cache now stores the winning child's key and re-derives the
+  action against the live state.)
 - Budget and cache behaviour (`unknown` is never `unsolvable`, shared caches, determinism),
   `minSlots` against brute force, and `replayLine` refusing an illegal line.
 - On the real review levels (`tools/collect/solver.test.ts`): the slice and all six art preview
