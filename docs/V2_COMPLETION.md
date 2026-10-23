@@ -36,6 +36,35 @@ win (`npm run art:levels`), nothing more. Real level design, solving and difficu
 [reveal-cauldron.jpg](art/m11.5/reveal-cauldron.jpg) and [spellbook.jpg](art/m11.5/spellbook.jpg)
 are screenshots from the browser pane at 390×800 (the Spellbook one is caught mid fade-in).
 
+## The world's moment (M13.3)
+
+On top of the picture's own effect (chosen by its theme) the win card carries its **world's** mark,
+from `worldMoment.ts` and `worldIdentity.ts`:
+
+| World              | Seal     | Seal colour | Card tint (backdrop) |
+| ------------------ | -------- | ----------- | -------------------- |
+| Moonlit Beginnings | crescent | gold        | the world's night    |
+| Crystal Garden     | crystal  | teal        | deep teal            |
+| Zodiac Realm       | star     | blue        | deep indigo          |
+
+- A **world line** under the lore, led by the seal: "First page of Moonlit Beginnings" for the first
+  page you collect there, "Moonlit Beginnings · 2 of 3 pages so far" for progress (also on a replay; always "so far", since the totals are only the pages that exist today), and
+  "Moonlit Beginnings: every page so far" when the win collects the last page the library has for that
+  world. It never says a world is finished: most pages do not exist yet (docs/V2_WORLDS.md). If the
+  win could not be saved, no progress is claimed and there is no world line.
+- The end card's shade takes the world's backdrop colour.
+- When the reveal finishes by itself, the seal's colour opens once as a **ring** around the picture
+  (0.9 s). **A skip tap, reduced motion, or a redraw of a reveal already seen shows no ring**: the
+  line, seal and tint are static and appear with the text.
+- Nothing waits on it, nothing is gated by it, and it changes no outcome.
+
+Tested: the line wording for first/progress/every-page/replay/single-page worlds, unknown pieces,
+distinct seals, seal outlines inside their radius, and the ring (rises, fades, ends, never plays when
+reduced or skipped). Checked in the browser pane: the crescent seal and "First page of Moonlit
+Beginnings" after winning the crescent level, and the star seal with "Zodiac Realm · 1 of 1 page"
+after Libra. Also checked at 320×480 with the longest line ("every page so far"): it fits above the buttons. **Not checked:** the crystal seal on screen, the ring in motion by eye (it was driven
+through a background tab), reduced motion in the running game, a real phone.
+
 ## Rules it keeps
 
 - **Skippable:** a tap anywhere during the reveal jumps to the finished picture. It is presentation
@@ -75,4 +104,4 @@ unavailable storage (an unreadable book is never overwritten), and the preview l
 the running game (their logic is tested, the wiring is not clicked through), the other four reveals,
 and anything on a real phone. The Phaser scene lifecycle (the restart cycle above) has no automated
 test, only the browser check. The reveals are a first pass at the effect designs, not tuned.
-The Spellbook became a world-grouped gallery with replay in M13.2 (docs/V2_GALLERY.md); world-specific completion moments are M13.3.
+The Spellbook became a world-grouped gallery with replay in M13.2 (docs/V2_GALLERY.md); world-specific completion moments followed in M13.3 (below).

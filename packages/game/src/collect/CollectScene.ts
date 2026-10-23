@@ -26,6 +26,7 @@ import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
+import { worldMoment, type WorldMoment } from "./worldMoment";
 import { browserStore, readSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
 import { VisualModel } from "./visuals";
 
@@ -80,7 +81,7 @@ export class CollectScene extends Phaser.Scene {
   /** The picture reveal shown after a win on a level with a known picture (M11.5). */
   private reveal: CompletionOverlay | null = null;
   /** What recording this win in the Spellbook did, so a relayout does not count it twice. */
-  private winRecord: { isNew: boolean; saved: boolean } | null = null;
+  private winRecord: { isNew: boolean; saved: boolean; world: WorldMoment | null } | null = null;
   /** The reveal has finished or been skipped once for this win: a relayout must not replay it. */
   private revealSeen = false;
   private portalGlow: Phaser.GameObjects.Image | null = null;
@@ -652,12 +653,15 @@ export class CollectScene extends Phaser.Scene {
       const read = readSpellbook(store);
       const result = recordWin(read.book, subject.id, Date.now());
       // An unreadable book is never overwritten: better to forget one win than the collection.
+      const saved = read.ok && saveSpellbook(store, result.book);
       this.winRecord = {
         isNew: result.isNew,
-        saved: read.ok && saveSpellbook(store, result.book),
+        saved,
+        // Progress is only claimed for a win that is really in the book.
+        world: saved ? worldMoment(result.book, subject.id, result.isNew) : null,
       };
     }
-    const { isNew, saved } = this.winRecord;
+    const { isNew, saved, world } = this.winRecord;
     const overlay = new CompletionOverlay(this, {
       layout: this.layout,
       level: { ...level, subject },
@@ -665,6 +669,7 @@ export class CollectScene extends Phaser.Scene {
       reduced: isReducedMotion(this),
       isNew,
       saved,
+      world,
       instant: this.revealSeen,
       onSpellbook: () => this.openSpellbook(),
       onAgain: () => this.session.restart(),
