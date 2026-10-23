@@ -29,6 +29,11 @@ describe("service worker build", () => {
     ]);
   });
 
+  it("never precaches the v2 review board chunk (it lives in v2/, outside the shell)", () => {
+    const files = ["play/index.html", "_astro/play.abc.js", "v2/CollectScene.js"];
+    expect(shellFiles(files)).toEqual(["_astro/play.abc.js", "play/index.html"]);
+  });
+
   it("maps navigations to their page keys", () => {
     expect(pageKeys("/play")).toEqual(["/play", "/play/"]);
     expect(pageKeys("/play/")).toEqual(["/play/"]);

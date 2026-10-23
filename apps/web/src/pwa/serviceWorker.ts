@@ -11,7 +11,11 @@
  * load its lazily requested files (the hint worker) even offline.
  */
 
-/** Pages and files that make up the playable game. Everything else is cached at runtime. */
+/**
+ * Pages and files that make up the playable game. Everything else is cached at runtime. (The v2
+ * review board lives in `v2/`, outside this rule on purpose: it is never precached and does not
+ * change the worker version.)
+ */
 function isShell(file: string): boolean {
   return (
     file === "play/index.html" ||

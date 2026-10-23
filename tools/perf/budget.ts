@@ -33,6 +33,14 @@ export const BUDGETS: Budget[] = [
     max: 450 * KB,
   },
   {
+    // The v2 review board and engine (`?engine=v2`): its own allowance until v2 replaces v1.
+    label: "v2 collect chunk",
+    match: (f) => f.path === "v2/CollectScene.js",
+    measure: "gzip",
+    per: "total",
+    max: 40 * KB,
+  },
+  {
     label: "each HTML page",
     match: (f) => f.path.endsWith(".html"),
     measure: "gzip",
@@ -149,4 +157,30 @@ export function scriptLeaks(
       return { page: p.path, gzip: all.reduce((n, f) => n + (bundles.get(f)?.gzip ?? 0), 0) };
     })
     .filter((r) => r.gzip > max);
+}
+
+/**
+ * While the v2 board is a lazily loaded review chunk, the build must contain it under its stable
+ * name and the shipped play bundle must reference it by that name only. A hashed name would change
+ * the play bundle (and the service worker version) on every v2-only change. `sources` are the
+ * `_astro/*.js` files with their text.
+ */
+export function v2ChunkProblems(
+  paths: readonly string[],
+  sources: readonly { path: string; text: string }[],
+): string[] {
+  const problems: string[] = [];
+  if (!paths.includes("v2/CollectScene.js")) {
+    problems.push("v2/CollectScene.js is missing: the lazy v2 board chunk lost its stable name");
+  }
+  for (const p of paths) {
+    if (/^_astro\/CollectScene\./.test(p))
+      problems.push(`${p}: v2 chunk landed in _astro/ (hashed, precached)`);
+  }
+  for (const s of sources) {
+    if (/CollectScene\.[A-Za-z0-9_-]{6,}\.js/.test(s.text)) {
+      problems.push(`${s.path} references a hashed v2 chunk name`);
+    }
+  }
+  return problems;
 }

@@ -12,6 +12,7 @@ import { CONSENT_EVENT, createAnalytics, readConsent, safeFlush, track } from ".
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
+import { v2Requested } from "./collect/engineFlag";
 import { theme } from "./theme";
 
 /** MediaQueryList change listeners (Safari before 14 only has the old addListener API). */
@@ -74,6 +75,25 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
+  // The v2 board (`?engine=v2`, review builds only) is a separate chunk, loaded only when asked for;
+  // without the flag nothing of it is requested and the game below is exactly the shipped one.
+  if (v2Requested(window.location.search, import.meta.env?.PUBLIC_ENGINE)) {
+    void import("./collect/CollectScene")
+      .then(({ CollectScene }) => {
+        const start = () => {
+          game.scene.stop("boot");
+          game.scene.add("collect", CollectScene, true);
+        };
+        // The scene manager boots on READY (after the game object reports `isBooted`): adding a
+        // scene earlier would start it alongside the title screen.
+        if (game.scene.isBooted) start();
+        else game.events.once(Phaser.Core.Events.READY, start);
+      })
+      .catch((error: unknown) => {
+        // Offline, or a stale/removed review chunk: stay on the title screen and say why.
+        console.error("The v2 board could not be loaded (review build only).", error);
+      });
+  }
   // Audio stays silent until the first tap or key (browser rule), then follows the saved settings.
   const audio = new AudioEngine(audioSettings(defaultSave().settings));
   game.registry.set("audio", audio);
@@ -171,7 +191,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
         // Menus size everything (scrolling included) at create time: rebuild them. The play
         // scene re-lays itself out from the registry on resize, keeping the board in progress.
         for (const scene of game.scene.getScenes(true)) {
-          if (scene.scene.key === "play") continue;
+          if (scene.scene.key === "play" || scene.scene.key === "collect") continue;
           // Keep the scroll position (in CSS pixels, so it survives the ratio change).
           scene.scene.restart({ scrollCss: scene.cameras.main.scrollY / oldDpr });
         }
