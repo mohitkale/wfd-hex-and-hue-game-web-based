@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import * as collect from "@hexhue/core/collect";
 import { pieces } from "../../content/v2art";
 import { encodeArtLevel, type ArtGenerated } from "../../packages/game/src/collect/artLevelCodec";
+import { stageForLevel } from "../../content/curveV2";
 import type { Tier } from "../../content/difficulty";
 import { generateForTier } from "../collect/tierGate";
 import { pieceToArt, type ArtPiece } from "./piece";
@@ -22,14 +23,26 @@ export const OUTPUT = new URL(
 );
 
 /**
- * The tier each piece is generated for, and the seed. The generator only returns a level whose
- * simulated players behave as the tier's band demands (M12.3, `tools/collect/tierGate.ts`): the
- * moons, the cauldron, the crystals and the scales can only support the tutorial band (cheap play
- * beats them however they are dealt: see docs/V2_STRATEGIES.md); the black cat reaches easy.
+ * Where each piece sits on the difficulty curve (content/curveV2.ts, docs/V2_CURVE.md): its target
+ * level number, from which the curve gives its tier. Only pieces that can meet their stage are
+ * placed: the library has five tutorial-grade lossless pictures for the three lossless slots of the
+ * first stage, and nothing that reaches stage 3 or later. Unplaced pieces are generated as tutorial
+ * levels and are not part of the curve.
  */
-export const TARGET_TIER: Record<string, Tier> = { "black-cat": "easy" };
+export const PREVIEW_LEVEL: Record<string, number> = {
+  "crescent-moon": 1,
+  "triple-moon": 2,
+  "witchs-cauldron": 3,
+  "black-cat": 6,
+};
 export const DEFAULT_TIER: Tier = "tutorial";
 export const SEED = 1;
+
+/** A piece's target tier: its stage's, if it is on the curve. */
+export const tierFor = (id: string): Tier => {
+  const level = PREVIEW_LEVEL[id];
+  return level === undefined ? DEFAULT_TIER : stageForLevel(level).tier;
+};
 
 export interface ArtLevel {
   level: collect.CollectLevel;
@@ -39,7 +52,7 @@ export interface ArtLevel {
 /** Generates a piece's level (M12.2) for its tier (M12.3), adding its shades and subject. */
 export function levelForPiece(piece: ArtPiece): ArtLevel {
   const { art, shades } = pieceToArt(piece);
-  const tier = TARGET_TIER[piece.id] ?? DEFAULT_TIER;
+  const tier = tierFor(piece.id);
   const g = generateForTier(art, `art-${piece.id}`, piece.name, tier, SEED);
   if (!g) throw new Error(`${piece.id}: no level meets the ${tier} band`);
   const report = collect.strategyReport(g.level);

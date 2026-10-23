@@ -23,7 +23,7 @@ import {
   unlockedList,
 } from "../../packages/game/src/collect/v2Spellbook";
 import { botPlay } from "../collect/density";
-import { DEFAULT_TIER, OUTPUT, TARGET_TIER, artLevels, levelForPiece, serialize } from "./levels";
+import { OUTPUT, artLevels, levelForPiece, serialize, tierFor } from "./levels";
 
 const withoutShades = (level: collect.CollectLevel): collect.CollectLevel => {
   const { shades: _shades, ...rest } = level;
@@ -85,7 +85,7 @@ describe("the art library's preview levels", () => {
       expect(record.strategies.randomRate, level.id).toBe(report.randomRate);
       // The label is the piece's target tier, not whatever was written, and its band is met.
       const id = level.subject!.id;
-      expect(record.tier, level.id).toBe(TARGET_TIER[id] ?? DEFAULT_TIER);
+      expect(record.tier, level.id).toBe(tierFor(id));
       expect(checkStrategies(report, record.tier as Tier), level.id).toEqual([]);
     }
   });
