@@ -76,6 +76,7 @@ function argmax(legal: Action[], score: (a: Action) => number): Action {
 const PICKS: Record<PlayerId, Pick> = {
   "first-front": (_s, legal) => legal.find(isSelect) ?? legal[0]!,
   "last-front": (_s, legal) => [...legal].reverse().find(isSelect) ?? legal[0]!,
+  // A forced resume (no front is legal) does not move the cursor: it counts columns, not slots.
   "round-robin": (s, legal, memory) => {
     const fronts = legal.filter(isSelect);
     if (fronts.length === 0) return legal[0]!;
@@ -88,9 +89,10 @@ const PICKS: Record<PlayerId, Pick> = {
         return hit;
       }
     }
-    return fronts[0]!;
+    return fronts[0]!; // unreachable: some front is legal, and the loop covers every column
   },
   "tidy-left": (_s, legal) => legal.find((a) => a.kind === "resume") ?? legal[0]!,
+  // When no front is legal the first waiting group is taken (the rule does not say which).
   "tidy-right": (_s, legal) =>
     legal.find((a) => a.kind === "resume") ?? [...legal].reverse().find(isSelect) ?? legal[0]!,
   largest: (s, legal) => argmax(legal, (a) => remaining(s, a)),

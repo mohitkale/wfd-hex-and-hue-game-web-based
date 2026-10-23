@@ -92,7 +92,7 @@ export interface GenerateOptions {
   refineSteps?: number;
   /**
    * Extra acceptance test (M12.3): returns the reasons a level is not acceptable, empty if it is.
-   * The hill climb then works to remove them (fewest reasons first, then more random failures), and
+   * The hill climb then works to remove them (fewest reasons first), and
    * a level with any reason left is never returned. Costly (it runs the simulated players), so only
    * the best candidate is refined and checked.
    */
@@ -303,10 +303,21 @@ export function generateLevel(
   const gate = options.gate;
   const refining = (spec.minRandomLoss > 0 || gate !== undefined) && refineSteps > 0;
   // The gate runs the simulated players, which is slow: only the single best candidate is refined.
-  const pool = gate ? found.slice(0, 1) : refining ? found.slice(0, 3) : found.slice(0, 1);
+  const pool = gate
+    ? found.slice(0, 1)
+    : spec.minRandomLoss > 0
+      ? found.slice(0, 3)
+      : found.slice(0, 1);
   for (const c of pool) {
     const level = refining
-      ? refine(c.level, budget, refineSteps, createRng(attemptSeed(seed, 1000 + c.attempt)), gate)
+      ? refine(
+          c.level,
+          budget,
+          refineSteps,
+          createRng(attemptSeed(seed, 1000 + c.attempt)),
+          spec,
+          gate,
+        )
       : c.level;
     const result = evaluate({ ...level, slots: 8 }, spec, budget, true);
     if (!result) continue;
@@ -337,20 +348,22 @@ export function randomLossRate(level: CollectLevel, runs = 12): number {
 /**
  * Hill-climbs on the deal (swap or move groups; shift cubes between, or merge, groups of one colour), keeping a change
  * only when the solver can still win the level and random play fails at least as often. The slot
- * count is held fixed, so pressure comes from the order and the group sizes. Returns the input if nothing helped. With a `gate`, fewer reasons to reject come first.
+ * count is held fixed (with a `gate` it is re-derived for each candidate), so pressure comes from the order and the group sizes. Returns the input if nothing helped. With a `gate`, fewer reasons to reject come first; more random failures only matter when the profile asks for pitfalls.
  */
 function refine(
   level: CollectLevel,
   budget: number,
   steps: number,
   rng: Rng,
+  spec: ProfileSpec,
   gate?: (level: CollectLevel) => string[],
 ): CollectLevel {
+  const wantLoss = spec.minRandomLoss > 0;
   let current = level;
-  let best = randomLossRate(current);
+  let bestLoss = wantLoss ? randomLossRate(current) : 0;
   let bestProblems = gate ? gate(current).length : 0;
-  // Nothing to fix: the gate already accepts the candidate, so there is no need to change it.
-  if (gate && bestProblems === 0) return current;
+  // Nothing to fix: the gate accepts the candidate and it already has the pitfalls the profile asks for.
+  if (gate && bestProblems === 0 && (!wantLoss || bestLoss >= spec.minRandomLoss)) return current;
   for (let step = 0; step < steps; step++) {
     const columns = current.columns.map((c) => c.map((g) => ({ ...g })));
     const places: [number, number][] = columns.flatMap((c, ci) =>
@@ -387,15 +400,24 @@ function refine(
       ga.capacity += gb.capacity;
       columns[b[0]]!.splice(b[1], 1);
     }
-    const candidate: CollectLevel = { ...current, columns };
+    let candidate: CollectLevel = { ...current, columns };
     if (columns.some((c) => c.length === 0) || validateCollectLevel(candidate).length > 0) continue;
+    if (gate) {
+      // Moving groups can change how many slots the level needs: gate it at the slot count the
+      // final level will have, not at the one the deal started with.
+      const fewest = minSlots(candidate, budget);
+      if (fewest.slots === null) continue;
+      candidate = { ...candidate, slots: Math.min(8, fewest.slots + spec.slack) };
+    }
     if (new CollectSolver(candidate, budget).solve().status !== "solved") continue;
     const problems = gate ? gate(candidate).length : 0;
     if (problems > bestProblems) continue;
-    const loss = randomLossRate(candidate);
-    if (problems < bestProblems || loss >= best) {
+    // With pitfalls wanted, more random failures is better; otherwise a level that is no worse is kept
+    // (sideways moves let the search wander towards a tier's band instead of away from it).
+    const loss = wantLoss ? randomLossRate(candidate) : 0;
+    if (problems < bestProblems || !wantLoss || loss >= bestLoss) {
       bestProblems = problems;
-      best = loss;
+      bestLoss = loss;
       current = candidate;
     }
   }

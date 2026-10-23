@@ -24,8 +24,9 @@ All act only at settled states, take one legal action, and the real engine runs 
 | `clears-capacity` | Among actions that complete their group, the one delivering most; if none, as `most-delivered` |
 | `random`          | Uniform among legal actions; 200 runs on seeds 0..199, reported as a win rate                  |
 
-A run of more than three actions per group counts as a loss for the win rate (it cannot happen on
-a valid level: every legal action delivers at least one cube). `strategyReport(level)` returns each
+A run of more than three actions per group counts as a loss for the win rate. It has not happened:
+on the seven levels above the most any player needed was about 1.4 actions per group (a group can
+park and be resumed, so the cap is a safety net, not a proof). `strategyReport(level)` returns each
 player's result and loss reason, `simpleWins` (of nine), the random win rate, and whether any
 player witnessed a loss.
 
@@ -70,12 +71,15 @@ pictures or hand design, not more shuffling.
   easy. `tiersSatisfied(outcome)` lists the fitting tiers. The tree measures (dead ends, slack,
   planning depth) are M12.4's and join `checkLevel`.
 - `generateLevel(..., { gate })` takes the gate: the generator refines its best candidate until the
-  gate has nothing to object to (fewest objections first) and never returns a level it still objects
-  to; `tools/collect/tierGate.ts`'s `generateForTier` wires the tier's gate and profiles.
+  gate has nothing to object to (fewest objections first; moves that change the slot count are gated
+  at the slot count the final level will have) and never returns a level it still objects to; `tools/collect/tierGate.ts`'s `generateForTier` wires the tier's gate and profiles.
 - `npm run art:levels` generates each art level for its target tier (`black-cat`: easy, the rest
   tutorial), records the players' results and the tier in the committed data, and a test recomputes
   them and checks the recorded tier's band, so a level that stops meeting it fails the build. The CI
   gate over every shipped level, with the world-level repetition check, is M12.6.
+- The gate covers the **simple-player** rules only. A band's other rules (the reachable-loss rule,
+  dead ends, slack, planning depth) arrive with M12.4 and join `checkLevel`; the black cat labelled
+  easy has a witnessed loss, but nothing here checks that it must.
 - The players judge cheap play only. A level is never penalised because a human or the solver finds
   a clever line: a hard level beaten by no cheap player is accepted however winnable it is.
 
