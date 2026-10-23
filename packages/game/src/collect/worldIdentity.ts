@@ -33,6 +33,9 @@ export interface Atmosphere {
   backdrop: number;
 }
 
+/** The world's seal: a small mark shown on its completion moments (M13.3). */
+export type SealKind = "crescent" | "crystal" | "star";
+
 export interface WorldIdentity {
   id: WorldId;
   name: string;
@@ -44,6 +47,7 @@ export interface WorldIdentity {
   /** How its lore speaks, for authors. */
   voice: string;
   atmosphere: Atmosphere;
+  seal: { kind: SealKind; color: number };
 }
 
 export const WORLD_IDENTITIES: Readonly<Record<WorldId, WorldIdentity>> = {
@@ -64,6 +68,7 @@ export const WORLD_IDENTITIES: Readonly<Record<WorldId, WorldIdentity>> = {
       speed: 1,
       backdrop: 0x140b2e,
     },
+    seal: { kind: "crescent", color: 0xf6d97a },
   },
   crystal: {
     id: "crystal",
@@ -82,6 +87,7 @@ export const WORLD_IDENTITIES: Readonly<Record<WorldId, WorldIdentity>> = {
       speed: 1.6,
       backdrop: 0x0a1a26,
     },
+    seal: { kind: "crystal", color: 0x78d9cd },
   },
   zodiac: {
     id: "zodiac",
@@ -100,6 +106,7 @@ export const WORLD_IDENTITIES: Readonly<Record<WorldId, WorldIdentity>> = {
       speed: 0.5,
       backdrop: 0x0a0a2e,
     },
+    seal: { kind: "star", color: 0x89aef0 },
   },
 };
 

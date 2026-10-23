@@ -14,6 +14,7 @@ import {
 import type { CollectLayout } from "./collectLayout";
 import { Particles } from "./particles";
 import { fitCell, paintPicture } from "./pictureView";
+import { PULSE_MS, sealPoints, sealPulse, type WorldMoment } from "./worldMoment";
 
 export interface CompletionOptions {
   layout: CollectLayout;
@@ -24,6 +25,8 @@ export interface CompletionOptions {
   isNew: boolean;
   /** The win could be written to storage. */
   saved: boolean;
+  /** The picture's world: its line, seal and backdrop (null if no world claims it, or it was not saved). */
+  world: WorldMoment | null;
   /** Show the finished picture at once (a relayout after the reveal was already seen or skipped). */
   instant: boolean;
   onSpellbook: () => void;
@@ -55,6 +58,8 @@ export class CompletionOverlay {
   private readonly cell: number;
   private readonly x0: number;
   private readonly y0: number;
+  private readonly ring: Phaser.GameObjects.Graphics;
+  private pulseOn = false;
   private startedAt = -1;
   private skipped: boolean;
   private finished = false;
@@ -80,13 +85,14 @@ export class CompletionOverlay {
         l.frame.y + l.frame.h / 2,
         l.frame.w,
         l.frame.h,
-        0x140b2e,
+        o.world?.backdrop ?? 0x140b2e,
         0.86,
       )
       .setDepth(50);
     this.g = scene.add.graphics().setDepth(52);
     this.particleLayer = new ParticleLayer(scene, this.particles, TEX.glow, 53);
-    this.objects.push(shade, this.g);
+    this.ring = scene.add.graphics().setDepth(53);
+    this.objects.push(shade, this.g, this.ring);
 
     const cx = l.frame.x + l.frame.w / 2;
     const picBottom = this.y0 + level.height * this.cell;
@@ -106,8 +112,24 @@ export class CompletionOverlay {
     const name = text(picBottom + 14 * dpr, level.subject.name, 25, "#f6d97a", true);
     const caption = text(name.y + name.height + 4 * dpr, this.spec.caption, 13, theme.textDim);
     const lore = text(caption.y + caption.height + 10 * dpr, level.subject.lore, 15, theme.text);
+    let belowLore = lore.y + lore.height + 12 * dpr;
+    if (o.world) {
+      const worldLine = text(belowLore, o.world.line, 13, hex(o.world.seal.color));
+      // The seal sits just left of the line, filled in the world's colour.
+      const seal = scene.add.graphics().setDepth(54).setAlpha(0);
+      seal.fillStyle(o.world.seal.color, 1);
+      seal.beginPath();
+      sealPoints(o.world.seal.kind, 8 * dpr).forEach((p, i) =>
+        i === 0 ? seal.moveTo(p.x, p.y) : seal.lineTo(p.x, p.y),
+      );
+      seal.closePath();
+      seal.fillPath();
+      seal.setPosition(cx - worldLine.width / 2 - 14 * dpr, worldLine.y + worldLine.height / 2);
+      this.later.push(worldLine, seal);
+      belowLore += worldLine.height + 8 * dpr;
+    }
     const book = text(
-      lore.y + lore.height + 12 * dpr,
+      belowLore,
       !o.saved
         ? "Could not be saved on this device"
         : o.isNew
@@ -162,6 +184,7 @@ export class CompletionOverlay {
   update(now: number): void {
     if (this.finished) {
       // Let the last particles fade out instead of cutting them off.
+      this.drawPulse(now);
       if (now - this.finishedAt <= this.spec.particle.lifeMs) this.particleLayer.update(now);
       else if (this.finishedAt >= 0) {
         this.particleLayer.update(-1e9);
@@ -207,9 +230,30 @@ export class CompletionOverlay {
     }
   }
 
+  /** The world's seal colour as a ring that opens once around the picture (not after a skip). */
+  private drawPulse(now: number): void {
+    if (!this.pulseOn || !this.o.world) return;
+    const p = sealPulse(now - this.finishedAt, { reduced: this.o.reduced, skipped: false });
+    this.ring.clear();
+    if (p.alpha === 0) {
+      if (now - this.finishedAt >= PULSE_MS) this.pulseOn = false;
+      return;
+    }
+    const { level } = this.o;
+    const reach = Math.max(level.width, level.height) * this.cell * 0.75;
+    this.ring.lineStyle(Math.max(2, this.o.dpr * 2), this.o.world.seal.color, p.alpha);
+    this.ring.strokeCircle(
+      this.x0 + (level.width * this.cell) / 2,
+      this.y0 + (level.height * this.cell) / 2,
+      reach * p.radius,
+    );
+  }
+
   private finish(now: number): void {
     this.finished = true;
     this.finishedAt = now;
+    // A skip, reduced motion or a redraw of a reveal already seen means no pulse.
+    this.pulseOn = !this.skipped && !this.o.reduced && !this.o.instant && !!this.o.world;
     this.zone.destroy();
     this.scene.tweens.add({
       targets: this.later,
@@ -222,3 +266,6 @@ export class CompletionOverlay {
     });
   }
 }
+
+/** `0xrrggbb` as a CSS colour string. */
+const hex = (c: number): string => `#${c.toString(16).padStart(6, "0")}`;
