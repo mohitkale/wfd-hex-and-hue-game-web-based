@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { validateLevel, verifySolution, type Level } from "@hexhue/core";
 import { worlds } from "../../packages/game/src/levels";
-import { STRATEGIES, decisionProfile, playsToWin, winRates, type StrategyName } from "./strategies";
+import {
+  STRATEGIES,
+  decisionProfile,
+  playsToWin,
+  winRates,
+  type Strategy,
+  type StrategyName,
+} from "./strategies";
 
 /** Two colors side by side, one wisp each: any launch order wins. */
 const easy: Level = {
@@ -40,7 +47,7 @@ describe("audit strategies", () => {
     };
     const picked: number[] = [];
     const strategy: typeof STRATEGIES.random = (s, moves, rand) => {
-      const m = STRATEGIES["first-column"](s, moves, rand);
+      const m = (STRATEGIES["first-column"] as Strategy)(s, moves, rand);
       if (m.kind === "column") picked.push(m.index);
       return m;
     };
