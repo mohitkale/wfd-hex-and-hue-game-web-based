@@ -24,9 +24,10 @@ import { cellCenter, computeCollectLayout, hudButtonX, type CollectLayout } from
 import { RingStats } from "./profile";
 import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
-import { demoLineFromSearch, levelFromSearch } from "./levels";
+import { demoLineFromSearch, dailyFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
+import { dailyMoment, readDailyBook, recordDaily, saveDailyBook, shareOrCopy } from "./dailyBook";
 import { browserStore, readSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
 import { sealMap } from "./sealView";
 import { VisualModel } from "./visuals";
@@ -85,7 +86,14 @@ export class CollectScene extends Phaser.Scene {
   /** The picture reveal shown after a win on a level with a known picture (M11.5). */
   private reveal: CompletionOverlay | null = null;
   /** What recording this win in the Spellbook did, so a relayout does not count it twice. */
-  private winRecord: { isNew: boolean; saved: boolean; world: WorldMoment | null } | null = null;
+  private winRecord: {
+    isNew: boolean;
+    saved: boolean;
+    world: WorldMoment | null;
+    daily: { line: string; shareText: string } | null;
+  } | null = null;
+  /** The UTC date of the daily challenge being played (M13.5), or null on any other level. */
+  private dailyDate: string | null = null;
   /** The reveal has finished or been skipped once for this win: a relayout must not replay it. */
   private revealSeen = false;
   private portalGlow: Phaser.GameObjects.Image | null = null;
@@ -123,7 +131,10 @@ export class CollectScene extends Phaser.Scene {
     const search = typeof window !== "undefined" ? window.location.search : "";
     // `v2.level`: a level chosen in the game (Spellbook replay), kept so "Back to the board" returns to it.
     const chosen = this.registry.get("v2.level") as string | undefined;
-    const level = levelFromSearch(search, chosen);
+    // `?level=daily`: today's challenge, remembered by its date so the win is recorded for that day.
+    const daily = dailyFromSearch(search, Date.now(), chosen);
+    this.dailyDate = daily?.date ?? null;
+    const level = levelFromSearch(search, daily ? daily.levelId : chosen);
     const params = new URLSearchParams(search);
     if (params.get("speed") === "2") this.speed = 2;
     // `?view=spellbook` opens the v2 Spellbook first (once: "Back to the board" returns here).
@@ -673,9 +684,10 @@ export class CollectScene extends Phaser.Scene {
         saved,
         // Progress is only claimed for a win that is really in the book.
         world: saved ? worldMoment(result.book, subject.id, result.isNew) : null,
+        daily: this.recordDaily(),
       };
     }
-    const { isNew, saved, world } = this.winRecord;
+    const { isNew, saved, world, daily } = this.winRecord;
     const overlay = new CompletionOverlay(this, {
       layout: this.layout,
       level: { ...level, subject },
@@ -684,6 +696,8 @@ export class CollectScene extends Phaser.Scene {
       isNew,
       saved,
       world,
+      daily,
+      onShare: (text) => this.share(text),
       instant: this.revealSeen,
       onSpellbook: () => this.openSpellbook(),
       onAgain: () => this.session.restart(),
@@ -691,6 +705,29 @@ export class CollectScene extends Phaser.Scene {
     this.reveal = overlay;
     this.overlay = overlay.objects;
     return true;
+  }
+
+  /** Records today's daily (first completion of a day counts) and says what the win card shows. */
+  private recordDaily(): { line: string; shareText: string } | null {
+    const date = this.dailyDate;
+    if (!date) return null;
+    const store = browserStore();
+    const read = readDailyBook(store);
+    const moves = Math.max(1, this.session.log.length);
+    const result = recordDaily(read.book, date, moves, Date.now());
+    // As with the Spellbook, a book that could not be read is never overwritten.
+    const saved = read.ok && (!result.isNew || saveDailyBook(store, result.book));
+    return dailyMoment(result.book, date, { isNew: result.isNew, saved, moves });
+  }
+
+  /** Shares the daily's text (share sheet, else clipboard) and says what happened on the card. */
+  private share(text: string): void {
+    const nav = typeof navigator === "undefined" ? null : navigator;
+    void shareOrCopy(text, nav).then((r) =>
+      this.reveal?.note(
+        r === "copied" ? "Copied to clipboard" : r === "shared" ? "Shared" : "Could not share",
+      ),
+    );
   }
 
   private openSpellbook(): void {

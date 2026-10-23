@@ -1,6 +1,7 @@
 import * as collect from "@hexhue/core/collect";
 import { createRng } from "@hexhue/core";
 import { ART_LEVELS } from "./artLevels";
+import { dailyLevelId, dayNumber, utcDate } from "./daily";
 import { layeredOrb } from "./denseBoard";
 import { LOSE_LINES, SLICE_ID, WIN_LINE, moonlitHat } from "./slice";
 
@@ -209,6 +210,24 @@ export function levelFromSearch(search: string, chosen?: string | null): collect
     new URLSearchParams(search).get("level") ??
     DEFAULT_DEV_LEVEL;
   return (DEV_LEVELS[name] ?? DEV_LEVELS[DEFAULT_DEV_LEVEL]!)();
+}
+
+/**
+ * `?level=daily` (or a replay choice of `"daily"`): today's daily challenge (M13.5), by the UTC date
+ * of `now`. `?date=YYYY-MM-DD` picks another day, for review and for replaying a day; a bad date falls
+ * back to today. Null when the level asked for is not the daily.
+ */
+export function dailyFromSearch(
+  search: string,
+  now: number,
+  chosen?: string | null,
+): { date: string; levelId: string } | null {
+  const params = new URLSearchParams(search);
+  if ((chosen ?? params.get("level")) !== "daily") return null;
+  const asked = params.get("date") ?? "";
+  const date = dayNumber(asked) !== null ? asked : utcDate(now);
+  const levelId = dailyLevelId(date, Object.keys(ART_LEVELS));
+  return levelId ? { date, levelId } : null;
 }
 
 /** `?demo=win|lose|deadlock`: a recorded line for the slice level (review builds), else null. */
