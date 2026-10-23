@@ -7,7 +7,7 @@
  * waiver that no longer applies, so recorded debt cannot go stale.
  */
 import * as collect from "@hexhue/core/collect";
-import { checkEntry, stageForLevel, type CurveEntry } from "../../content/curveV2";
+import { checkCurve, checkEntry, stageForLevel, type CurveEntry } from "../../content/curveV2";
 import {
   checkLevel,
   checkStrategies,
@@ -53,6 +53,24 @@ export interface LevelReport {
 const describe = (a: collect.Action): string =>
   a.kind === "select" ? `column ${a.column + 1}` : `resume slot ${a.slot + 1}`;
 
+/** The reachable-loss rules of the tier bands and the curve: a level that cannot lose has no decisions. */
+const isLossRule = (m: string): boolean => /reachable loss|must be able to cost something/.test(m);
+
+/** A level that could not be measured: reported as unsolvable, never as a crash. */
+function unreadable(
+  base: Omit<LevelReport, "solved" | "line" | "measures" | "score" | "issues">,
+  message: string,
+): LevelReport {
+  return {
+    ...base,
+    solved: false,
+    line: [],
+    measures: null,
+    score: null,
+    issues: [{ kind: "unsolvable", message, waived: false }],
+  };
+}
+
 export function reportLevel(entry: PoolLevel, level: collect.CollectLevel): LevelReport {
   const stage = stageForLevel(entry.level);
   const tier = stage.tier;
@@ -70,7 +88,12 @@ export function reportLevel(entry: PoolLevel, level: collect.CollectLevel): Leve
     height: level.height,
     level,
   };
-  const solved = collect.solve(level);
+  let solved: collect.SolveResult;
+  try {
+    solved = collect.solve(level);
+  } catch (error) {
+    return unreadable(base, `the level could not be solved: ${(error as Error).message}`);
+  }
   if (solved.status !== "solved") {
     return {
       ...base,
@@ -91,9 +114,18 @@ export function reportLevel(entry: PoolLevel, level: collect.CollectLevel): Leve
     };
   }
   // A solution only counts if the live engine replays it to a win.
-  const replay = collect.replayLine(level, solved.line!);
+  let replay: ReturnType<typeof collect.replayLine>;
+  try {
+    replay = collect.replayLine(level, solved.line!);
+  } catch (error) {
+    return unreadable(
+      base,
+      `the solver's line is refused by the engine: ${(error as Error).message}`,
+    );
+  }
   const line = solved.line!.map(describe);
-  const measures = collect.measureLevel(level)!;
+  const measures = collect.measureLevel(level);
+  if (!measures) return unreadable(base, "the level could not be measured");
   const score = collect.difficultyScore(measures);
   const known = new Set(entry.knownIssues.map((k) => k.message));
   const issues: Issue[] = [];
@@ -111,7 +143,10 @@ export function reportLevel(entry: PoolLevel, level: collect.CollectLevel): Leve
   const tutorialNumber = tier === "tutorial" ? entry.level : undefined;
   for (const m of checkLevel(metrics, tier, tutorialNumber)) {
     if (trivial.includes(m)) continue;
-    issues.push({ kind: "band", message: m, waived: known.has(m) });
+    // A level that cannot lose (or must not be lost, in the lossless tutorial) has no decisions to
+    // make: that is triviality, not a band deviation, and cannot be waived.
+    if (isLossRule(m)) issues.push({ kind: "trivial", message: m, waived: false });
+    else issues.push({ kind: "band", message: m, waived: known.has(m) });
   }
   const curveEntry: CurveEntry = {
     level: entry.level,
@@ -131,22 +166,52 @@ export function reportLevel(entry: PoolLevel, level: collect.CollectLevel): Leve
     reachableLoss: measures.reachableLoss,
   };
   for (const m of checkEntry(curveEntry)) {
-    // The cheap-player and loss rows repeat tier checks above: report each deviation once.
-    if (trivial.some((t) => m.endsWith(t))) continue;
+    // The cheap-player rows repeat the tier checks above and the loss rows repeat the band's:
+    // report each deviation once (as trivial).
+    if (trivial.some((t) => m.endsWith(t)) || isLossRule(m)) continue;
     issues.push({ kind: "curve", message: m, waived: known.has(m) });
   }
-  // Waivers must still be needed.
-  const present = new Set(issues.map((i) => i.message));
+  // Waivers must still be needed, and may only name something waivable.
+  const present = new Map(issues.map((issue) => [issue.message, issue]));
   for (const k of entry.knownIssues) {
-    if (!present.has(k.message)) {
+    const hit = present.get(k.message);
+    if (!hit) {
       issues.push({
         kind: "waiver",
         message: `the recorded deviation no longer occurs: ${k.message}`,
         waived: false,
       });
+    } else if (hit.kind === "trivial" || hit.kind === "unsolvable") {
+      issues.push({
+        kind: "waiver",
+        message: `this cannot be waived (${hit.kind}): ${k.message}`,
+        waived: false,
+      });
     }
   }
   return { ...base, solved: true, line, measures, score, issues };
+}
+
+/** The curve entry of a measured level report. */
+function curveEntryOf(l: LevelReport): CurveEntry {
+  const m = l.measures!;
+  return {
+    level: l.number,
+    id: l.id,
+    cubes: l.cubes,
+    measures: {
+      score: l.score!.total,
+      deadEndShare: m.deadEndShare,
+      temptingPoorShare: m.temptingPoorShare,
+      doomedFirstShare: m.doomedFirstShare,
+      planningDepth: m.planningDepth,
+      hiddenColors: m.hiddenColors,
+      slotPressure: m.slotPressure,
+      seconds: m.seconds,
+    },
+    strategies: { wins: m.wins, randomRate: m.randomRate },
+    reachableLoss: m.reachableLoss,
+  };
 }
 
 export interface PoolReport {
@@ -163,11 +228,19 @@ export function reportPool(
   load: (id: string) => collect.CollectLevel,
   knownWorld: readonly string[] = [],
 ): PoolReport {
-  const levels = pool.map((entry) => reportLevel(entry, load(entry.id)));
+  const failures: string[] = [];
+  if (pool.length === 0) failures.push("pool: there are no levels to check");
+  const levels: LevelReport[] = [];
+  for (const entry of pool) {
+    try {
+      levels.push(reportLevel(entry, load(entry.id)));
+    } catch (error) {
+      failures.push(`${entry.id}: the level could not be loaded: ${(error as Error).message}`);
+    }
+  }
   const ids = pool.map((p) => p.id);
   const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
   const numbers = pool.map((p) => p.level);
-  const failures: string[] = [];
   for (const id of new Set(dup)) failures.push(`pool: level id ${id} is listed twice`);
   numbers.forEach((n, i) => {
     if (numbers.indexOf(n) !== i) failures.push(`pool: level number ${n} is used twice`);
@@ -184,6 +257,15 @@ export function reportPool(
         message: `the recorded world deviation no longer occurs: ${w}`,
         waived: false,
       });
+  }
+  // The pool-wide curve rules (rising stages, no growth in length); the per-level and world-cap
+  // messages are already reported above.
+  const perLevel = new Set(levels.flatMap((l) => l.issues.map((i) => i.message)));
+  const curveEntries = levels.filter((l) => l.measures).map((l) => curveEntryOf(l));
+  for (const message of checkCurve(curveEntries)) {
+    if (perLevel.has(message) || /^level \d+ \(/.test(message) || /wins \d+ of \d+/.test(message))
+      continue;
+    world.push({ kind: "curve", message, waived: knownWorld.includes(message) });
   }
   for (const l of levels) {
     for (const i of l.issues)

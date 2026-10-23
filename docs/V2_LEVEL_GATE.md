@@ -63,6 +63,16 @@ passes with every recorded deviation reasoned.
 
 ## Limits
 
+- **Waivers match the exact message** (including a number such as `0.666...`), so an improvement that
+  moves a value also fails (the new value is unwaived and the old waiver is stale) until the list is
+  edited. Structured waivers with thresholds, and a `--release` mode that allows none, are the next
+  strengthening; M15.4 can add the latter.
+- **A level is gated only if it is in the pool**; nothing yet ties the pool to what ships (a test
+  checks `SHIPPED`, which is empty, is covered by the pool). A level's tier follows its declared
+  number, so the number matters.
+- A level that cannot be solved, loaded or measured is reported as a failure, not a crash; an empty
+  pool fails.
+
 - The pool is small (four levels) because no more exist that can be placed on the curve.
 - The gate measures with the settled-sequential tree and the solver budgets of V2_MEASURES.md; a level
   that needs more is reported as not decided, and fails.

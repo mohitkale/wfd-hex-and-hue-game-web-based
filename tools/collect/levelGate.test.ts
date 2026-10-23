@@ -1,6 +1,7 @@
 import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
 import { KNOWN_WORLD_ISSUES, POOL, type PoolLevel } from "../../content/poolV2";
+import { SHIPPED } from "../../content/v2art";
 import { board, fixtureB } from "../../packages/core/src/collect/fixtures";
 import { EXTRA_LEVEL, PREVIEW_LEVEL } from "../art/placement";
 import { reportHtml, reportLevel, reportPool } from "./levelGate";
@@ -169,6 +170,77 @@ describe("bad fixtures fail the gate (and so CI: exit code 1)", () => {
     );
     expect(result.code).toBe(0);
     expect(written).toContain("Gate: FAIL");
+  });
+});
+
+describe("loopholes the review found are closed", () => {
+  it("a level that cannot lose is trivial and cannot be waived, however many messages are pasted", () => {
+    // The good level has no reachable loss: at a medium number that is a missing decision, not a band detail.
+    const lossless = reportLevel(entry("good", 16), goodLevel());
+    const rule = lossless.issues.filter((i) => /reachable loss/.test(i.message));
+    expect(rule.length).toBeGreaterThan(0);
+    for (const i of rule) expect([i.kind, i.waived]).toEqual(["trivial", false]);
+    const pasted = lossless.issues.map((i) => ({
+      message: i.message,
+      reason: "a reason that is long enough to look serious",
+    }));
+    const result = run([entry("good", 16, pasted)], load, [], ["--check"]);
+    expect(result.code).toBe(1);
+    expect(result.err.join("\n")).toContain("cannot be waived (trivial)");
+  });
+
+  it("waiving an unsolvable level is rejected explicitly, not silently ignored", () => {
+    const r = reportLevel(
+      entry("unwinnable", 1, [
+        { message: "the solver proves the level cannot be won", reason: "x" },
+      ]),
+      unwinnable(),
+    );
+    expect(r.issues.map((i) => i.message).join("\n")).not.toContain("no longer occurs");
+    expect(
+      run(
+        [
+          entry("unwinnable", 1, [
+            { message: "the solver proves the level cannot be won", reason: "x" },
+          ]),
+        ],
+        load,
+        [],
+        ["--check"],
+      ).code,
+    ).toBe(1);
+  });
+
+  it("an empty pool fails, and a level that cannot be loaded is a failure, not a crash", () => {
+    const empty = run([], load, [], ["--check"]);
+    expect(empty.code).toBe(1);
+    expect(empty.err.join("\n")).toContain("no levels to check");
+    const missing = run([entry("no-such-level", 1)], load, [], ["--check"]);
+    expect(missing.code).toBe(1);
+    expect(missing.err.join("\n")).toContain("could not be loaded");
+  });
+
+  it("a level the engine refuses or the measures cannot read is reported as unsolvable, not thrown", () => {
+    const broken = { ...goodLevel(), slots: 3 };
+    // A level whose rules the validator rejects cannot be solved: the gate reports it.
+    const bad = { ...broken, columns: [[{ color: 0, capacity: 1 }]] };
+    const r = reportLevel(entry("good", 1), bad as collect.CollectLevel);
+    expect(r.solved).toBe(false);
+    expect(r.issues[0]!.kind).toBe("unsolvable");
+  });
+
+  it("applies the pool-wide curve rules: stages that do not rise are a failure", () => {
+    // The same level at an easy and a tutorial number: the stage means cannot rise.
+    const levelsFlat = [entry("good-a", 1), entry("good-b", 8)];
+    const result = reportPool(levelsFlat, (id) => ({ ...goodLevel(), id }));
+    expect(result.world.map((w) => w.message).join("\n")).toContain("must rise at least");
+    expect(result.failures.join("\n")).toContain("must rise at least");
+  });
+
+  it("everything shipped must be in the pool (nothing is shipped yet)", () => {
+    for (const id of SHIPPED)
+      expect(POOL.map((p) => `art-${p}`).concat(POOL.map((p) => p.id))).toContain(`art-${id}`);
+    expect(SHIPPED).toEqual([]);
   });
 });
 

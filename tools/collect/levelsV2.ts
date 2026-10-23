@@ -22,7 +22,13 @@ export function run(
   write: (html: string) => void = () => undefined,
 ): { code: number; out: string[]; err: string[]; report: PoolReport } {
   const report = reportPool(pool, load, known);
-  const out = [`${report.levels.length} level(s), ${report.failures.length} failure(s)`];
+  const out = [
+    ...report.levels.map(
+      (l) =>
+        `${l.id.padEnd(24)} level ${String(l.number).padStart(2)} ${l.tier.padEnd(8)} ${l.issues.filter((i) => !i.waived).length} issue(s), ${l.issues.filter((i) => i.waived).length} known`,
+    ),
+    `${report.levels.length} level(s), ${report.failures.length} failure(s)`,
+  ];
   if (args.includes("--report")) write(reportHtml(report));
   const err = report.failures.map((failure) => `✗ ${failure}`);
   return { code: args.includes("--check") && report.failures.length > 0 ? 1 : 0, out, err, report };
