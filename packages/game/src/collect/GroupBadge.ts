@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { isReducedMotion } from "../a11y";
 import { hexToNumber, inkFor, theme } from "../theme";
 import { symbolTexture } from "../view/textures";
+import { badgeFontPx, isHorizontal } from "./badgeBox";
 import { bake } from "./bake";
 import { tonesFor } from "./cubePaint";
 
@@ -50,10 +51,8 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     const bg = scene.add.image(0, 0, key).setOrigin(0.5);
     this.add(bg);
 
-    const horizontal = w >= h * 1.25;
-    const fontPx = Math.round(
-      opts.mini ? Math.min(h * 0.62, w * 0.7) : Math.min(h * 0.36, w * 0.34),
-    );
+    const horizontal = isHorizontal(w, h);
+    const fontPx = badgeFontPx(w, h, opts.mini === true);
     if (!opts.mini) {
       const scale = Math.max(
         1,

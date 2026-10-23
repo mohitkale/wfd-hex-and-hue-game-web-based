@@ -1,0 +1,66 @@
+# The v2 play screen (M14.1)
+
+Portrait-first, uncluttered, with big readable numbers. This is what changed and what is measured; the
+screen's geometry is the pure `computeCollectLayout` (`collectLayout.ts`), tested for every device in
+the matrix of docs/QA.md.
+
+## What changed
+
+- **A progress bar** along the bottom of the HUD (`progress.ts`, `CollectHud.ts`): delivered over
+  total, a gold fill on a faint track, no extra words. It never reads 100% until the last cube is
+  delivered, and shows a sliver as soon as one is.
+- **Bigger numbers in the field strip.** The "working" tiles are wide, with the creature on the left, so
+  their number now uses the height (about 19 to 23 css px instead of 13 to 17). Front groups are 22 to 35
+  css px, slots about 15, peeks behind a front group 9 or more.
+- **`CollectScene` is split** (it was 847 lines, now about 670): `CollectHud` (title, buttons, progress),
+  `Toast` (the one-line message, now wrapping to the board width), `PortalView`, `EndCard` (plain win and
+  loss card) and the pure `badgeBox.ts` (where each badge sits and how big its number is) and
+  `endCardText.ts`. No behaviour moved except the above.
+- Nothing else was added: no new panels, labels or counters. The screen is still the HUD, the board,
+  the field strip, the holding slots and the summon columns.
+
+## The device matrix
+
+24×24 board, five slots, four columns (the typical level), sizes in CSS px
+(`npm run layout:matrix`):
+
+| Device              | Viewport @ dpr | Cube | Column     | Slot | Front number | Field number |
+| ------------------- | -------------- | ---- | ---------- | ---- | ------------ | ------------ |
+| iPhone SE (1st gen) | 320×568 @2     | 11.5 | 70×113.5   | 44   | 22.5         | 19           |
+| iPhone SE (2nd gen) | 375×667 @2     | 13.5 | 82×133.5   | 51.5 | 26           | 22           |
+| iPhone 15           | 393×852 @3     | 14   | 86×170.3   | 54   | 27.3         | 23           |
+| Pixel 7             | 412×915 @2.625 | 14.9 | 90.7×172.2 | 54.1 | 29           | 23.2         |
+| Galaxy S8           | 360×740 @3     | 12.7 | 78×148     | 54   | 25           | 23           |
+| iPad                | 768×1024 @2    | 17.5 | 108×172    | 54   | 34.5         | 23           |
+| iPad (landscape)    | 1024×768 @2    | 16.5 | 108×153.5  | 54   | 33           | 23           |
+| Desktop             | 1440×900 @1    | 17   | 108×172    | 54   | 35           | 23           |
+| Phone (landscape)   | 844×390 @3     | 7.7  | 112.3×78   | 33.3 | 23.3         | 14.3         |
+
+## What the tests guarantee (`interface.test.ts`)
+
+For every device above and for boards of 10, 24 and 40 cubes a side with 3 to 8 slots and 3 to 6
+columns:
+
+- Nothing leaves the frame; the board overlaps no other part of the screen; the panels stack in order
+  (HUD, board, field, slots, columns) and no two tiles overlap; the notch and home bar are respected.
+- Portrait devices: every summon column is at least 44 css px wide and 90 tall; five slots are at least
+  44 css px (eight are narrower but at least 30); the HUD buttons are 44 css px apart.
+- Numbers: front group at least 18 css px (14 with six columns), slot and field numbers at least 14 (10
+  for eight slots), peeks at least 9 (8 with six columns on a 320 px phone, the tightest case).
+- Cubes are not specks: at least 20 css px on a 10×10 board, 11 on 24×24 and 7 on 40×40.
+- Landscape phones still lay out, with a board you can see (the game is portrait-first and shows an
+  "upright" hint there).
+- Text contrast on the play screen's backgrounds is at least 4.5:1 (WCAG AA) for body, dim and gold text,
+  the toast and the group numbers.
+- The progress numbers: never 100% early, survive no cubes, negative or too many delivered, and the bar
+  sits inside the HUD on every device.
+
+## Verified, and not
+
+Checked in the browser pane at 375×812: the progress bar filling as cubes are delivered, the larger
+field numbers, a loss card with Retry and Undo (Retry restarts cleanly) and the toast wrapping.
+
+**Not done:** the real-hardware pass of docs/QA.md (one iPhone, one mid-range Android: touch feel, frame
+rate); a screen-reader path for the canvas beyond what the page already has; an audit of every dialog on
+a 320×480 screen (the win cards were checked in M13). The group numbers' contrast is checked as white on
+the dark panel; the coloured badge behind each number was not measured per colour.

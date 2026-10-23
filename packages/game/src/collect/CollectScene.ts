@@ -5,7 +5,6 @@ import { getAudio } from "../audio";
 import { Haptics } from "../haptics";
 import type { Insets } from "../layout";
 import { theme } from "../theme";
-import { Button } from "../view/Button";
 import { whenSaveReady } from "../save";
 import { ensureTextures, TEX } from "../view/textures";
 import { fadeIn } from "../view/transition";
@@ -17,9 +16,13 @@ import { ParticleLayer } from "./ParticleLayer";
 import { PanelsView, paintPanelFrames } from "./PanelsView";
 import { AmbientLayer } from "./ambient";
 import { atmosphereForTheme } from "./worldIdentity";
-import { bake } from "./bake";
 import { planCues, playCues, rejectionCue, type CueSinks } from "./cues";
 import { Emitter, Particles } from "./particles";
+import { CollectHud } from "./CollectHud";
+import { PortalView } from "./PortalView";
+import { buildEndCard } from "./EndCard";
+import { Toast } from "./Toast";
+import { progressOf } from "./progress";
 import { cellCenter, computeCollectLayout, hudButtonX, type CollectLayout } from "./collectLayout";
 import { RingStats } from "./profile";
 import { shadeTonesGrid, tonesFor } from "./cubePaint";
@@ -88,7 +91,7 @@ export class CollectScene extends Phaser.Scene {
   private readonly clock = new TickClock(24);
   private speed: 1 | 2 = 1;
   private marks = new Map<number, number>();
-  private toastText: Phaser.GameObjects.Text | null = null;
+  private toaster!: Toast;
   private overlay: Phaser.GameObjects.GameObject[] = [];
   private overlayTimer: Phaser.Time.TimerEvent | null = null;
   /** The picture reveal shown after a win on a level with a known picture (M11.5). */
@@ -105,8 +108,8 @@ export class CollectScene extends Phaser.Scene {
   private sharing = false;
   /** The reveal has finished or been skipped once for this win: a relayout must not replay it. */
   private revealSeen = false;
-  private portalGlow: Phaser.GameObjects.Image | null = null;
-  private speedLabel: Phaser.GameObjects.Text | null = null;
+  private portal!: PortalView;
+  private hud!: CollectHud;
   private unsubscribe: (() => void)[] = [];
   /** Colour-blind mode (M6.5): each colour also shows its symbol. `?cb=1` forces it for review. */
   private colorblind = false;
@@ -133,7 +136,6 @@ export class CollectScene extends Phaser.Scene {
     this.revealSeen = false;
     this.demo = null;
     this.marks = new Map();
-    this.toastText = null;
     this.frameTime = 0;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
@@ -159,7 +161,7 @@ export class CollectScene extends Phaser.Scene {
     // The first sealed level of a visit explains the seals once; it never waits on a tap.
     if (level.seals && !this.registry.get("v2.sealIntro")) {
       this.registry.set("v2.sealIntro", true);
-      this.time.delayedCall(500, () => this.toast(SEAL_HINT, 4200));
+      this.time.delayedCall(500, () => this.toaster.show(SEAL_HINT, 4200));
     }
     this.unsubscribe.push(
       this.session.subscribe((batch) => this.onBatch(batch)),
@@ -250,7 +252,6 @@ export class CollectScene extends Phaser.Scene {
     this.overlay = [];
     this.reveal = null;
     this.children.removeAll(true);
-    this.toastText = null;
     this.build();
   }
 
@@ -271,12 +272,13 @@ export class CollectScene extends Phaser.Scene {
       fieldCap: level.fieldCap,
       portalX: level.portalX ?? collect.defaultPortalX(level.width),
     });
+    this.toaster = new Toast(this, this.layout);
     this.atlas = ensureFamiliarAtlas(this, level.palette);
     const reduced = isReducedMotion(this);
     const tones = level.palette.map(tonesFor);
 
     this.bakeStaticLayer();
-    this.drawPortal();
+    this.portal = new PortalView(this, this.layout, this.session.state.params.portal);
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
     this.model.resync(state);
     this.emitter = new Emitter(new Particles(160), this.layout.cell, reduced);
@@ -311,7 +313,7 @@ export class CollectScene extends Phaser.Scene {
     );
     this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
     this.familiars.onDelivered = (_color, group) => {
-      this.pulsePortal();
+      this.portal.pulse();
       this.panels.badge(group)?.pulse();
     };
     this.panels = new PanelsView(
@@ -373,93 +375,18 @@ export class CollectScene extends Phaser.Scene {
     g.destroy();
   }
 
-  /** The portal: a glowing gate in the bottom ring (a baked image under a softly pulsing glow). */
-  private drawPortal(): void {
-    const l = this.layout;
-    const dpr = this.dpr;
-    const p = cellCenter(l, this.session.state.params.portal);
-    this.portalGlow = this.add
-      .image(p.x, p.y, TEX.glow)
-      .setTint(0xb48cff)
-      .setDepth(0.5)
-      .setDisplaySize(l.cell * 3.2, l.cell * 3.2)
-      .setAlpha(0.8);
-    const gw = Math.round(l.cell * 1.6) + 4;
-    const gh = Math.round(l.cell * 1.15) + 4;
-    const key = bake(this, `gate:${gw}x${gh}:${dpr}`, gw, gh, (g) => {
-      g.fillStyle(0x140b2e, 1);
-      g.fillEllipse(gw / 2, gh / 2, l.cell * 1.6, l.cell * 1.15);
-      g.lineStyle(Math.max(1, Math.round(dpr * 1.5)), 0xf6d97a, 0.95);
-      g.strokeEllipse(gw / 2, gh / 2, l.cell * 1.6, l.cell * 1.15);
-    });
-    this.add.image(p.x, p.y, key).setDepth(3);
-    if (!isReducedMotion(this)) {
-      this.tweens.add({
-        targets: this.portalGlow,
-        alpha: 0.45,
-        duration: 1300,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
-    }
-  }
-
-  private pulsePortal(): void {
-    if (!this.portalGlow || isReducedMotion(this)) return;
-    const base = this.layout.cell * 3.2;
-    this.tweens.add({
-      targets: this.portalGlow,
-      displayWidth: base * 1.3,
-      displayHeight: base * 1.3,
-      duration: 90,
-      yoyo: true,
-      ease: "Sine.easeOut",
-    });
-  }
-
   private buildHud(): void {
-    const l = this.layout;
-    const dpr = this.dpr;
-    const cy = l.hud.y + l.hud.h / 2;
-    this.add
-      .text(l.frame.x + 14 * dpr, cy, this.session.level.name, {
-        fontFamily: theme.font,
-        fontStyle: "bold",
-        fontSize: `${Math.round(16 * dpr)}px`,
-        color: theme.text,
-      })
-      .setOrigin(0, 0.5)
-      .setDepth(20);
-    const size = Math.round(36 * dpr);
-    const buttons: [string, () => void][] = [
-      ["↶", () => this.session.undo()],
-      ["⟲", () => this.session.restart()],
-      [`${this.speed}×`, () => this.toggleSpeed()],
-    ];
-    buttons.forEach(([label, onPress], i) => {
-      const x = hudButtonX(l, i, buttons.length);
-      const text = this.add
-        .text(x, cy, label, {
-          fontFamily: theme.font,
-          fontStyle: "bold",
-          fontSize: `${Math.round(17 * dpr)}px`,
-          color: theme.text,
-        })
-        .setOrigin(0.5)
-        .setDepth(21);
-      if (i === 2) this.speedLabel = text;
-      const zone = this.add
-        .zone(x, cy, size + 8 * dpr, size + 8 * dpr)
-        .setDepth(22)
-        .setInteractive({ useHandCursor: true });
-      zone.on("pointerdown", onPress);
+    this.hud = new CollectHud(this, this.layout, this.session.level.name, this.speed, {
+      onUndo: () => this.session.undo(),
+      onRestart: () => this.session.restart(),
+      onSpeed: () => this.toggleSpeed(),
     });
+    this.hud.setProgress(progressOf(this.session.state).fraction);
   }
 
   private toggleSpeed(): void {
     this.speed = this.speed === 1 ? 2 : 1;
-    this.speedLabel?.setText(`${this.speed}×`);
+    this.hud.setSpeed(this.speed);
   }
 
   private buildInput(): void {
@@ -486,41 +413,12 @@ export class CollectScene extends Phaser.Scene {
     const result = this.session.tap(action);
     if (!result.ok) {
       const reason = result.reason;
-      if (reason !== "ok" && reason !== "unavailable") this.toast(REASON_TEXT[reason]);
+      if (reason !== "ok" && reason !== "unavailable") this.toaster.show(REASON_TEXT[reason]);
       const cue = rejectionCue(reason);
       if (cue) playCues([cue], this.sinks);
       return;
     }
     this.panels.sync(this.session.state);
-  }
-
-  private toast(text: string, holdMs = 1200): void {
-    this.toastText?.destroy();
-    const l = this.layout;
-    const t = this.add
-      .text(l.frame.x + l.frame.w / 2, l.field[0]!.y - 6 * this.dpr, text, {
-        fontFamily: theme.font,
-        fontStyle: "bold",
-        fontSize: `${Math.round(13 * this.dpr)}px`,
-        color: "#ffffff",
-        backgroundColor: "#2a1650",
-        padding: { x: 10 * this.dpr, y: 5 * this.dpr },
-        align: "center",
-        wordWrap: { width: l.frame.w * 0.9 },
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(40);
-    this.toastText = t;
-    this.tweens.add({
-      targets: t,
-      alpha: 0,
-      delay: holdMs,
-      duration: 300,
-      onComplete: () => {
-        if (this.toastText === t) this.toastText = null;
-        t.destroy();
-      },
-    });
   }
 
   // -------------------------------------------------------------------------------------------
@@ -562,6 +460,7 @@ export class CollectScene extends Phaser.Scene {
     playCues(planCues(batch.events), this.sinks);
     if (marksChanged) this.cubes.setMarks(this.marks);
     this.panels.sync(this.session.state);
+    this.hud.setProgress(progressOf(this.session.state).fraction);
     const status = this.session.state.status;
     if (status !== "playing" && this.overlay.length === 0 && !this.overlayTimer) {
       this.overlayTimer = this.time.delayedCall(700, () => this.showEnd(0));
@@ -757,91 +656,18 @@ export class CollectScene extends Phaser.Scene {
   private showEnd(delay: number): void {
     const state = this.session.state;
     if (state.status === "playing" || this.overlay.length > 0) return;
-    const l = this.layout;
-    const dpr = this.dpr;
     const won = state.status === "won";
     const subject = this.session.level.subject;
     if (won && subject && this.showReveal(subject)) return;
-    const shade = this.add
-      .rectangle(
-        l.frame.x + l.frame.w / 2,
-        l.frame.y + l.frame.h / 2,
-        l.frame.w,
-        l.frame.h,
-        0x140b2e,
-        0.72,
-      )
-      .setDepth(50)
-      .setAlpha(0);
-    const title = this.add
-      .text(
-        l.frame.x + l.frame.w / 2,
-        l.frame.y + l.frame.h * 0.36,
-        won ? "Every cube collected!" : state.lossReason === "slotsFull" ? "Out of slots" : "Stuck",
-        {
-          fontFamily: theme.font,
-          fontStyle: "bold",
-          fontSize: `${Math.round(26 * dpr)}px`,
-          color: won ? "#f6d97a" : theme.text,
-        },
-      )
-      .setOrigin(0.5)
-      .setDepth(51)
-      .setAlpha(0);
-    const sub = this.add
-      .text(
-        l.frame.x + l.frame.w / 2,
-        l.frame.y + l.frame.h * 0.36 + 34 * dpr,
-        won
-          ? `Delivered ${state.deliveredTotal} cubes`
-          : state.lossReason === "slotsFull"
-            ? "A group ran out of cubes with every slot full"
-            : "No group can reach the cubes that are left",
-        {
-          fontFamily: theme.font,
-          fontSize: `${Math.round(15 * dpr)}px`,
-          color: theme.textDim,
-          align: "center",
-        },
-      )
-      .setOrigin(0.5)
-      .setDepth(51)
-      .setAlpha(0);
-    const bw = Math.min(l.frame.w * 0.6, 220 * dpr);
-    const retry = new Button(
-      this,
-      l.frame.x + l.frame.w / 2,
-      l.frame.y + l.frame.h * 0.5,
-      bw,
-      "Retry",
-      {
-        dpr,
-        primary: true,
-        onPress: () => this.session.restart(),
-      },
-    ).setDepth(51);
-    this.add.existing(retry);
-    retry.setAlpha(0);
-    const parts: Phaser.GameObjects.GameObject[] = [shade, title, sub, retry];
-    if (!won && this.session.canUndo) {
-      const undo = new Button(
-        this,
-        l.frame.x + l.frame.w / 2,
-        l.frame.y + l.frame.h * 0.5 + 60 * dpr,
-        bw,
-        "Undo last move",
-        { dpr, onPress: () => this.session.undo() },
-      ).setDepth(51);
-      this.add.existing(undo);
-      undo.setAlpha(0);
-      parts.push(undo);
-    }
-    this.overlay = parts;
-    this.tweens.add({
-      targets: parts,
-      alpha: 1,
+    this.overlay = buildEndCard(this, this.layout, {
+      won,
+      lossReason: state.lossReason,
+      delivered: state.deliveredTotal,
+      canUndo: this.session.canUndo,
       delay,
-      duration: isReducedMotion(this) ? 1 : 260,
+      reduced: isReducedMotion(this),
+      onRetry: () => this.session.restart(),
+      onUndo: () => this.session.undo(),
     });
   }
 }

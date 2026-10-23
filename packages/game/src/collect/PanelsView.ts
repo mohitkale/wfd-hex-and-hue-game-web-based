@@ -2,12 +2,11 @@ import * as collect from "@hexhue/core/collect";
 import type Phaser from "phaser";
 import { theme } from "../theme";
 import type { CollectLayout } from "./collectLayout";
+import { badgeBox, PEEK, type Place } from "./badgeBox";
 import { GroupBadge } from "./GroupBadge";
 import { leaveScale } from "./swarm";
 
 type CollectState = collect.CollectState;
-
-type Place = "column" | "field" | "slot";
 
 interface Tracked {
   badge: GroupBadge;
@@ -16,9 +15,6 @@ interface Tracked {
   depth: number;
   completing: boolean;
 }
-
-/** How many queued groups are drawn per column (the front one plus peeks behind it). */
-const PEEK = 2;
 
 /**
  * The bottom of the screen: summon columns (only the front group of each is tappable), the field
@@ -95,32 +91,6 @@ export class PanelsView {
     return null;
   }
 
-  private rectFor(place: Place, index: number, depth: number) {
-    const l = this.layout;
-    if (place === "field") {
-      const r = l.field[index] ?? l.field[l.field.length - 1]!;
-      return { x: r.x + r.w / 2, y: r.y + r.h / 2, w: r.w, h: r.h, mini: false };
-    }
-    if (place === "slot") {
-      const r = l.slots[index] ?? l.slots[0]!;
-      return { x: r.x + r.w / 2, y: r.y + r.h / 2, w: r.w, h: r.h, mini: false };
-    }
-    const r = l.columns[index]!;
-    if (depth === 0) {
-      const h = Math.min(r.h * 0.6, r.w * 1.05);
-      return { x: r.x + r.w / 2, y: r.y + h / 2 + r.h * 0.02, w: r.w * 0.94, h, mini: false };
-    }
-    const miniH = Math.min(r.h * 0.17, r.w * 0.3);
-    const top = r.y + Math.min(r.h * 0.6, r.w * 1.05) + r.h * 0.04;
-    return {
-      x: r.x + r.w / 2,
-      y: top + (depth - 0.5) * (miniH + r.h * 0.02),
-      w: r.w * (depth === 1 ? 0.8 : 0.66),
-      h: miniH,
-      mini: true,
-    };
-  }
-
   /** Re-places every badge for `state`. Call after each tick batch, tap, undo or resize. */
   sync(state: Readonly<CollectState>): void {
     const working = state.groups.filter((g) => g.status === "working").map((g) => g.id);
@@ -147,7 +117,7 @@ export class PanelsView {
         t.badge.setNumber(remaining);
         continue;
       }
-      const rect = this.rectFor(target.place, target.index, target.depth);
+      const rect = badgeBox(this.layout, target.place, target.index, target.depth);
       const from = t && !t.completing ? { x: t.badge.x, y: t.badge.y } : null;
       if (t) {
         this.scene.tweens.killTweensOf(t.badge);
