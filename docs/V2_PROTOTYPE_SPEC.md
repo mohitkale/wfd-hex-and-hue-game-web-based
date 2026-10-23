@@ -316,15 +316,15 @@ Everything else in v1 is untouched; any other v1 edit before M15.5 needs a state
 
 ## 7. Performance budget for collectors (audit risk R4)
 
-| Item                  | Budget                                                                                                             |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Live familiar sprites | ≤ `squad × fieldCap` ≤ 36, pooled; no allocation per frame                                                         |
-| Cube drawing          | One batched layer (one draw call per colour page or one render texture); removal edits it, no per-cell GameObjects |
-| Per-tick simulation   | target ≤ 1 ms amortised on a mid-range phone for a 40×40 board (measured in M10.3)                                 |
-| Pathfinding           | Only on assignment, incremental `dist`; none per frame (GAME_DESIGN_V2 §4a)                                        |
-| Frame time            | target ≤ 16.6 ms (60 fps); measured on a mid-range Android in M10.3 and documented                                 |
-| Texture memory        | One familiar atlas ≤ 512×512; colours by tint, no per-colour copies                                                |
-| Download              | `collect` chunk ≤ 40 KB gzip (§6), enforced by the budget script                                                   |
+| Item                  | Budget                                                                                                                                                                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live familiar sprites | ≤ `squad × fieldCap` ≤ 36, pooled; no per-frame allocation in the sprite loop                                                                                                                                                            |
+| Cube drawing          | One render texture; removal clears that cell, flushed once per frame; static board, outlines, HUD circles, badge backgrounds and the portal gate are baked textures (Graphics re-tessellates every frame: measured in `docs/V2_PERF.md`) |
+| Per-tick simulation   | target ≤ 1 ms amortised on a mid-range phone for a 40×40 board (CPU measured on a desktop in M10.3, `docs/V2_PERF.md`; on a phone in M15.3)                                                                                              |
+| Pathfinding           | Only on assignment, incremental `dist`; none per frame (GAME_DESIGN_V2 §4a)                                                                                                                                                              |
+| Frame time            | target ≤ 16.6 ms (60 fps); to be measured on a mid-range Android in M15.3 (deferred from M10.3: no device was available; see `docs/V2_PERF.md`)                                                                                          |
+| Texture memory        | One familiar atlas ≤ 512×512; colours by tint, no per-colour copies                                                                                                                                                                      |
+| Download              | `collect` chunk ≤ 40 KB gzip (§6), enforced by the budget script                                                                                                                                                                         |
 
 ## 8. Vertical-slice content plan (the level built in M10.5)
 
