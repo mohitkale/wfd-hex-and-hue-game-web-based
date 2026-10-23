@@ -4,6 +4,11 @@ How a picture gets from a painter's PNG (or hand-typed rows) to something the ga
 what stops bad art. The rules themselves are [ART_DIRECTION_V2.md](ART_DIRECTION_V2.md); this page is
 the tooling.
 
+## Status
+
+The representative set of M11.3 (six pieces) is in `content/v2art` awaiting the owner's review at
+gate G2 (see [V2_ART_SET.md](V2_ART_SET.md)); none is reviewed or shipped.
+
 ## The pieces
 
 | What              | Where                         | Notes                                                                       |
@@ -20,6 +25,15 @@ the tooling.
 The v1 pipeline (`tools/art/check.ts`'s single colour-distance rule, `art:preview`) is untouched:
 v1 levels still use it. v2 art uses the families-and-ramps rules instead; `check.ts` only supplies
 the board panel colour to them.
+
+## Labelling the source
+
+`hand-drawn` means a person (or the author) placed the picture cell by cell; drafting aids may block
+in a shape, but the finished piece must not be only what they produced. A piece whose silhouette and
+base shading came from geometric helpers with a few details added by hand is a borderline case:
+label it `hand-drawn` only if the owner accepts that workflow, and say what was generated in
+`provenance.notes` (the M11.3 set does this and asks the owner at G2). When in doubt use
+`generated-draft`, which can be neither reviewed nor shipped until it is finished by hand.
 
 ## Authoring
 

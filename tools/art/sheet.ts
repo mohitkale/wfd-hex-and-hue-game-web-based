@@ -45,6 +45,55 @@ export function renderPng(piece: ArtPiece, pitch: number, panel = true): PNG {
   return png;
 }
 
+/**
+ * All pieces on one PNG at `pitch` px per cube on the board's panel colour, laid out in rows no
+ * wider than `maxWidth`. The committed contact sheets (docs/art/v2) come from here, and a test fails
+ * when they are stale.
+ */
+export function contactSheetPng(library: readonly ArtPiece[], pitch: number, maxWidth = 1400): PNG {
+  const gutter = Math.round(pitch * 2);
+  const images = library.map((p) => renderPng(p, pitch));
+  const placed: { png: PNG; x: number; y: number }[] = [];
+  let x = gutter;
+  let y = gutter;
+  let rowH = 0;
+  let width = maxWidth;
+  for (const png of images) {
+    if (x + png.width + gutter > maxWidth && x > gutter) {
+      x = gutter;
+      y += rowH + gutter;
+      rowH = 0;
+    }
+    placed.push({ png, x, y });
+    x += png.width + gutter;
+    rowH = Math.max(rowH, png.height);
+    width = Math.max(width, x);
+  }
+  const sheet = new PNG({ width: Math.min(width, maxWidth + gutter), height: y + rowH + gutter });
+  const [pr, pg, pb] = PANEL;
+  for (let i = 0; i < sheet.width * sheet.height; i++) sheet.data.set([pr, pg, pb, 255], i * 4);
+  // The pieces are drawn on the panel colour already, so a visible frame separates them.
+  for (const { png, x: ox, y: oy } of placed) {
+    for (let row = 0; row < png.height; row++) {
+      const from = row * png.width * 4;
+      sheet.data.set(
+        png.data.subarray(from, from + png.width * 4),
+        ((oy + row) * sheet.width + ox) * 4,
+      );
+    }
+    const frame = [48, 32, 92, 255];
+    for (let i = 0; i < png.width; i++) {
+      sheet.data.set(frame, (oy * sheet.width + ox + i) * 4);
+      sheet.data.set(frame, ((oy + png.height - 1) * sheet.width + ox + i) * 4);
+    }
+    for (let j = 0; j < png.height; j++) {
+      sheet.data.set(frame, ((oy + j) * sheet.width + ox) * 4);
+      sheet.data.set(frame, ((oy + j) * sheet.width + ox + png.width - 1) * 4);
+    }
+  }
+  return sheet;
+}
+
 function svg(piece: ArtPiece, pitch: number): string {
   const parsed = parsePiece(piece);
   const gap = pitch >= 6 ? Math.max(1, Math.floor(pitch / 12)) : 0;
@@ -96,9 +145,23 @@ table{border-collapse:collapse;margin-top:8px}td{padding:2px 10px 2px 0;font-siz
 </style><h1>Hex & Hue v2 art sheet</h1>${cards || "<p>No pieces yet.</p>"}`;
 }
 
+/** The committed contact sheets: every piece at 10 px (full size) and 9 px (a 320 px phone). */
+export const CONTACT_SHEETS: { file: string; pitch: number }[] = [
+  { file: "contact-sheet-full.png", pitch: 14 },
+  { file: "contact-sheet-phone.png", pitch: 9 },
+];
+export const CONTACT_DIR = new URL("../../docs/art/v2/", import.meta.url);
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const out = new URL("../../dist/", import.meta.url);
   mkdirSync(fileURLToPath(out), { recursive: true });
   writeFileSync(new URL("art-sheet.html", out), sheetHtml(pieces));
   console.log(`→ ${fileURLToPath(new URL("art-sheet.html", out))}`);
+  if (process.argv.includes("--png")) {
+    mkdirSync(fileURLToPath(CONTACT_DIR), { recursive: true });
+    for (const { file, pitch } of CONTACT_SHEETS) {
+      writeFileSync(new URL(file, CONTACT_DIR), PNG.sync.write(contactSheetPng(pieces, pitch)));
+      console.log(`→ docs/art/v2/${file}`);
+    }
+  }
 }
