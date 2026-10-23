@@ -51,7 +51,7 @@ export const parking = (): collect.CollectLevel =>
 /**
  * The wax-seal tutorial (M13.4, docs/V2_VARIETY.md): all the gold is sealed by violet, so the gold
  * group cannot start (the tap says why) until the violet is gathered. One lesson, no
- * trap: either way round the level is winnable.
+ * trap: one line (violet, then gold).
  */
 export const sealsIntro = (): collect.CollectLevel =>
   fromRows(

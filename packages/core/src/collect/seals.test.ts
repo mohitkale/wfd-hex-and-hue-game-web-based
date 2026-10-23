@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY } from "../level";
+import { createRng } from "../rng";
 import { apply, explain, legalActions } from "./actions";
 import { board, randomLevel } from "./fixtures";
 import { generateLevel, reachableByColor, type GeneratorArt } from "./generator";
@@ -192,20 +193,65 @@ describe("state with seals", () => {
     expect("seals" in plain.params).toBe(false);
   });
 
-  it("keeps every engine invariant on every tick of a sealed game, with a cloned state too", () => {
-    for (const seed of [3, 8, 21, 34]) {
-      const base = randomLevel(seed, true);
-      if (!base) continue;
-      const level = sealRandom(base, seed);
+  it("keeps every engine invariant on every tick of WHOLE sealed games (random legal play, lifts included)", () => {
+    let games = 0;
+    let lifted = 0;
+    for (let seed = 1; seed <= 400 && games < 40; seed++) {
+      const base = randomLevel(seed, seed % 2 === 0);
+      const level = base ? sealRandom(base, seed) : null;
       if (!level) continue;
+      games++;
+      const rng = createRng(seed);
       const s = createCollectState(level);
-      for (const a of legalActions(s).slice(0, 1)) apply(s, a);
-      for (let i = 0; i < 2000 && s.status === "playing"; i++) {
-        if (step(s).length === 0) break;
-        expect(violation(s), `seed ${seed} tick ${s.tick}`).toBeNull();
-        expect(violation(cloneState(s)), `seed ${seed} clone`).toBeNull();
+      const initial = sealedCells(s).length;
+      for (let move = 0; move < 200 && s.status === "playing"; move++) {
+        const legal = legalActions(s);
+        if (legal.length === 0) break;
+        apply(s, legal[rng.int(0, legal.length - 1)]!);
+        for (let i = 0; i < 5000 && s.status === "playing"; i++) {
+          if (step(s).length === 0) break;
+          expect(violation(s), `seed ${seed} tick ${s.tick}`).toBeNull();
+          expect(violation(cloneState(s)), `seed ${seed} clone`).toBeNull();
+        }
+      }
+      if (initial > 0 && sealedCells(s).length < initial) lifted++;
+    }
+    expect(games).toBeGreaterThan(20);
+    expect(lifted).toBeGreaterThan(0); // the lifts really were exercised
+  }, 120_000);
+
+  it("pins the same-tick lift: a sealed group that runs dry the tick its key completes is not parked", () => {
+    // R R G, R's second cube sealed by G. Both groups are summoned at once with one slot; their
+    // familiars deliver on the same tick, so R runs dry exactly when G completes.
+    const level = withSeals(
+      board(["RRG"], [[["R", 2]], [["G", 1]]], {
+        colors: "RG",
+        squad: 1,
+        spawnGap: 1,
+        fieldCap: 2,
+        slots: 1,
+      }),
+      [{ key: 1, cells: [1] }],
+    );
+    const s = createCollectState(level);
+    apply(s, { kind: "select", column: 0 });
+    apply(s, { kind: "select", column: 1 });
+    let parkedEver = false;
+    let keyDoneAt = 0;
+    for (let i = 0; i < 200 && s.status === "playing"; i++) {
+      if (step(s).length === 0) break;
+      expect(violation(s)).toBeNull();
+      if (s.groups.some((g) => g.status === "waiting")) parkedEver = true;
+      if (s.groups[1]!.status === "completed" && !keyDoneAt) {
+        keyDoneAt = s.tick;
+        // On this very tick R has nothing out and its last cube was sealed a moment ago.
+        expect(s.groups[0]!.status).toBe("working");
+        expect(s.familiars.filter((f) => f.group === 0)).toEqual([]);
       }
     }
+    expect(keyDoneAt).toBeGreaterThan(0);
+    expect(parkedEver).toBe(false); // the single slot was never used
+    expect(s.status).toBe("won");
   });
 });
 
@@ -221,6 +267,74 @@ function sealRandom(level: CollectLevel, seed: number): CollectLevel | null {
   const candidate = withSeals(level, [{ key, cells }]);
   return validateCollectLevel(candidate).length === 0 ? candidate : null;
 }
+
+describe("solver with seals: shapes the random fuzz rarely makes", () => {
+  it("two seals in a chain (R by G, G by B) have exactly the order B, G, R", () => {
+    const level = withSeals(
+      board(["RRGGBB"], [[["R", 2]], [["G", 2]], [["B", 2]]], {
+        colors: "RGB",
+        squad: 1,
+        spawnGap: 1,
+        slots: 3,
+      }),
+      [
+        { key: 1, cells: [1] },
+        { key: 2, cells: [3] },
+      ],
+    );
+    expect(validateCollectLevel(level)).toEqual([]);
+    const memo = solve(level, 100_000);
+    expect(memo.status).toBe("solved");
+    expect(bruteSolve(level, 100_000, false).status).toBe("solved");
+    expect(replayLine(level, memo.line!).state.status).toBe("won");
+  });
+
+  it("a ring of seals (R by G, G by R) is a genuine deadlock: unsolvable, and the engine loses it", () => {
+    const level = withSeals(
+      board(["RRGG"], [[["R", 2]], [["G", 2]]], { colors: "RG", squad: 1, spawnGap: 1, slots: 2 }),
+      [
+        { key: 1, cells: [1] },
+        { key: 0, cells: [2] },
+      ],
+    );
+    expect(validateCollectLevel(level)).toEqual([]);
+    expect(solve(level, 100_000).status).toBe("unsolvable");
+    expect(bruteSolve(level, 100_000, false).status).toBe("unsolvable");
+    const s = createCollectState(level);
+    apply(s, { kind: "select", column: 0 });
+    runUntilSettled(s);
+    apply(s, { kind: "select", column: 1 });
+    runUntilSettled(s);
+    expect([s.status, s.lossReason]).toEqual(["lost", "deadlock"]);
+  });
+
+  it("agrees with brute force on random levels with TWO seals (several groups per key colour, waiting ones included)", () => {
+    let compared = 0;
+    for (let seed = 1; seed <= 3000 && compared < 60; seed++) {
+      const base = randomLevel(seed, seed % 2 === 0);
+      if (!base) continue;
+      const first = sealRandom(base, seed);
+      if (!first) continue;
+      // A second seal: another colour's cubes, keyed by a different colour than the first.
+      const used = new Set(first.seals![0]!.cells);
+      const present = [...new Set(first.cells.filter((c) => c !== EMPTY))];
+      const color = present[seed % present.length]!;
+      const key = present[(seed + 1) % present.length]!;
+      const cells = first.cells.flatMap((c, i) =>
+        c === color && !used.has(i) && i % 4 === 1 ? [i] : [],
+      );
+      if (color === key || cells.length === 0) continue;
+      const level = withSeals(first, [...first.seals!, { key, cells }]);
+      if (validateCollectLevel(level).length > 0) continue;
+      if (level.columns.reduce((n, c) => n + c.length, 0) > 6) continue;
+      const reference = bruteSolve(level, 200_000, false);
+      if (reference.status === "unknown") continue;
+      expect(solve(level, 200_000).status, `seed ${seed}`).toBe(reference.status);
+      compared++;
+    }
+    expect(compared).toBeGreaterThan(20);
+  }, 180_000);
+});
 
 describe("solver with seals", () => {
   it("agrees with unmemoised brute force on random sealed levels, and every line wins", () => {
@@ -277,7 +391,7 @@ describe("generating sealed levels", () => {
       ...(seals === undefined ? {} : { seals }),
     });
 
-  it("asking for no seals changes nothing, and the output carries none", () => {
+  it("asking for seals: 0 is the same as not asking, and the output carries none", () => {
     const a = gen(bands(16, 16, 4), 3);
     expect(a).not.toBeNull();
     expect(gen(bands(16, 16, 4), 3, 0)).toEqual(a);

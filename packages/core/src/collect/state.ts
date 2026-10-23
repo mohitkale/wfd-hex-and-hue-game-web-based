@@ -226,7 +226,7 @@ function checkShape(s: CollectState): void {
           isInt(v.key) &&
           v.key >= 0 &&
           Array.isArray(v.cells) &&
-          v.cells.every((c) => isInt(c) && c >= 0),
+          v.cells.every((c) => isInt(c) && c >= 0 && c < (p.width + 2) * (p.height + 2)),
       )
     )
       fail("params.seals must be a list of {key, cells}");

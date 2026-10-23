@@ -341,8 +341,6 @@ export function generateLevel(
       : c.level;
     const result = evaluate({ ...level, slots: 8 }, spec, budget, true);
     if (!result) continue;
-    // Refinement reorders groups, never seals: the seals must still be in the player's way at the start.
-    if (sealCount > 0 && openingSealed(result.level) === 0) continue;
     if (gate && gate(result.level).length > 0) continue;
     const s = score(result.metrics);
     if (!best || s > best.score) best = { ...result, attempt: c.attempt, acceptable, score: s };

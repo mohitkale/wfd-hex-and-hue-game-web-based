@@ -1,5 +1,6 @@
 import { EMPTY } from "../level";
 import { computeDist, topologyFor } from "./grid";
+import { sealGate } from "./seals";
 import { cachesOf, type CollectState } from "./state";
 
 /**
@@ -54,6 +55,13 @@ export function violation(s: CollectState): string | null {
   for (let i = 0; i < s.reserved.length; i++) if (s.reserved[i] === 1) reservedCount++;
   const onBoardReserved = [...seen].filter((c) => s.grid[c] !== EMPTY).length;
   if (reservedCount !== onBoardReserved) return "reserved flags do not match familiars";
+
+  // Seals (M13.4): a cube is reserved only while unsealed, and seals only lift, so no reserved cube is sealed.
+  const sealed = sealGate(s);
+  if (sealed) {
+    for (let i = 0; i < s.reserved.length; i++)
+      if (s.reserved[i] === 1 && sealed(i)) return `reserved cube ${i} is still sealed`;
+  }
 
   // Capacity bookkeeping per group.
   for (const g of s.groups) {

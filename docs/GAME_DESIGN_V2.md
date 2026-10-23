@@ -228,7 +228,10 @@ exactly as §4 to §10 say; its state carries no `seals` field.
   but it is **not assignable** while any group of its **key** colour has not completed: it is skipped
   by target selection (§4) and does not count for "has an assignable cube" (§6, §7 Phase 3).
 - A seal lifts when **every group of the key colour is `completed`** and never returns. The lift is
-  seen from the next tick's Phase 2. Waiting groups are not resumed for the player (§5).
+  visible to Phase 3 pass 2 (stall) of the **same tick** the key group completes in pass 1, and to the
+  next tick's Phase 2. So a sealed-colour group that ran dry on that tick is not parked (it keeps
+  working and spawns again next tick); one that was already parked is never resumed automatically,
+  only by a player `resume` (§5).
 - So a group of a partly sealed colour can start, deliver what is not sealed and run dry with capacity
   left: it parks (§5), exactly as if the rest were hidden. If all its reachable cubes are sealed the
   tap is refused with reason `sealed` (distinct from `noReachableCube`).

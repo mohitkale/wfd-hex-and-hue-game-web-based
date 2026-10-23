@@ -12,7 +12,8 @@ import { paintCube, paintSeal, tonesFor, type CubeTones } from "./cubePaint";
  */
 export class CubeLayer {
   private readonly rt: Phaser.GameObjects.RenderTexture;
-  private readonly sealRt: Phaser.GameObjects.RenderTexture;
+  /** Created on the first seal: a level without seals pays for no second full-board texture. */
+  private sealRt: Phaser.GameObjects.RenderTexture | null = null;
   private sealed = new Map<number, number>();
   private readonly ringG: Phaser.GameObjects.Graphics;
   private readonly size: number;
@@ -43,10 +44,6 @@ export class CubeLayer {
       .renderTexture(boardRect.x + cell, boardRect.y + cell, mosaicW, mosaicH)
       .setOrigin(0, 0)
       .setDepth(1);
-    this.sealRt = scene.add
-      .renderTexture(boardRect.x + cell, boardRect.y + cell, mosaicW, mosaicH)
-      .setOrigin(0, 0)
-      .setDepth(1.05);
     this.ringG = scene.add.graphics().setDepth(1.1);
     this.paintAll(scene);
   }
@@ -78,9 +75,21 @@ export class CubeLayer {
     if (seals.size === this.sealed.size && [...seals].every(([k, v]) => this.sealed.get(k) === v))
       return;
     this.sealed = new Map(seals);
+    const { cell, boardRect, stride } = this.layout;
+    if (!this.sealRt) {
+      // Same footprint as the cube texture, made only when there is something to draw on it.
+      this.sealRt = this.scene.add
+        .renderTexture(
+          boardRect.x + cell,
+          boardRect.y + cell,
+          (stride - 2) * cell,
+          boardRect.h - 2 * cell,
+        )
+        .setOrigin(0, 0)
+        .setDepth(1.05);
+    }
     this.sealRt.clear();
     if (seals.size > 0) {
-      const { cell, stride } = this.layout;
       const g = this.scene.make.graphics({}, false);
       for (const [i, key] of seals) {
         const x = ((i % stride) - 1) * cell + Math.floor(this.gap / 2);

@@ -42,13 +42,15 @@ gathered".
 **Solver.** Seal state needs no new solver state. Checked, not just argued: on 120 random small sealed
 levels the memoised solver gives the same verdict as the unmemoised brute-force search, every winning
 line replays to a win in the live engine, and a seal turns a solvable level unsolvable in some cases
-(so it is a real constraint). Engine invariants (`violation`) hold after every tick of sealed games,
-also on cloned states.
+(so it is a real constraint). Engine invariants (`violation`, including "no reserved cube is sealed") hold after every tick of
+whole sealed games played with random legal moves, also on cloned states.
 
 **Generator.** `generateLevel(art, id, name, { seals: n })` seals part (a third to six tenths) of `n`
 colours, keeps a candidate only if the solver can win it **and** a sealed cube is reachable at the
-opening. With `seals: 0` (the default) output is identical to before, so every shipped level and the
-committed JSON are unchanged (tested). Seals use their own random stream.
+opening. With `seals: 0` (the default) the code path is the old one: the evidence that nothing
+changed is that the committed level JSON is still current (a test fails if it is not) and every
+existing generator test passes; a separate test checks `seals: 0` equals omitting it. Seals use their
+own random stream.
 
 **Effect on real pictures** (`npm run seals:report`; gentle profile, seed 1, nothing tuned):
 
@@ -80,7 +82,7 @@ decision-making the flat pictures lacked, and every row is a level the solver ca
 
 - `?engine=v2&level=seals` ("Wax Seals", `levels.ts`): all the gold is sealed by violet. The first tap
   on gold is refused with the reason, violet is open, and finishing violet visibly lifts the seals.
-  One lesson, no trap; winnable either way round (tested with the solver).
+  One lesson, no trap: there is exactly one line (violet, then gold), checked with the solver.
 - Seals are painted into their own RenderTexture over the cubes and redrawn only when a seal lifts
   (a key colour's last group completes), so there is no per-frame cost.
 - The toast now wraps to the board width, so the longer messages fit narrow phones.
@@ -91,6 +93,11 @@ decision-making the flat pictures lacked, and every row is a level the solver ca
   unwinnable by chance (triple moon: 2% of random runs). Seals are not yet in any shipped level, the
   tier gate (`tierGate.ts`), the difficulty curve or the pool: using them in the catalogue means
   choosing seal counts per tier and re-running the M12.6 gate. That is level design, not engine work.
+- **The measures do not model seals.** `peel`-based "hidden colours" and the difficulty score ignore
+  them (the table shows the score unchanged for some sealed levels while simple players start losing),
+  so do not trust the score for a sealed level until the measures learn about seals.
+- **Generation cost.** With seals on, each attempt evaluates up to six variants (about six times the
+  solver work); asking for more sealed colours than the picture has gives `null`.
 - **Colour only.** The mark is the key colour's square; the colour-blind mode (`?cb=1`) marks familiars
   but not seals. The refusal text helps, but a shape on the mark would be better.
 - **No on-device check.** Browser-pane check only (tutorial level, refusal toast, lifting seals at
