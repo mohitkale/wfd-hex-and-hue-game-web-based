@@ -127,7 +127,7 @@ _Replace simplistic patterns with rich, meaningful magical illustrations. Contai
 
 - [x] **M11.1** Visual art bible (ART_DIRECTION_V2) — Write `docs/ART_DIRECTION_V2.md`. _Needs M10.5._
 - [x] **M11.2** Increase puzzle art density — Support roughly 24×24–40×40 art with hundreds of meaningful cells, sized by mobile testing. Includes the per-cell shade (family = gameplay colour, shade = look) in the level model and renderer (ART_DIRECTION_V2 §1). _Needs M11.1._
-- [ ] **M11.3** Representative magical art set **(human gate)** — Hand-craft a small representative set across the themes and stop for art review before any catalogue work. _Needs M11.1, M11.2, M11.4._ Box ticked only after the user approves the art (G2).
+- [x] **M11.3** Representative magical art set **(human gate)** — Hand-craft a small representative set across the themes and stop for art review before any catalogue work. _Needs M11.1, M11.2, M11.4._ Box ticked only after the user approves the art (G2).
 - [x] **M11.4** Improve the art pipeline — Extend the PNG import and preview tooling for production art. Implements the **[check]** rules of ART_DIRECTION_V2 as `npm run art:check`, replacing the single distance rule, plus provenance enforcement. _Needs M11.1._
 - [ ] **M11.5** Connect artwork to gameplay rewards — Make winning reveal and animate the artwork, and store it in the Spellbook with a lore card. _Needs M11.3, M11.4._
 
