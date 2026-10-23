@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { theme } from "../theme";
 import { Button } from "../view/Button";
-import { DragScroll } from "../view/DragScroll";
+import { DragScroll, takeRestoredScroll } from "../view/DragScroll";
 import { fadeIn } from "../view/transition";
 import { artLevelForPiece } from "./artLevels";
 import { computeCollectLayout } from "./collectLayout";
@@ -32,6 +32,9 @@ export class CollectSpellbookScene extends Phaser.Scene {
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
     this.layout();
+    // A pixel-ratio change restarts the scene (index.ts): keep the player where they were.
+    const restored = takeRestoredScroll(this, dpr);
+    if (restored !== null) this.scroller.scrollTo(restored);
     fadeIn(this);
   }
 

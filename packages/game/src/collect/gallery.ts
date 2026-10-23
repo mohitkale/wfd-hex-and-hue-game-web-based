@@ -18,7 +18,8 @@ export interface GalleryCard {
 }
 
 export interface GallerySection {
-  world: WorldId;
+  /** The world, or null for the "Other pages" section. */
+  world: WorldId | null;
   name: string;
   tagline: string;
   cards: GalleryCard[];
@@ -55,7 +56,7 @@ export function buildGallery(
     if (!cards || cards.length === 0) continue;
     const identity = id === UNCLAIMED ? null : WORLD_IDENTITIES[id];
     sections.push({
-      world: (id === UNCLAIMED ? "moonlit" : id) as WorldId,
+      world: id === UNCLAIMED ? null : id,
       name: identity?.name ?? "Other pages",
       tagline: identity?.tagline ?? "",
       cards,

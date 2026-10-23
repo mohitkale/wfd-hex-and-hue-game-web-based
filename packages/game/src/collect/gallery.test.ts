@@ -107,6 +107,8 @@ describe("replay", () => {
     expect(levelFromSearch("?level=art-black-cat").id).toBe("art-black-cat");
     expect(levelFromSearch("?level=art-black-cat", null).id).toBe("art-black-cat");
     expect(levelFromSearch("", "no-such-level").id).toBe(levelFromSearch("").id);
+    // An unknown choice falls through to the address bar rather than to the default level.
+    expect(levelFromSearch("?level=art-black-cat", "no-such-level").id).toBe("art-black-cat");
   });
 
   it("every card's level id is playable", () => {

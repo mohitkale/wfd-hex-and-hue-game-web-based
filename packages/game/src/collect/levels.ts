@@ -182,7 +182,10 @@ export const DEFAULT_DEV_LEVEL = "slice";
 /** `?level=<name>` from a URL search string, falling back to the default. */
 export function levelFromSearch(search: string, chosen?: string | null): collect.CollectLevel {
   // A level picked in the game (replaying a Spellbook page) wins over the address bar.
-  const name = chosen ?? new URLSearchParams(search).get("level") ?? DEFAULT_DEV_LEVEL;
+  const name =
+    (chosen && DEV_LEVELS[chosen] ? chosen : null) ??
+    new URLSearchParams(search).get("level") ??
+    DEFAULT_DEV_LEVEL;
   return (DEV_LEVELS[name] ?? DEV_LEVELS[DEFAULT_DEV_LEVEL]!)();
 }
 
