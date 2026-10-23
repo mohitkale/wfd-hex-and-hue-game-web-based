@@ -6,7 +6,7 @@ import {
   validateCollectLevel,
   type CollectLevel,
 } from "./level";
-import { createCollectState } from "./state";
+import { createCollectState, hashState } from "./state";
 import { paddedIndex } from "./grid";
 
 describe("validateCollectLevel", () => {
@@ -82,5 +82,67 @@ describe("parseCollectLevel", () => {
     const bad = fixtureA();
     bad.slots = 0;
     expect(() => parseCollectLevel(bad)).toThrow("slots must be");
+  });
+});
+
+describe("shades (display-only looks within a colour family)", () => {
+  /** Two shades per colour: even cube index = base, odd = a lighter one. */
+  function shaded(level: CollectLevel): CollectLevel {
+    const colors = level.palette.flatMap((hex) => [hex, "#ffffff"]);
+    const family = level.palette.flatMap((_, i) => [i, i]);
+    const cells = level.cells.map((c, i) => (c < 0 ? -1 : c * 2 + (i % 2)));
+    return { ...level, shades: { colors, family, cells } };
+  }
+
+  it("accepts a level whose cubes carry shades of their own family", () => {
+    expect(validateCollectLevel(shaded(fixtureB()))).toEqual([]);
+  });
+
+  it("round-trips through JSON", () => {
+    const level = shaded(fixtureB());
+    expect(parseCollectLevel(JSON.parse(JSON.stringify(level)))).toEqual(level);
+  });
+
+  it("rejects a shade from the wrong family, a shade on an empty cell and bad shapes", () => {
+    const wrongFamily = shaded(fixtureB());
+    const i = wrongFamily.cells.findIndex((c) => c === 0);
+    wrongFamily.shades!.cells[i] = 2;
+    expect(validateCollectLevel(wrongFamily).join()).toContain("belongs to family");
+
+    const onEmpty = shaded(fixtureB());
+    const e = onEmpty.cells.findIndex((c) => c < 0);
+    if (e >= 0) {
+      onEmpty.shades!.cells[e] = 0;
+      expect(validateCollectLevel(onEmpty).join()).toContain("the cell is empty");
+    }
+
+    const short = shaded(fixtureB());
+    short.shades!.cells.pop();
+    expect(validateCollectLevel(short).join()).toContain("shades.cells has");
+
+    const badColor = shaded(fixtureB());
+    badColor.shades!.colors[0] = "red";
+    expect(validateCollectLevel(badColor).join()).toContain("is not #rrggbb");
+
+    const badFamily = shaded(fixtureB());
+    badFamily.shades!.family[0] = 99;
+    expect(validateCollectLevel(badFamily).join()).toContain("is not a palette index");
+
+    expect(() => parseCollectLevel({ ...shaded(fixtureB()), shades: "no" })).toThrow(
+      "shades must be an object",
+    );
+  });
+
+  it("limits the number of shades", () => {
+    const level = shaded(fixtureB());
+    const n = COLLECT_LIMITS.maxShades + 1;
+    level.shades!.colors = Array.from({ length: n }, () => "#ffffff");
+    level.shades!.family = Array.from({ length: n }, () => 0);
+    expect(validateCollectLevel(level).join()).toContain("shades must have");
+  });
+
+  it("never changes the game: the state is identical with and without shades", () => {
+    const plain = fixtureB();
+    expect(hashState(createCollectState(shaded(plain)))).toBe(hashState(createCollectState(plain)));
   });
 });

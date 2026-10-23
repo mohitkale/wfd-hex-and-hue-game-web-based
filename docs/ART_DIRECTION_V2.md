@@ -40,11 +40,15 @@ small, deliberate illustrations of witchy things, and must stay readable when ev
   grid's width or of its height, so no tiny picture swims in a big frame.
 - **A-03 [check]** At least 3 of the 4 corner cells are empty (the silhouette rule), and at least
   10 % of all cells are empty.
-- Smallest cube on a 320 px-wide phone: decided by M11.2 from measurement (hypothesis: 8 CSS px,
-  which makes 32 per side the practical default and 40 a hero-only size).
-- Play time is part of the design: a 600-cube piece is about five minutes at 1×. M11.2 reports
-  cube count and expected duration per size, and the level design (M12) decides how a long piece is
-  paced, not this document.
+- **Cube size (measured in M11.2, [V2_ART_DENSITY.md](V2_ART_DENSITY.md)):** width is the binding
+  side. Standard pieces (up to 32 per side) get at least 8.5 CSS px per cube on every phone from
+  320 px wide; hero pieces (up to 40) get 7 px on a 320 px phone and at least 8 px from 360 px
+  wide. So **32 is the working default and 40 is hero-only**, and a feature that must read
+  (an eye, a rune) is at least 2×2 cells.
+- Play time is set by the level's squad, spawn gap and field cap as much as by the picture:
+  a 32×32 test board (772 cubes) took 90 s for a bot that taps as soon as anything is legal and
+  about six minutes for one that waits for the board to settle each time. The level design (M12)
+  paces a piece; this document only keeps the cell count meaningful.
 
 ## 3. Colour: families and ramps
 
@@ -401,10 +405,11 @@ Scorecard (every rule passes):
 
 ## Calibration log
 
-| Date       | Rule | Initial               | Now              | Why                                                                                         |
-| ---------- | ---- | --------------------- | ---------------- | ------------------------------------------------------------------------------------------- |
-| 2026-10-23 | all  | (set)                 | -                | First version; revised only by M11.2 measurements and M11.3 pieces.                         |
-| 2026-10-23 | A-20 | IoU 0.80              | 0.75             | The first crescent scored 0.79; a thin halo and tips lose cells at half size.               |
-| 2026-10-23 | A-31 | top shade 35 %        | 45 %             | A mostly-gold subject has a natural base share; the backdrop cap (A-33) stays 35 %.         |
-| 2026-10-23 | A-13 | stated for all shades | used shades only | Seven house glint/light pairs fail 50; listed in section 3.                                 |
-| 2026-10-23 | A-17 | hard fail at 60       | warning          | Two house pairs collapse under deuteranopia; the M6.5 symbols are the answer (as in M10.1). |
+| Date       | Rule         | Initial                     | Now                             | Why                                                                                         |
+| ---------- | ------------ | --------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
+| 2026-10-23 | all          | (set)                       | -                               | First version; revised only by M11.2 measurements and M11.3 pieces.                         |
+| 2026-10-23 | A-20         | IoU 0.80                    | 0.75                            | The first crescent scored 0.79; a thin halo and tips lose cells at half size.               |
+| 2026-10-23 | A-31         | top shade 35 %              | 45 %                            | A mostly-gold subject has a natural base share; the backdrop cap (A-33) stays 35 %.         |
+| 2026-10-23 | §2 cube size | hypothesis 8 px, 32 default | 7 px absolute / 8.5 px up to 32 | Measured on a phone matrix in M11.2 (V2_ART_DENSITY.md).                                    |
+| 2026-10-23 | A-13         | stated for all shades       | used shades only                | Seven house glint/light pairs fail 50; listed in section 3.                                 |
+| 2026-10-23 | A-17         | hard fail at 60             | warning                         | Two house pairs collapse under deuteranopia; the M6.5 symbols are the answer (as in M10.1). |

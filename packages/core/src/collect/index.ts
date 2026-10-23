@@ -3,6 +3,7 @@ export {
   defaultPortalX,
   parseCollectLevel,
   validateCollectLevel,
+  type CellShades,
   type CollectLevel,
   type GroupSpec,
 } from "./level";

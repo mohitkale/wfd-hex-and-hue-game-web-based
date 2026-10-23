@@ -26,8 +26,10 @@ export class CubeLayer {
     private readonly layout: CollectLayout,
     palette: readonly string[],
     private readonly grid: number[],
+    /** Per padded cell tones for shaded art (ART_DIRECTION_V2 §1); absent = family colours. */
+    private readonly lookTones: readonly (CubeTones | undefined)[] | null = null,
   ) {
-    this.tones = palette.map(tonesFor);
+    this.tones = palette.map((hex) => tonesFor(hex));
     const { cell, boardRect, stride } = layout;
     this.gap = Math.max(1, Math.floor(cell / 12));
     this.size = cell - this.gap;
@@ -52,7 +54,7 @@ export class CubeLayer {
       // Mosaic-local pixel position (the ring cell at index 0 of each padded row/column is skipped).
       const x = ((i % stride) - 1) * cell + Math.floor(this.gap / 2);
       const y = (Math.floor(i / stride) - 1) * cell + Math.floor(this.gap / 2);
-      paintCube(g, x, y, this.size, this.tones[color]!);
+      paintCube(g, x, y, this.size, this.lookTones?.[i] ?? this.tones[color]!);
     }
     this.rt.draw(g, 0, 0);
     this.rt.render();
