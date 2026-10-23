@@ -23,6 +23,7 @@ export type SoundName =
   | "tap"
   | "invalid"
   | "collect"
+  | "pickup"
   | "portal"
   | "park"
   | "launch"
@@ -63,6 +64,9 @@ export function soundSpec(name: SoundName, opts: SoundOptions = {}): Note[] {
       );
       return [{ freq: PENTATONIC[step]!, wave: "sine", at: 0, dur: 0.09, gain: 0.14 }];
     }
+    case "pickup":
+      // A soft low "pop" as a familiar grabs a cube: quieter than the delivery notes it leads into.
+      return [{ freq: 330, to: 440, wave: "triangle", at: 0, dur: 0.05, gain: 0.1 }];
     case "portal":
       return [
         { freq: 880, wave: "sine", at: 0, dur: 0.18, gain: 0.16 },

@@ -8,8 +8,12 @@ import { TEX } from "../view/textures";
 import { bake } from "./bake";
 import { paintCube, type CubeTones } from "./cubePaint";
 import { FAMILIAR_H, FAMILIAR_W, FRAME_NAMES, badgeRect, type FrameName } from "./familiarArt";
+import type { Emitter } from "./particles";
 import {
   CellSpreader,
+  bump,
+  squashX,
+  squashY,
   drawnCoord,
   drift,
   ease,
@@ -43,10 +47,16 @@ interface Entry {
   liftFromX: number;
   liftFromY: number;
   liftUntil: number;
+  /** Pickup squash: the familiar flattens and springs back until this time. */
+  squashUntil: number;
+  /** When this carrier last left a trail puff. */
+  trailAt: number;
 }
 
 const D = { shadow: 4, sprite: 5, cube: 6, effect: 8 } as const;
 const SHADOW_ALPHA = 0.35;
+/** The pickup squash lasts this many ticks (so it is twice as quick in wall time at 2×). */
+const SQUASH_TICKS = 2;
 const FRAME_INDEX = Object.fromEntries(FRAME_NAMES.map((n, i) => [n, i])) as Record<
   FrameName,
   number
@@ -84,6 +94,7 @@ export class FamiliarLayer {
     private readonly reduced: boolean,
     /** Palette hex colours when colour-blind symbols are on, otherwise null. */
     private readonly symbolPalette: readonly string[] | null = null,
+    private readonly emitter: Emitter | null = null,
   ) {
     this.frameNames = tones.map((_, c) => FRAME_NAMES.map((f) => `${c}:${f}`));
     const size = Math.max(4, Math.round(layout.cell * 0.82));
@@ -155,6 +166,8 @@ export class FamiliarLayer {
       liftFromX: 0,
       liftFromY: 0,
       liftUntil: 0,
+      squashUntil: 0,
+      trailAt: -Infinity,
     };
   }
 
@@ -169,6 +182,8 @@ export class FamiliarLayer {
     e.popping = false;
     e.cubeColor = -1;
     e.liftUntil = 0;
+    e.squashUntil = 0;
+    e.trailAt = -Infinity;
     this.pool.push(e);
   }
 
@@ -182,6 +197,7 @@ export class FamiliarLayer {
         entry.liftFromX = this.cx(e.cube);
         entry.liftFromY = this.cy(e.cube);
         entry.liftUntil = this.now + this.tickMs * 3;
+        entry.squashUntil = this.now + this.tickMs * SQUASH_TICKS;
       }
     }
   }
@@ -193,6 +209,7 @@ export class FamiliarLayer {
   update(tick: number, alpha: number, timeMs: number, tickMs: number): void {
     this.now = timeMs;
     this.tickMs = tickMs;
+    if (this.emitter) this.emitter.tickMs = tickMs;
     const s = this.scale;
     const cell = this.layout.cell;
     const cubeSize = Math.max(4, Math.round(cell * 0.82));
@@ -247,7 +264,15 @@ export class FamiliarLayer {
           ? 0
           : Math.sin((timeMs / 110) * e.hoverRate + e.hoverPhase) * s * 0.7;
       e.img.setPosition(x, y + hover);
-      if (!e.retiring && !e.popping) e.img.setScale(s);
+      if (!e.retiring && !e.popping) {
+        // Pickup squash: flatten a little and spring back over a couple of ticks (never delays play).
+        if (timeMs < e.squashUntil) {
+          const b = bump(1 - (e.squashUntil - timeMs) / (this.tickMs * SQUASH_TICKS));
+          e.img.setScale(squashX(s, b), squashY(s, b));
+        } else {
+          e.img.setScale(s);
+        }
+      }
       e.shadow.setPosition(x, y + s * 2.2);
       if (!e.retiring && !e.popping) e.shadow.setDisplaySize(s * 11, s * 4);
 
@@ -274,6 +299,15 @@ export class FamiliarLayer {
         e.cube.setVisible(false);
         e.mark?.setVisible(false);
         e.cubeColor = -1;
+      }
+      if (this.emitter && v.mode === "carry" && v.carried !== null) {
+        e.trailAt = this.emitter.trail(
+          x,
+          y + hover + s * 1.5,
+          this.tones[v.carried]!.light,
+          timeMs,
+          e.trailAt,
+        );
       }
       if (e.chest) this.placeChest(e, v, frameFor(v, tick), x, y + hover);
       if (v.mode === "retiring" && !e.retiring) this.retire(v.id, e);
@@ -387,27 +421,9 @@ export class FamiliarLayer {
       ease: "Cubic.easeIn",
       onComplete: () => {
         g.destroy();
-        this.burst(px, py, tone.light);
+        this.emitter?.sparks(px, py, tone.light, 6, this.now);
         this.onDelivered(colorIndex, group);
       },
     });
-  }
-
-  /** A few sparks drifting up out of the portal. */
-  private burst(x: number, y: number, color: number): void {
-    const r = Math.max(1, Math.round(this.layout.cell * 0.12));
-    for (let i = 0; i < 6; i++) {
-      const a = -Math.PI / 2 + ((i - 2.5) / 6) * Math.PI;
-      const dot = this.scene.add.circle(x, y, r, color, 0.9).setDepth(D.effect);
-      this.scene.tweens.add({
-        targets: dot,
-        x: x + Math.cos(a) * this.layout.cell * 1.1,
-        y: y + Math.sin(a) * this.layout.cell * 1.1,
-        alpha: 0,
-        duration: 280,
-        ease: "Sine.easeOut",
-        onComplete: () => dot.destroy(),
-      });
-    }
   }
 }

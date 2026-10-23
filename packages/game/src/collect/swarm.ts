@@ -111,3 +111,23 @@ export class CellSpreader {
     return this.offsets.get(id) ?? 0;
   }
 }
+
+/**
+ * A 0..1..0 swell over `k` (progress 0..1 through a short moment): 0 outside it, 1 in the middle.
+ * Drives the pickup squash: the familiar flattens a little and springs back.
+ */
+export function bump(k: number): number {
+  return k <= 0 || k >= 1 ? 0 : Math.sin(Math.PI * k);
+}
+
+/** The squashed sprite scale on each axis for a swell `b` (0..1) around the resting scale `s`. */
+export const squashX = (s: number, b: number): number => s * (1 + 0.14 * b);
+export const squashY = (s: number, b: number): number => s * (1 - 0.2 * b);
+
+/**
+ * How far a finished group's badge scales as it leaves: it swells when completed and shrinks when
+ * dropped; reduced motion never scales it.
+ */
+export function leaveScale(completed: boolean, reduced: boolean): number {
+  return reduced ? 1 : completed ? 1.25 : 0.6;
+}

@@ -3,7 +3,7 @@ import type { SaveData } from "../save/schema";
 import { AudioEngine, type AudioSettings } from "./engine";
 
 export { AudioEngine, type AudioLike, type AudioSettings } from "./engine";
-export type { SoundName } from "./sounds";
+export type { SoundName, SoundOptions } from "./sounds";
 
 export const audioSettings = (s: SaveData["settings"]): AudioSettings => ({
   sound: s.sound,
