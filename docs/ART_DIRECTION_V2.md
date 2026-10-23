@@ -70,13 +70,13 @@ panel (`#0f0824`, floor 1.6).
 | Night     | `#3d335d` | `#4b426c` | `#5d5680` | `#9691ac` | `#c6c4d3` | 1.7          |
 
 Measured on the table above with `tools/art/color.ts` (redmean distance): the closest two **base**
-colours are 127 apart (Ember/Gold); consecutive shades within a family are 46-164 apart; the
+colours are 127 apart (Ember/Gold); consecutive shades within a family are 44-164 apart; the
 largest hue drift from a base is 21°.
 
 **Shades that cannot share a piece** (cross-family distance below 50; the checker rejects a piece
-that uses both): Ruby glint / Rose light (48), Ember glint / Gold glint (45), Sapphire glint /
-Moonstone light (49), Amethyst glint / Moonstone base (43), Amethyst glint / Moonstone light (27),
-Moonstone shade / Night light (18), Moonstone base / Night glint (32). All other pairs of the 50
+that uses both): Ruby glint / Rose light (47), Ember glint / Gold glint (45), Sapphire glint /
+Moonstone light (48), Amethyst glint / Moonstone base (43), Amethyst glint / Moonstone light (27),
+Moonstone shade / Night light (19), Moonstone base / Night glint (32). All other pairs of the 50
 house shades are at least 50 apart. In practice: use glints sparingly, and a piece with both
 Moonstone and Night leaves out Night's light and glint.
 
@@ -108,7 +108,7 @@ must pass the same checks and are added to this table when they ship.
   visible instead of forbidding it. The check simulates deuteranopia (Machado et al. 2009,
   severity 1.0, applied in linear RGB: the same matrix as `tools/familiar/familiar.test.ts`) and
   reports every pair of base colours in the piece that ends up less than 30 redmean apart **and**
-  has a luminance contrast ratio below 1.4. Today that is two house pairs: **Teal/Rose** (15,
+  has a luminance contrast ratio below 1.4 (the ratio is measured on the original colours, not the simulated ones). Today that is two house pairs: **Teal/Rose** (15,
   ratio 1.16) and **Sapphire/Amethyst** (22, ratio 1.11). A piece may contain such a pair, but the
   review sheet flags it and the pair should not touch each other, so the symbols are the only thing
   telling them apart in a small area. Re-tuning those two ramps for value is a candidate change if
@@ -197,7 +197,7 @@ stated.
 - **A-30 orphan:** a filled cell with no neighbour of its own family.
 - **A-32 dither cell:** a filled cell whose four neighbours are all filled and all of a different
   family. (Empty and out-of-grid neighbours disqualify the cell, which is what separates it from an
-  orphan.) The mean horizontal run is over maximal runs of consecutive identical cells in a row.
+  orphan.) The mean horizontal run is over maximal runs of consecutive identical _filled_ cells in a row; empty cells do not form runs.
 - **A-31 rectangle:** the largest axis-aligned rectangle made only of one legend character.
 - **A-34 fragment:** a 4-connected group of same-family cells of fewer than 3 cells.
 - **A-13 / A-14** are evaluated on the shades a piece actually uses; "consecutive" means adjacent
@@ -229,7 +229,7 @@ the level model and renderer (family still decides gameplay) alongside the large
 `npm run art:check` implementing every rule marked **[check]** with the section 5a definitions,
 reports A-17 as a warning, enforces the provenance fields of section 6, and **replaces** the single
 distance-90 rule in `tools/art/check.ts`, which would otherwise reject every multi-shade ramp
-(shade steps are 46-164). Until then v1 art keeps using `check.ts` unchanged.
+(shade steps are 44-164). Until then v1 art keeps using `check.ts` unchanged.
 
 ## 8. Worked before / after
 
@@ -311,7 +311,7 @@ Scorecard (every rule passes):
 | A-12 | closest bases 203                                                        | pass   |
 | A-13 | closest cross-family shades 79                                           | pass   |
 | A-14 | steps 58-146                                                             | pass   |
-| A-15 | max hue drift 8°                                                         | pass   |
+| A-15 | max hue drift 9°                                                         | pass   |
 | A-16 | lowest contrast 2.20                                                     | pass   |
 | A-18 | light < shade in all three families (x+y 8.6/12.9, 15.3/21.1, 23.5/26.3) | pass   |
 | A-19 | glint 2.6 % (4 cells)                                                    | pass   |
@@ -378,8 +378,8 @@ Scorecard (every rule passes):
 | A-12 | closest bases 203                                         | pass   |
 | A-13 | closest cross-family shades 79                            | pass   |
 | A-14 | steps 86-146                                              | pass   |
-| A-15 | max hue drift 8°                                          | pass   |
-| A-16 | lowest contrast 3.11                                      | pass   |
+| A-15 | max hue drift 9°                                          | pass   |
+| A-16 | lowest contrast 3.13                                      | pass   |
 | A-18 | light < shade in Gold (17.0/25.5) and Amethyst (7.9/21.9) | pass   |
 | A-19 | glint 0.9 % (2 cells)                                     | pass   |
 | A-20 | IoU 0.79                                                  | pass   |
