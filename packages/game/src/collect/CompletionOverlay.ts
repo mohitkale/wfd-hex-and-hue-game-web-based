@@ -14,7 +14,7 @@ import {
 import type { CollectLayout } from "./collectLayout";
 import { Particles } from "./particles";
 import { fitCell, paintPicture } from "./pictureView";
-import { PULSE_MS, sealPoints, sealPulse, type WorldMoment } from "./worldMoment";
+import { PULSE_MS, sealPoints, sealPulse, shouldPulse, type WorldMoment } from "./worldMoment";
 
 export interface CompletionOptions {
   layout: CollectLayout;
@@ -60,6 +60,7 @@ export class CompletionOverlay {
   private readonly y0: number;
   private readonly ring: Phaser.GameObjects.Graphics;
   private pulseOn = false;
+  private pulseStart = 0;
   private startedAt = -1;
   private skipped: boolean;
   private finished = false;
@@ -75,7 +76,8 @@ export class CompletionOverlay {
     this.spec = effectForTheme(level.subject.theme);
     this.times = revealTimes(level.width, level.height, this.spec.order);
     this.seeds = particleSeeds(this.spec, level.width, level.height);
-    this.cell = fitCell(level, l.frame.w * 0.84, l.frame.h * 0.4);
+    // A world line adds a row of text, so the picture gives it a little room.
+    this.cell = fitCell(level, l.frame.w * 0.84, l.frame.h * (o.world ? 0.35 : 0.4));
     this.x0 = Math.round(l.frame.x + (l.frame.w - level.width * this.cell) / 2);
     this.y0 = Math.round(l.frame.y + l.frame.h * 0.07);
 
@@ -124,7 +126,10 @@ export class CompletionOverlay {
       );
       seal.closePath();
       seal.fillPath();
-      seal.setPosition(cx - worldLine.width / 2 - 14 * dpr, worldLine.y + worldLine.height / 2);
+      seal.setPosition(
+        Math.max(l.frame.x + 12 * dpr, cx - worldLine.width / 2 - 14 * dpr),
+        worldLine.y + Math.min(worldLine.height, 16 * dpr) / 2,
+      );
       this.later.push(worldLine, seal);
       belowLore += worldLine.height + 8 * dpr;
     }
@@ -233,10 +238,10 @@ export class CompletionOverlay {
   /** The world's seal colour as a ring that opens once around the picture (not after a skip). */
   private drawPulse(now: number): void {
     if (!this.pulseOn || !this.o.world) return;
-    const p = sealPulse(now - this.finishedAt, { reduced: this.o.reduced, skipped: false });
+    const p = sealPulse(now - this.pulseStart);
     this.ring.clear();
     if (p.alpha === 0) {
-      if (now - this.finishedAt >= PULSE_MS) this.pulseOn = false;
+      if (now - this.pulseStart >= PULSE_MS) this.pulseOn = false;
       return;
     }
     const { level } = this.o;
@@ -253,7 +258,13 @@ export class CompletionOverlay {
     this.finished = true;
     this.finishedAt = now;
     // A skip, reduced motion or a redraw of a reveal already seen means no pulse.
-    this.pulseOn = !this.skipped && !this.o.reduced && !this.o.instant && !!this.o.world;
+    this.pulseOn = shouldPulse({
+      skipped: this.skipped,
+      reduced: this.o.reduced,
+      instant: this.o.instant,
+      hasWorld: !!this.o.world,
+    });
+    this.pulseStart = now;
     this.zone.destroy();
     this.scene.tweens.add({
       targets: this.later,

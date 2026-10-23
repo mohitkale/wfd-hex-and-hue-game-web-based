@@ -32,7 +32,7 @@ export function worldMoment(
   const id = subject ? worldForTheme(subject.theme) : null;
   if (!id) return null;
   const identity = WORLD_IDENTITIES[id];
-  const section = buildGallery(book).sections.find((s) => s.name === identity.name);
+  const section = buildGallery(book).sections.find((s) => s.world === id);
   if (!section) return null;
   const { collected } = section;
   const total = section.cards.length;
@@ -41,7 +41,7 @@ export function worldMoment(
       ? `${identity.name}: every page so far`
       : wasNew && collected === 1
         ? `First page of ${identity.name}`
-        : `${identity.name} · ${collected} of ${total} ${total === 1 ? "page" : "pages"}`;
+        : `${identity.name} · ${collected} of ${total} ${total === 1 ? "page" : "pages"} so far`;
   return {
     worldName: identity.name,
     line,
@@ -98,16 +98,24 @@ export function sealPoints(kind: SealKind, r: number): { x: number; y: number }[
 export const PULSE_MS = 900;
 
 /**
- * The seal's ring pulse `elapsedMs` after the reveal finished: radius 0..1 (of the picture) and alpha.
- * Nothing is drawn (alpha 0) before it starts, after it ends, or at all with reduced motion or when
- * the reveal was skipped: a skip means no show.
+ * Whether the ring plays at all: only when the reveal ran to its end by itself (a skip means no
+ * show), motion is allowed, the reveal is not a redraw of one already seen, and there is a world.
  */
-export function sealPulse(
-  elapsedMs: number,
-  opts: { reduced: boolean; skipped: boolean },
-): { radius: number; alpha: number } {
-  if (opts.reduced || opts.skipped || elapsedMs < 0 || elapsedMs >= PULSE_MS)
-    return { radius: 0, alpha: 0 };
+export function shouldPulse(o: {
+  skipped: boolean;
+  reduced: boolean;
+  instant: boolean;
+  hasWorld: boolean;
+}): boolean {
+  return o.hasWorld && !o.skipped && !o.reduced && !o.instant;
+}
+
+/**
+ * The seal's ring pulse `elapsedMs` after the reveal finished: radius 0..1 (of the picture) and alpha.
+ * Nothing is drawn (alpha 0) before it starts or after it ends.
+ */
+export function sealPulse(elapsedMs: number): { radius: number; alpha: number } {
+  if (elapsedMs < 0 || elapsedMs >= PULSE_MS) return { radius: 0, alpha: 0 };
   const t = elapsedMs / PULSE_MS;
   return { radius: 1 - (1 - t) * (1 - t), alpha: 0.7 * (1 - t) };
 }

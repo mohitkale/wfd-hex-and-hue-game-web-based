@@ -48,7 +48,7 @@ from `worldMoment.ts` and `worldIdentity.ts`:
 | Zodiac Realm       | star     | blue        | deep indigo          |
 
 - A **world line** under the lore, led by the seal: "First page of Moonlit Beginnings" for the first
-  page you collect there, "Moonlit Beginnings · 2 of 3 pages" for progress (also on a replay), and
+  page you collect there, "Moonlit Beginnings · 2 of 3 pages so far" for progress (also on a replay; always "so far", since the totals are only the pages that exist today), and
   "Moonlit Beginnings: every page so far" when the win collects the last page the library has for that
   world. It never says a world is finished: most pages do not exist yet (docs/V2_WORLDS.md). If the
   win could not be saved, no progress is claimed and there is no world line.
@@ -62,7 +62,7 @@ Tested: the line wording for first/progress/every-page/replay/single-page worlds
 distinct seals, seal outlines inside their radius, and the ring (rises, fades, ends, never plays when
 reduced or skipped). Checked in the browser pane: the crescent seal and "First page of Moonlit
 Beginnings" after winning the crescent level, and the star seal with "Zodiac Realm · 1 of 1 page"
-after Libra. **Not checked:** the crystal seal on screen, the ring in motion by eye (it was driven
+after Libra. Also checked at 320×480 with the longest line ("every page so far"): it fits above the buttons. **Not checked:** the crystal seal on screen, the ring in motion by eye (it was driven
 through a background tab), reduced motion in the running game, a real phone.
 
 ## Rules it keeps
