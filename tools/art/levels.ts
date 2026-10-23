@@ -43,6 +43,9 @@ export function levelForPiece(piece: ArtPiece): ArtLevel {
   const g = generateForTier(art, `art-${piece.id}`, piece.name, tier, SEED);
   if (!g) throw new Error(`${piece.id}: no level meets the ${tier} band`);
   const report = collect.strategyReport(g.level);
+  const measured = collect.measureLevel(g.level);
+  if (!measured) throw new Error(`${piece.id}: the generated level could not be measured`);
+  const score = collect.difficultyScore(measured);
   return {
     level: {
       ...g.level,
@@ -57,9 +60,26 @@ export function levelForPiece(piece: ArtPiece): ArtLevel {
       metrics: g.metrics,
       tier,
       strategies: { wins: report.wins, randomRate: report.randomRate },
+      difficulty: {
+        score: round(score.total),
+        components: Object.fromEntries(score.components.map((c) => [c.id, round(c.points)])),
+        measures: {
+          deadEndShare: round(measured.deadEndShare),
+          doomedFirstShare: round(measured.doomedFirstShare),
+          temptingPoorShare: round(measured.temptingPoorShare),
+          planningDepth: Number.isFinite(measured.planningDepth) ? measured.planningDepth : null,
+          effectiveBranching: round(measured.effectiveBranching),
+          slotPressure: round(measured.slotPressure),
+          hiddenColors: measured.hiddenColors,
+          recoveryDepth: measured.recoveryDepth,
+          seconds: Math.round(measured.seconds),
+        },
+      },
     },
   };
 }
+
+const round = (x: number): number => Math.round(x * 1000) / 1000;
 
 export const artLevels = (): ArtLevel[] => pieces.map(levelForPiece);
 

@@ -29,6 +29,7 @@
     "art:levels": "tsx tools/art/levels.ts",
     "solver:report": "tsx tools/collect/solverReport.ts",
     "strategy:report": "tsx tools/collect/strategyReport.ts",
+    "measures:report": "tsx tools/collect/measuresReport.ts",
     "audit:v1": "tsx tools/audit/run.ts",
     "familiar:sheet": "tsx tools/familiar/sheet.ts",
     "icons": "tsx tools/icons/build.ts",

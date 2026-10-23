@@ -138,6 +138,30 @@
      "clears-capacity": true
     },
     "randomRate": 1
+   },
+   "difficulty": {
+    "score": 3.333,
+    "components": {
+     "dead-ends": 0,
+     "planning": 0,
+     "temptation": 0,
+     "opening": 0,
+     "slots": 3.333,
+     "hidden": 0,
+     "recovery": 0,
+     "gap": 0
+    },
+    "measures": {
+     "deadEndShare": 0,
+     "doomedFirstShare": 0,
+     "temptingPoorShare": 0,
+     "planningDepth": 1,
+     "effectiveBranching": 2.583,
+     "slotPressure": 0.333,
+     "hiddenColors": 0,
+     "recoveryDepth": 0,
+     "seconds": 137
+    }
    }
   }
  },
@@ -270,6 +294,30 @@
      "clears-capacity": true
     },
     "randomRate": 1
+   },
+   "difficulty": {
+    "score": 3.333,
+    "components": {
+     "dead-ends": 0,
+     "planning": 0,
+     "temptation": 0,
+     "opening": 0,
+     "slots": 3.333,
+     "hidden": 0,
+     "recovery": 0,
+     "gap": 0
+    },
+    "measures": {
+     "deadEndShare": 0,
+     "doomedFirstShare": 0,
+     "temptingPoorShare": 0,
+     "planningDepth": 1,
+     "effectiveBranching": 2.273,
+     "slotPressure": 0.333,
+     "hiddenColors": 0,
+     "recoveryDepth": 0,
+     "seconds": 126
+    }
    }
   }
  },
@@ -424,6 +472,30 @@
      "clears-capacity": true
     },
     "randomRate": 1
+   },
+   "difficulty": {
+    "score": 3.333,
+    "components": {
+     "dead-ends": 0,
+     "planning": 0,
+     "temptation": 0,
+     "opening": 0,
+     "slots": 3.333,
+     "hidden": 0,
+     "recovery": 0,
+     "gap": 0
+    },
+    "measures": {
+     "deadEndShare": 0,
+     "doomedFirstShare": 0,
+     "temptingPoorShare": 0,
+     "planningDepth": 1,
+     "effectiveBranching": 2.417,
+     "slotPressure": 0.333,
+     "hiddenColors": 0,
+     "recoveryDepth": 0,
+     "seconds": 253
+    }
    }
   }
  },
@@ -562,6 +634,30 @@
      "clears-capacity": true
     },
     "randomRate": 1
+   },
+   "difficulty": {
+    "score": 3.333,
+    "components": {
+     "dead-ends": 0,
+     "planning": 0,
+     "temptation": 0,
+     "opening": 0,
+     "slots": 3.333,
+     "hidden": 0,
+     "recovery": 0,
+     "gap": 0
+    },
+    "measures": {
+     "deadEndShare": 0,
+     "doomedFirstShare": 0,
+     "temptingPoorShare": 0,
+     "planningDepth": 1,
+     "effectiveBranching": 2.333,
+     "slotPressure": 0.333,
+     "hiddenColors": 0,
+     "recoveryDepth": 0,
+     "seconds": 299
+    }
    }
   }
  },
@@ -711,6 +807,30 @@
      "clears-capacity": true
     },
     "randomRate": 1
+   },
+   "difficulty": {
+    "score": 5.833,
+    "components": {
+     "dead-ends": 0,
+     "planning": 0,
+     "temptation": 0,
+     "opening": 0,
+     "slots": 3.333,
+     "hidden": 2.5,
+     "recovery": 0,
+     "gap": 0
+    },
+    "measures": {
+     "deadEndShare": 0,
+     "doomedFirstShare": 0,
+     "temptingPoorShare": 0,
+     "planningDepth": 1,
+     "effectiveBranching": 2.538,
+     "slotPressure": 0.333,
+     "hiddenColors": 1,
+     "recoveryDepth": 0,
+     "seconds": 238
+    }
    }
   }
  },
@@ -891,6 +1011,30 @@
      "clears-capacity": true
     },
     "randomRate": 0.85
+   },
+   "difficulty": {
+    "score": 12.974,
+    "components": {
+     "dead-ends": 0,
+     "planning": 0,
+     "temptation": 0,
+     "opening": 0,
+     "slots": 5,
+     "hidden": 6,
+     "recovery": 0,
+     "gap": 1.974
+    },
+    "measures": {
+     "deadEndShare": 0,
+     "doomedFirstShare": 0,
+     "temptingPoorShare": 0,
+     "planningDepth": 1,
+     "effectiveBranching": 2.444,
+     "slotPressure": 0.5,
+     "hiddenColors": 3,
+     "recoveryDepth": 1,
+     "seconds": 266
+    }
    }
   }
  }

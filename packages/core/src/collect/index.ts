@@ -68,3 +68,12 @@ export {
   type RunResult,
   type StrategyReport,
 } from "./players";
+export {
+  SCORE_SPEC,
+  difficultyScore,
+  measureLevel,
+  type DifficultyScore,
+  type MeasureOptions,
+  type Measures,
+  type ScoreComponent,
+} from "./measures";
