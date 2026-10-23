@@ -1,5 +1,6 @@
 import * as collect from "@hexhue/core/collect";
 import { createRng } from "@hexhue/core";
+import { LOSE_LINES, WIN_LINE, moonlitHat } from "./slice";
 
 /**
  * Levels for the `?engine=v2` review build. The vertical-slice level (M10.5) replaces `demo` as the
@@ -155,6 +156,8 @@ export function stripes(
 }
 
 export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
+  /** The M10.5 vertical slice (gate G1). */
+  slice: moonlitHat,
   parking,
   purple12,
   moon: demoMoon,
@@ -164,10 +167,23 @@ export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
   big: () => stripes("dev-big", "Big 40×40 (dev)", 40, 5, 130),
 };
 
-export const DEFAULT_DEV_LEVEL = "moon";
+export const DEFAULT_DEV_LEVEL = "slice";
 
 /** `?level=<name>` from a URL search string, falling back to the default. */
 export function levelFromSearch(search: string): collect.CollectLevel {
   const name = new URLSearchParams(search).get("level") ?? DEFAULT_DEV_LEVEL;
   return (DEV_LEVELS[name] ?? DEV_LEVELS[DEFAULT_DEV_LEVEL]!)();
+}
+
+/** `?demo=win|lose|deadlock`: a recorded line for the slice level (review builds), else null. */
+export function demoLineFromSearch(
+  search: string,
+  level: collect.CollectLevel,
+): readonly collect.Action[] | null {
+  if (level.id !== moonlitHat().id) return null;
+  const demo = new URLSearchParams(search).get("demo");
+  if (demo === "win") return WIN_LINE;
+  if (demo === "lose" || demo === "slots") return LOSE_LINES.slots;
+  if (demo === "deadlock") return LOSE_LINES.deadlock;
+  return null;
 }

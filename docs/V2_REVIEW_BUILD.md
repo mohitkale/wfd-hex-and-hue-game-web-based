@@ -12,7 +12,8 @@ Open one of:
 
 | URL                               | What you get                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------ |
-| `/play/?engine=v2`                | The crescent-moon dev level (20×18, five colours, 3 columns, 4 slots)          |
+| `/play/?engine=v2`                | The M10.5 vertical slice, "Moonlit Hat" (see `docs/V2_SLICE.md`)               |
+| `/play/?engine=v2&level=moon`     | The crescent-moon dev level (20×18, five colours, 3 columns, 4 slots)          |
 | `/play/?engine=v2&level=parking`  | The teaching board from the design doc: park, resume, or lose with one slot    |
 | `/play/?engine=v2&level=purple12` | Purple 12 can reach only 7 cubes: it waits showing 5 until the blue is cleared |
 | add `&cb=1`                       | Colour-blind symbols on familiars, carried cubes and groups                    |

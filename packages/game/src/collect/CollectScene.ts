@@ -21,7 +21,7 @@ import { cellCenter, computeCollectLayout, hudButtonX, type CollectLayout } from
 import { RingStats } from "./profile";
 import { tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
-import { levelFromSearch } from "./levels";
+import { demoLineFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
 import { VisualModel } from "./visuals";
 
@@ -57,6 +57,12 @@ export class CollectScene extends Phaser.Scene {
     sound: (name, options) => getAudio(this).play(name, options),
     haptic: (kind) => this.haptics.play(kind),
   };
+  /**
+   * `?demo=win|lose` (review builds): taps a recorded line one action at a time whenever the board
+   * has settled, so a reviewer can watch a winning or a losing sequence. Any manual undo or restart
+   * ends it.
+   */
+  private demo: { line: readonly collect.Action[]; next: number; readyAt: number } | null = null;
   /** The time of the latest frame, for effects started by events between frames. */
   private frameTime = 0;
   private atlas = "";
@@ -93,9 +99,14 @@ export class CollectScene extends Phaser.Scene {
     if (params.get("speed") === "2") this.speed = 2;
     this.colorblind = params.get("cb") === "1";
     this.session = new collect.CollectSession(level);
+    const line = demoLineFromSearch(search, level);
+    if (line) this.demo = { line, next: 0, readyAt: 0 };
     this.unsubscribe.push(
       this.session.subscribe((batch) => this.onBatch(batch)),
-      this.session.onReplace(() => this.rebuild()),
+      this.session.onReplace(() => {
+        this.demo = null;
+        this.rebuild();
+      }),
     );
     this.scale.on("resize", this.rebuild, this);
     // A restored WebGL context loses the contents of render textures (the baked board and cubes):
@@ -471,6 +482,18 @@ export class CollectScene extends Phaser.Scene {
     }
   }
 
+  /** Plays the next demo action once the board has settled and a short pause has passed. */
+  private stepDemo(time: number): void {
+    const d = this.demo;
+    if (!d || this.overlay.length > 0 || this.session.state.status !== "playing") return;
+    if (!collect.isSettled(this.session.state)) {
+      d.readyAt = time + 900;
+      return;
+    }
+    if (time < d.readyAt || d.next >= d.line.length) return;
+    this.tap(d.line[d.next++]!);
+  }
+
   /** A finished group: its badge blooms and throws sparks in its own colour. */
   private celebrateGroup(group: number): void {
     const colorIndex = this.session.state.groups[group]!.color;
@@ -509,6 +532,7 @@ export class CollectScene extends Phaser.Scene {
       time,
       this.clock.tickMs / this.speed,
     );
+    this.stepDemo(time);
     this.ambient.update(time);
     this.particleLayer.update(time);
     this.cubes.flush();
