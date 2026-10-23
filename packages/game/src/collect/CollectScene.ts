@@ -116,7 +116,9 @@ export class CollectScene extends Phaser.Scene {
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
     const search = typeof window !== "undefined" ? window.location.search : "";
-    const level = levelFromSearch(search);
+    // `v2.level`: a level chosen in the game (Spellbook replay), kept so "Back to the board" returns to it.
+    const chosen = this.registry.get("v2.level") as string | undefined;
+    const level = levelFromSearch(search, chosen);
     const params = new URLSearchParams(search);
     if (params.get("speed") === "2") this.speed = 2;
     // `?view=spellbook` opens the v2 Spellbook first (once: "Back to the board" returns here).

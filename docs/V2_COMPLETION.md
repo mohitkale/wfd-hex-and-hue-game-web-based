@@ -29,7 +29,7 @@ win (`npm run art:levels`), nothing more. Real level design, solving and difficu
 
 2. The name, the lore line and the Spellbook line appear: "Added to your Spellbook" the first time,
    "Already in your Spellbook" after, "Could not be saved on this device" if storage failed.
-3. **Spellbook** opens the v2 Spellbook (a grid of every art piece: finished with its name once
+3. **Spellbook** opens the v2 Spellbook (since M13.2 a scrollable gallery grouped by world, see docs/V2_GALLERY.md; every art piece: finished with its name once
    collected, a silhouette until then; tap a collected card for its page with the lore and how many
    times you have completed it). **Play again** restarts the level.
 
@@ -75,4 +75,4 @@ unavailable storage (an unreadable book is never overwritten), and the preview l
 the running game (their logic is tested, the wiring is not clicked through), the other four reveals,
 and anything on a real phone. The Phaser scene lifecycle (the restart cycle above) has no automated
 test, only the browser check. The reveals are a first pass at the effect designs, not tuned.
-The full Spellbook gallery with replay is M13.2; world-specific completion moments are M13.3.
+The Spellbook became a world-grouped gallery with replay in M13.2 (docs/V2_GALLERY.md); world-specific completion moments are M13.3.

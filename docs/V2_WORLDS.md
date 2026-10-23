@@ -67,7 +67,7 @@ group may be too big for what is open", and level 55 is "an astrology picture ·
   with the game keeping only the atmosphere; deferred.
 - **Look not tuned.** The three atmospheres differ in motion, count, size and speed, but have not been
   tuned by eye on a phone; the orbit speed (a few pixels a second) is a first guess.
-- **M13.2 and M13.3 stay blocked** until the worlds are filled (they need M13.1).
+- **M13.2 and M13.3 build on the structure, not the filled worlds** (dependency relaxed by the owner: they need M11.5 and this world structure; M13.1 itself stays open until the worlds are filled). M13.2 is done (docs/V2_GALLERY.md).
 
 ## What is missing
 
@@ -77,4 +77,4 @@ group may be too big for what is open", and level 55 is "an astrology picture ·
   hand-designed level like the slice, not a generated one.
 - **A world map.** The v2 build has no map screen; the atmosphere is the only world identity players
   see so far, and only on a level whose picture is known. The v1 world map is untouched.
-- Spellbook sections, world-specific completion moments and seals are M13.2 and M13.3.
+- Spellbook sections are done (M13.2); world-specific completion moments and seals are M13.3.
