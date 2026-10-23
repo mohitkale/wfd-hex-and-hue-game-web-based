@@ -119,7 +119,7 @@ _Make collecting cubes enjoyable to watch; deliver one polished playable level. 
 - [x] **M10.2** Physical collection animation — Render the full pick-up-and-deliver sequence from the event stream. _Needs M9.4, M10.1._
 - [x] **M10.3** Swarm behaviour — Show many collectors at once without clutter and without changing outcomes. _Needs M10.2._
 - [x] **M10.4** Movement feedback and sound — Polish movement, carrying, pickup, deposit and completion feedback at 1× and 2×. _Needs M10.2, M10.3._
-- [ ] **M10.5** One complete playable level **(human gate)** — Deliver one manually designed, polished level on the new engine and stop for human evaluation of gameplay feel. _Needs M9.5, M10.4._ Box ticked only after the user approves (G1).
+- [x] **M10.5** One complete playable level **(human gate)** — Deliver one manually designed, polished level on the new engine and stop for human evaluation of gameplay feel. _Needs M9.5, M10.4._ Box ticked only after the user approves (G1).
 
 ### M11 — High-quality witchcraft pixel art and world design
 
