@@ -21,7 +21,7 @@ npm run dev     # then open the URL below (the port is printed, usually 4321)
 
 Use a phone-sized window (or your phone on the same network) for the intended portrait layout. The
 1×/2× button is a review-build control; the real 2× rule (optional rewarded ad) arrives in M14.3.
-Tapping anything yourself, or undo or restart, ends a demo. The demo and the `slice` level are reachable only through `?engine=v2` (`?level=slice` is the default; `demo=lose` is an alias of `demo=slots`). Reduced motion and the sound and haptics settings are honoured.
+Tapping anything yourself, or undo or restart, ends a demo. The demo and the `slice` level are reachable only through `?engine=v2` (`?level=slice` is the default once the tutorial is done or skipped, and always opens it; `demo=lose` is an alias of `demo=slots`). Reduced motion and the sound and haptics settings are honoured.
 
 ## The level
 

@@ -22,8 +22,10 @@ export interface Hint {
 /** What a step can look at: the state and what the board has told the machine so far. */
 export interface Context {
   state: Readonly<collect.CollectState>;
-  /** Flags the board reports: "rejected" (a tap was refused), "undone", "restarted". */
+  /** Flags the board reports: "rejected" (a tap was refused), "undone". */
   seen: ReadonlySet<string>;
+  /** True once the step's hint has been shown (its `ready` was true) at some point. */
+  shown: boolean;
 }
 
 export interface Step {
@@ -31,7 +33,12 @@ export interface Step {
   text: string;
   /** Where to point, from the current state (null: nothing to point at). */
   target: (state: Readonly<collect.CollectState>) => Target;
-  /** True once the player has done what the step teaches. */
+  /**
+   * Whether the hint is true right now (default: always). A step that is not ready shows nothing and
+   * waits: a hint never says "it waits" before anything waits, or "tap Undo" when nothing is lost.
+   */
+  ready?: (state: Readonly<collect.CollectState>) => boolean;
+  /** True once the player has done what the step teaches (or the game has moved past it). */
   done: (c: Context) => boolean;
 }
 
@@ -40,6 +47,7 @@ export const MAX_HINT_WORDS = 6;
 export class Tutorial {
   private at = 0;
   private readonly seen = new Set<string>();
+  private readonly shown = new Set<number>();
   private skipped = false;
 
   constructor(readonly script: readonly Step[]) {
@@ -76,7 +84,9 @@ export class Tutorial {
     if (this.skipped) return null;
     while (this.at < this.script.length) {
       const step = this.script[this.at]!;
-      if (!step.done({ state, seen: this.seen })) {
+      if (!step.done({ state, seen: this.seen, shown: this.shown.has(this.at) })) {
+        if (step.ready && !step.ready(state)) return null;
+        this.shown.add(this.at);
         return { id: step.id, text: step.text, target: step.target(state) };
       }
       this.at++;

@@ -10,7 +10,7 @@ tap, and is finished by something the player did.
 | ------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | `tutorial-summon`  | Summon, watch them carry cubes home, watch the number count down                           | "Tap a group to summon it", "Watch the number count down", "Tap the next group"                                          |
 | `tutorial-blocked` | A buried colour cannot be reached: the refused tap says why, then clear what is in the way | "Red is buried. Tap it", "Clear the blue around it", "Now red is free: tap it"                                           |
-| `tutorial-slots`   | A group with nothing left to reach waits in a slot; send it again when it can              | "Tap the red group", "Nothing left to reach: it waits", "Clear the blue first", "Tap the waiting group"                  |
+| `tutorial-slots`   | A group with nothing left to reach waits in a slot; send it again when it can              | "Tap the red group", "It waits. Clear the blue first", "Tap the waiting group"                                           |
 | `tutorial-undo`    | A bad choice can lose (one slot): Undo takes it back                                       | "Tap the red group", "Now tap the green group", "Out of slots. Tap Undo", "Clear the blue first", "Wake red, then green" |
 
 Each level is at most 5×5 cubes and is verified by the solver. The undo level really does lose when its
@@ -25,8 +25,15 @@ hints are followed to the mistake, and Undo really does recover (both tested).
 - **Steps are finished by the player**, never by a timer or a "Next": the state machine (`tutorial.ts`,
   pure) reads the game state and a few flags the board reports (a refused tap, an undo). It never goes
   back: what was taught stays taught. A restart starts the lesson again.
-- **Skip is always there** ("Skip ›", a 44 css px target). Skipping ends the hints and the tutorial is
-  not offered again.
+- **A hint is shown only when it is true.** A step can say when it is `ready`: "it waits" appears only
+  once a group really waits (and points at the blue to clear), "Now red is free" only once red can be
+  reached, "Out of slots. Tap Undo" only after a loss. If the player takes another road (blue first,
+  say), the steps they have already got past are skipped. Tested by playing other orders and checking
+  every hint against the state on every tick.
+- **Skip is always there** ("Skip ›", a tap target of 44 by 36 css px on its own row, clear of the HUD
+  buttons, hidden once the tutorial is over). Skipping ends the hints **for the whole visit** (a retry
+  or Next does not bring them back) and the tutorial is not offered on later visits. An explicit
+  `?level=tutorial` (or a `tutorial-` level) still opens it, with hints.
 - **Finishing a level** is remembered (`hexhue.v2.tutorial`, its own key); the win card offers **Next**
   (or **Play** after the last, which opens the slice), with Retry always free. Storage trouble only
   means the tutorial is offered again.

@@ -2,11 +2,12 @@ import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
 import { createRng } from "@hexhue/core";
 import { MAX_HINT_WORDS, Tutorial, type Hint, type Step } from "./tutorial";
-import { TUTORIAL, TUTORIAL_IDS, tutorialById } from "./tutorialLevels";
+import { TUTORIAL, TUTORIAL_IDS, createTutorial, tutorialById } from "./tutorialLevels";
 import {
   emptyTutorialBook,
   markDone,
   markSkipped,
+  nextAfter,
   nextTutorial,
   parseTutorialBook,
   readTutorialBook,
@@ -23,6 +24,28 @@ const settle = (session: collect.CollectSession) => {
   }
 };
 
+/**
+ * Whether a hint is true for the state it is shown in: a column hint points at a front group that can
+ * really be tapped (except the lesson that teaches the refusal), a slot hint at an occupied slot, and
+ * the Undo hint appears only after a loss.
+ */
+function hintProblem(hint: Hint, state: collect.CollectState): string | null {
+  const t = hint.target;
+  if (t?.kind === "column") {
+    if (!state.columns[t.index]?.length) return `${hint.id}: column ${t.index} is empty`;
+    const ok = collect.explain(state, { kind: "select", column: t.index }) === "ok";
+    if (!ok && hint.id !== "try-red") return `${hint.id}: column ${t.index} cannot be tapped now`;
+  }
+  if (t?.kind === "slot" && state.slots[t.index] == null)
+    return `${hint.id}: slot ${t.index} is empty`;
+  if (t?.kind === "undo" && state.status !== "lost")
+    return `${hint.id}: Undo is pointed at but nothing is lost`;
+  if (hint.id === "waits" && !state.slots.some((id) => id !== null)) return "waits: nothing waits";
+  if (hint.id === "red-free" && !collect.hasAssignable(state, 1))
+    return "red-free: red is not reachable yet";
+  return null;
+}
+
 /** Plays a tutorial level by doing exactly what each hint points at; returns the hints it showed. */
 function followHints(id: string): { won: boolean; hints: Hint[] } {
   const t = tutorialById(id)!;
@@ -31,6 +54,7 @@ function followHints(id: string): { won: boolean; hints: Hint[] } {
   const hints: Hint[] = [];
   const look = (): Hint | null => {
     const hint = tutorial.update(session.state);
+    if (hint) expect(hintProblem(hint, session.state), `${id}`).toBeNull();
     if (hint && hints[hints.length - 1]?.id !== hint.id) hints.push(hint);
     return hint;
   };
@@ -164,7 +188,6 @@ describe("the four tutorial levels", () => {
     expect(followHints("tutorial-slots").hints.map((h) => h.id)).toEqual([
       "send-red",
       "waits",
-      "clear-blue",
       "wake",
     ]);
     expect(followHints("tutorial-undo").hints.map((h) => h.id)).toEqual([
@@ -213,10 +236,7 @@ describe("the tutorial never gets in the way", () => {
           const hint = tutorial.update(session.state);
           expect(tutorial.position, `${t.id} seed ${seed}`).toBeGreaterThanOrEqual(last);
           last = tutorial.position;
-          if (hint?.target?.kind === "column")
-            expect(hint.target.index).toBeLessThan(session.state.columns.length);
-          if (hint?.target?.kind === "slot")
-            expect(hint.target.index).toBeLessThan(session.state.slots.length);
+          if (hint) expect(hintProblem(hint, session.state), `${t.id} seed ${seed}`).toBeNull();
         }
       }
     }
@@ -343,5 +363,118 @@ describe("where a visit starts", () => {
       expect(DEV_LEVELS[id]).toBeDefined();
       expect(levelFromSearch("", id).id).toBe(id);
     }
+  });
+});
+
+describe("other roads: the hint stays true when the player does things in another order", () => {
+  /** Taps these actions in order (skipping any that is refused), checking every hint on every tick. */
+  const play = (id: string, actions: collect.Action[]) => {
+    const t = tutorialById(id)!;
+    const session = new collect.CollectSession(t.make());
+    const tutorial = new Tutorial(t.script());
+    const seenHints: string[] = [];
+    const look = () => {
+      const hint = tutorial.update(session.state);
+      if (hint) {
+        expect(hintProblem(hint, session.state), id).toBeNull();
+        if (seenHints[seenHints.length - 1] !== hint.id) seenHints.push(hint.id);
+      }
+    };
+    for (const a of actions) {
+      look();
+      const r = session.tap(a);
+      if (!r.ok) tutorial.note("rejected");
+      for (let i = 0; i < 100_000 && session.tick() !== null; i++) look();
+    }
+    look();
+    return { session, tutorial, seenHints };
+  };
+  const sel = (column: number): collect.Action => ({ kind: "select", column });
+  const res = (slot: number): collect.Action => ({ kind: "resume", slot });
+
+  it("slots: blue first means red never waits, and 'it waits' is never said", () => {
+    const { session, seenHints } = play("tutorial-slots", [sel(2), sel(0), sel(1)]);
+    expect(session.state.status).toBe("won");
+    expect(seenHints).not.toContain("waits");
+  });
+
+  it("slots: the hint points at the slot only once something is in it", () => {
+    const { seenHints } = play("tutorial-slots", [sel(0), sel(2), res(0), sel(1)]);
+    expect(seenHints).toContain("waits");
+  });
+
+  it("undo: another road never shows the Undo hint when nothing was lost", () => {
+    for (const order of [
+      [sel(0), sel(2), res(0), sel(1)],
+      [sel(2), sel(0), sel(1)],
+      [sel(0), sel(2), sel(1), res(0)],
+    ]) {
+      const { seenHints } = play("tutorial-undo", order);
+      expect(seenHints, JSON.stringify(order)).not.toContain("undo");
+    }
+  });
+
+  it("undo: the real loss does show it, and only then", () => {
+    const { seenHints, session } = play("tutorial-undo", [sel(0), sel(1)]);
+    expect(session.state.status).toBe("lost");
+    expect(seenHints[seenHints.length - 1]).toBe("undo");
+  });
+
+  it("buried colour: clearing the blue first (never trying red) still teaches the way through", () => {
+    const { session, seenHints } = play("tutorial-blocked", [sel(1), sel(0)]);
+    expect(session.state.status).toBe("won");
+    // The first hint is on screen before the player's first tap; nothing asks for the refusal after it.
+    expect(seenHints).toEqual(["try-red", "red-free"]);
+  });
+
+  it("summon: the second group first is fine too", () => {
+    const { session } = play("tutorial-summon", [sel(1), sel(0)]);
+    expect(session.state.status).toBe("won");
+  });
+});
+
+describe("a step waits until its hint is true", () => {
+  const state = (over: Partial<collect.CollectState> = {}) =>
+    ({ status: "playing", deliveredTotal: 0, ...over }) as collect.CollectState;
+  it("shows nothing (and does not advance) while not ready, then shows it", () => {
+    let ready = false;
+    const t = new Tutorial([
+      {
+        id: "a",
+        text: "Tap it",
+        target: () => null,
+        ready: () => ready,
+        done: ({ shown }) => shown && ready,
+      },
+      { id: "b", text: "Then this", target: () => null, done: () => false },
+    ]);
+    expect(t.update(state())).toBeNull();
+    expect(t.position).toBe(0);
+    ready = true;
+    expect(t.update(state())?.id).toBe("a"); // now shown
+    expect(t.update(state())?.id).toBe("b"); // done: shown and ready
+  });
+});
+
+describe("Skip lasts the whole visit", () => {
+  it("a machine made after a skip (a retry, or Next) shows nothing", () => {
+    for (const id of TUTORIAL_IDS) {
+      const t = createTutorial(id, true)!;
+      const session = new collect.CollectSession(tutorialById(id)!.make());
+      expect(t.update(session.state)).toBeNull();
+      expect(t.finished).toBe(true);
+      expect(createTutorial(id, false)!.update(session.state)).not.toBeNull();
+    }
+    expect(createTutorial("not-a-tutorial")).toBeNull();
+  });
+
+  it("Next goes on to the level after the one just finished, then back to any not finished", () => {
+    let book = emptyTutorialBook();
+    expect(nextAfter(book, "tutorial-summon")).toBe("tutorial-blocked");
+    // Finishing the last one first: back to the first not finished.
+    book = markDone(book, "tutorial-undo");
+    expect(nextAfter(book, "tutorial-undo")).toBe("tutorial-summon");
+    for (const id of TUTORIAL_IDS) book = markDone(book, id);
+    expect(nextAfter(book, "tutorial-undo")).toBeNull();
   });
 });

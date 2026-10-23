@@ -1,5 +1,5 @@
-import type * as collect from "@hexhue/core/collect";
-import type { Step, Target } from "./tutorial";
+import * as collect from "@hexhue/core/collect";
+import { Tutorial, type Step, type Target } from "./tutorial";
 
 /**
  * The four tutorial levels (M14.2, docs/V2_ONBOARDING.md), each tiny, each teaching one thing and
@@ -103,6 +103,8 @@ const blockedScript: Step[] = [
     id: "red-free",
     text: "Now red is free: tap it",
     target: () => col(0),
+    // Only once red can really be reached (a moment after the blue is summoned).
+    ready: (s) => collect.hasAssignable(s, 1),
     done: ({ state }) => won(state) || started(state, 1),
   },
 ];
@@ -128,20 +130,18 @@ const slotsScript: Step[] = [
   },
   {
     id: "waits",
-    text: "Nothing left to reach: it waits",
-    target: () => ({ kind: "slot", index: 0 }),
-    done: ({ state }) => state.slots.some((id) => id !== null) || won(state),
-  },
-  {
-    id: "clear-blue",
-    text: "Clear the blue first",
+    text: "It waits. Clear the blue first",
+    // Once red really waits in a slot; the blue column is what to tap.
     target: () => col(2),
-    done: ({ state }) => started(state, 0),
+    ready: (s) => firstWaiting(s) >= 0,
+    // Or the player cleared the blue first and red never had to wait: the lesson moves on.
+    done: ({ state }) => started(state, 0) || state.groups[0]!.status === "completed" || won(state),
   },
   {
     id: "wake",
     text: "Tap the waiting group",
     target: (s) => ({ kind: "slot", index: Math.max(0, firstWaiting(s)) }),
+    ready: (s) => firstWaiting(s) >= 0,
     done: ({ state }) => state.slots.every((id) => id === null),
   },
 ];
@@ -175,7 +175,12 @@ const undoScript: Step[] = [
     id: "undo",
     text: "Out of slots. Tap Undo",
     target: () => ({ kind: "undo" }),
-    done: ({ seen, state }) => seen.has("undone") && state.status === "playing",
+    // Only when something really was lost; if the player took another road, the lesson moves on.
+    ready: (s) => s.status === "lost",
+    done: ({ state, seen, shown }) =>
+      (shown && seen.has("undone") && state.status === "playing") ||
+      won(state) ||
+      started(state, 0),
   },
   {
     id: "blue",
@@ -195,6 +200,15 @@ const undoScript: Step[] = [
     done: ({ state }) => won(state),
   },
 ];
+
+/** A machine for a tutorial level; `skipped` ones show nothing (Skip is for the whole visit). */
+export function createTutorial(id: string, skipped = false): Tutorial | null {
+  const t = tutorialById(id);
+  if (!t) return null;
+  const machine = new Tutorial(t.script());
+  if (skipped) machine.skip();
+  return machine;
+}
 
 export interface TutorialLevel {
   id: string;

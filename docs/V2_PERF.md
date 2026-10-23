@@ -6,7 +6,7 @@ measured.
 
 ## What is measured
 
-`?engine=v2&level=big&profile=1` turns on a profiler (`CollectScene.perf()`, also reachable as
+`?engine=v2&level=big&profile=1` turns on a profiler (always pass `level=`: with none, a clean browser profile now opens the tutorial, docs/V2_ONBOARDING.md) (`CollectScene.perf()`, also reachable as
 `window.__collect.perf()` in that build):
 
 | Metric                                           | Meaning                                                                                            |

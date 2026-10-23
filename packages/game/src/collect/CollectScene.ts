@@ -22,14 +22,14 @@ import { CollectHud } from "./CollectHud";
 import { PortalView } from "./PortalView";
 import { buildEndCard } from "./EndCard";
 import { Toast } from "./Toast";
-import { Tutorial } from "./tutorial";
+import type { Tutorial } from "./tutorial";
 import { TutorialLayer } from "./TutorialLayer";
-import { tutorialById } from "./tutorialLevels";
+import { createTutorial } from "./tutorialLevels";
 import {
   emptyTutorialBook,
   markDone,
   markSkipped,
-  nextTutorial,
+  nextAfter,
   readTutorialBook,
   saveTutorialBook,
   type TutorialBook,
@@ -175,7 +175,9 @@ export class CollectScene extends Phaser.Scene {
     this.tutorialBook = readTutorialBook(browserStore()).book;
     const tutorialId = daily ? null : tutorialStart(search, chosen, this.tutorialBook);
     this.tutorialId = tutorialId;
-    this.tutorial = tutorialId ? new Tutorial(tutorialById(tutorialId)!.script()) : null;
+    this.tutorial = tutorialId
+      ? createTutorial(tutorialId, this.registry.get("v2.tutorialSkipped") === true)
+      : null;
     this.tutorialSaved = false;
     const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     const params = new URLSearchParams(search);
@@ -200,7 +202,10 @@ export class CollectScene extends Phaser.Scene {
         // Undo is something the tutorial teaches; a restart starts its lesson over.
         if (reason === "undo") this.tutorial?.note("undone");
         else if (this.tutorialId) {
-          this.tutorial = new Tutorial(tutorialById(this.tutorialId)!.script());
+          this.tutorial = createTutorial(
+            this.tutorialId,
+            this.registry.get("v2.tutorialSkipped") === true,
+          );
           this.tutorialSaved = false;
         }
         this.demo = null;
@@ -707,12 +712,17 @@ export class CollectScene extends Phaser.Scene {
 
   /** Shows the tutorial's current hint (or nothing). */
   private refreshTutorial(): void {
-    this.tutorialLayer?.show(this.tutorial?.update(this.session.state) ?? null);
+    this.tutorialLayer?.show(
+      this.tutorial?.update(this.session.state) ?? null,
+      this.tutorial !== null && !this.tutorial.finished,
+    );
   }
 
   /** "Skip": no more hints, and the tutorial is not offered again on later visits. */
   private skipTutorial(): void {
     this.tutorial?.skip();
+    // For the rest of the visit (a retry or Next must not bring the hints back) and for later visits.
+    this.registry.set("v2.tutorialSkipped", true);
     this.tutorialBook = markSkipped(this.tutorialBook);
     saveTutorialBook(browserStore(), this.tutorialBook);
     this.refreshTutorial();
@@ -727,12 +737,12 @@ export class CollectScene extends Phaser.Scene {
       this.tutorialBook = markDone(this.tutorialBook, id);
       saveTutorialBook(browserStore(), this.tutorialBook);
     }
-    const more = nextTutorial(this.tutorialBook) !== null;
+    const following = nextAfter(this.tutorialBook, id);
     return {
-      label: more ? "Next" : "Play",
+      label: following ? "Next" : "Play",
       onPress: () => {
-        // "tutorial" resolves to the first level not finished; after the last, on to the slice.
-        this.registry.set("v2.level", more ? "tutorial" : "slice");
+        // On to the next level not finished; after the last, on to the slice.
+        this.registry.set("v2.level", following ?? "slice");
         this.scene.restart();
       },
     };

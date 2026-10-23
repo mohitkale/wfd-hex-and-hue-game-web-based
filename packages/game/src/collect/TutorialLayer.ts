@@ -25,6 +25,8 @@ export function targetRect(
 export class TutorialLayer {
   private readonly caption: Phaser.GameObjects.Text;
   private readonly ring: Phaser.GameObjects.Graphics;
+  private readonly skipLabel: Phaser.GameObjects.Text;
+  private readonly skipZone: Phaser.GameObjects.Zone;
   private ringTween: Phaser.Tweens.Tween | null = null;
   private shown = "";
 
@@ -35,7 +37,18 @@ export class TutorialLayer {
   ) {
     const l = layout;
     const dpr = l.dpr;
-    const top = l.hud.y + l.hud.h + 4 * dpr;
+    // The row sits below the HUD's tap targets (which reach a little past the HUD on a short screen).
+    const top = l.hud.y + l.hud.h + 8 * dpr;
+    this.skipLabel = scene.add
+      .text(l.frame.x + l.frame.w - 14 * dpr, top + 2 * dpr, "Skip ›", {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(13 * dpr)}px`,
+        color: theme.textDim,
+      })
+      .setOrigin(1, 0)
+      .setDepth(30);
+    // The caption is centred, so it keeps clear of Skip on both sides.
+    const room = l.frame.w - 2 * (this.skipLabel.width + 20 * dpr) - 24 * dpr;
     this.caption = scene.add
       .text(l.frame.x + l.frame.w / 2, top, "", {
         fontFamily: theme.font,
@@ -45,35 +58,33 @@ export class TutorialLayer {
         backgroundColor: "#f6d97a",
         padding: { x: 12 * dpr, y: 6 * dpr },
         align: "center",
-        wordWrap: { width: l.frame.w * 0.7 },
+        wordWrap: { width: Math.max(80 * dpr, Math.min(l.frame.w * 0.7, room)) },
       })
       .setOrigin(0.5, 0)
       .setDepth(30)
       .setVisible(false);
     this.ring = scene.add.graphics().setDepth(26);
-    const skip = scene.add
-      .text(l.frame.x + l.frame.w - 14 * dpr, top + 2 * dpr, "Skip ›", {
-        fontFamily: theme.font,
-        fontSize: `${Math.round(13 * dpr)}px`,
-        color: theme.textDim,
-      })
-      .setOrigin(1, 0)
-      .setDepth(30);
-    // A 44 css px tap target around the small label.
-    scene.add
+    // A 44 css px wide, 36 css px tall tap target around the small label, clear of the HUD.
+    this.skipZone = scene.add
       .zone(
-        skip.x - skip.width / 2,
-        skip.y + skip.height / 2,
-        Math.max(skip.width + 20 * dpr, 44 * dpr),
-        44 * dpr,
+        this.skipLabel.x - this.skipLabel.width / 2,
+        this.skipLabel.y + this.skipLabel.height / 2,
+        Math.max(this.skipLabel.width + 20 * dpr, 44 * dpr),
+        36 * dpr,
       )
       .setDepth(31)
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", onSkip);
   }
 
-  /** Shows `hint` (or clears everything for null); redraws only when it changed. */
-  show(hint: Hint | null): void {
+  /**
+   * Shows `hint` (nothing for null, e.g. while waiting for something to become true); `active` says
+   * whether the tutorial is still running, which keeps Skip on screen. Redraws only on a change.
+   */
+  show(hint: Hint | null, active: boolean): void {
+    this.skipLabel.setVisible(active);
+    if (active) this.skipZone.setInteractive({ useHandCursor: true });
+    else this.skipZone.disableInteractive();
     const key = hint ? `${hint.id}|${JSON.stringify(hint.target)}` : "";
     if (key === this.shown) return;
     this.shown = key;
@@ -89,8 +100,10 @@ export class TutorialLayer {
     if (!r) return;
     const dpr = this.layout.dpr;
     const pad = 3 * dpr;
+    // Never drawn above the frame, even for a tap target taller than a short screen's HUD.
+    const y = Math.max(this.layout.frame.y, r.y - pad);
     this.ring.lineStyle(Math.max(2, Math.round(2.5 * dpr)), theme.glow, 1);
-    this.ring.strokeRoundedRect(r.x - pad, r.y - pad, r.w + 2 * pad, r.h + 2 * pad, 14 * dpr);
+    this.ring.strokeRoundedRect(r.x - pad, y, r.w + 2 * pad, r.y + r.h + pad - y, 14 * dpr);
     if (!isReducedMotion(this.scene)) {
       this.ringTween = this.scene.tweens.add({
         targets: this.ring,

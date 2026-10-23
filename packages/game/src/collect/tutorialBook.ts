@@ -40,6 +40,13 @@ export const markSkipped = (book: TutorialBook): TutorialBook => ({ ...book, ski
 export const nextTutorial = (book: TutorialBook): string | null =>
   TUTORIAL_IDS.find((id) => !book.done.includes(id)) ?? null;
 
+/** The tutorial level to go on to after `id`: the next one not finished, else the first not finished. */
+export function nextAfter(book: TutorialBook, id: string): string | null {
+  const at = TUTORIAL_IDS.indexOf(id);
+  const todo = TUTORIAL_IDS.filter((x) => !book.done.includes(x));
+  return todo.find((x) => TUTORIAL_IDS.indexOf(x) > at) ?? todo[0] ?? null;
+}
+
 /** True when a first visit should start in the tutorial: not skipped and not finished. */
 export const shouldOfferTutorial = (book: TutorialBook): boolean =>
   !book.skipped && nextTutorial(book) !== null;
