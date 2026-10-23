@@ -44,13 +44,6 @@ export function topologyFor(width: number, height: number): Topology {
 export const paddedIndex = (stride: number, x: number, y: number): number =>
   (y + 1) * stride + (x + 1);
 
-/** True if the padded cell is part of the mosaic (not the ring). */
-export function inMosaic(t: Topology, cell: number): boolean {
-  const px = cell % t.stride;
-  const py = Math.floor(cell / t.stride);
-  return px >= 1 && px <= t.stride - 2 && py >= 1 && py <= t.rows - 2;
-}
-
 /** Pads `cells` (unpadded, row-major) with an empty ring. */
 export function padCells(width: number, height: number, cells: readonly number[]): number[] {
   const stride = width + 2;
