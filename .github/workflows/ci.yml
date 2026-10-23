@@ -24,6 +24,9 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
+      # The v2 art library (M11.4) and the v2 level quality gate (M12.6): both fail the build.
+      - run: npm run art:check
+      - run: npm run levels:check
       - run: npm run build
       - run: npm run budget
 

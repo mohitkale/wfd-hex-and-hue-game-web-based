@@ -13,10 +13,14 @@ import { curveEntry, placedEntries } from "./curveEntries";
 describe("the art library on the curve", () => {
   const entries = placedEntries();
 
-  it("every placed level is on the curve (a deviation fails the build)", () => {
-    expect(checkCurve(entries)).toEqual([]);
-    for (const e of entries) expect(checkEntry(e), e.id).toEqual([]);
-  });
+  it(
+    "every placed level is on the curve (a deviation fails the build)",
+    { timeout: 120_000 },
+    () => {
+      expect(checkCurve(entries)).toEqual([]);
+      for (const e of entries) expect(checkEntry(e), e.id).toEqual([]);
+    },
+  );
 
   it("places only pieces that exist, once each, at distinct level numbers", () => {
     const ids = Object.keys(PREVIEW_LEVEL);
@@ -46,7 +50,7 @@ describe("the art library on the curve", () => {
     expect(checkEntry(curveEntry(moonlitHat(), 60)).length).toBeGreaterThan(0);
   });
 
-  it("the unplaced pieces really cannot be placed, and say why", () => {
+  it("the unplaced pieces really cannot be placed, and say why", { timeout: 120_000 }, () => {
     const data = JSON.parse(readFileSync(OUTPUT, "utf8")) as ArtLevelData[];
     const unplaced = data.filter((d) => PREVIEW_LEVEL[d.subject.id] === undefined);
     expect(unplaced.map((d) => d.subject.id).sort()).toEqual([

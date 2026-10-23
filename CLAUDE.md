@@ -85,6 +85,8 @@ npm run art:check    # v2 art library: art-bible rules + provenance/review (in v
 npm run art:sheet    # dist/art-sheet.html: v2 pieces at full and phone size with rule results
 npm run art:levels    # playable preview level per v2 art piece (committed JSON; test fails if stale)
 npm run strategy:report # simulated players per level and tiers satisfied (docs/V2_STRATEGIES.md)
+npm run levels:report  # dist/levels-report.html: v2 level quality report (docs/V2_LEVEL_GATE.md)
+npm run levels:check   # v2 level gate: unsolvable/trivial/out-of-band fail (in verify/CI)
 npm run measures:report # decision measures + difficulty score per level (docs/V2_MEASURES.md)
 npm run solver:report # solver over the slice and art preview levels (docs/V2_SOLVER.md)
 npm run density      # cube size per phone and bot play time per board size (docs/V2_ART_DENSITY.md)
