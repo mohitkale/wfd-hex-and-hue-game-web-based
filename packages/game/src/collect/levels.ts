@@ -1,6 +1,6 @@
 import * as collect from "@hexhue/core/collect";
 import { createRng } from "@hexhue/core";
-import { LOSE_LINES, WIN_LINE, moonlitHat } from "./slice";
+import { LOSE_LINES, SLICE_ID, WIN_LINE, moonlitHat } from "./slice";
 
 /**
  * Levels for the `?engine=v2` review build. The vertical-slice level (M10.5) replaces `demo` as the
@@ -180,7 +180,7 @@ export function demoLineFromSearch(
   search: string,
   level: collect.CollectLevel,
 ): readonly collect.Action[] | null {
-  if (level.id !== moonlitHat().id) return null;
+  if (level.id !== SLICE_ID) return null;
   const demo = new URLSearchParams(search).get("demo");
   if (demo === "win") return WIN_LINE;
   if (demo === "lose" || demo === "slots") return LOSE_LINES.slots;

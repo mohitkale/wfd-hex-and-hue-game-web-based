@@ -14,14 +14,14 @@ npm run dev     # then open the URL below (the port is printed, usually 4321)
 | URL                              | What you get                                                                               |
 | -------------------------------- | ------------------------------------------------------------------------------------------ |
 | `/play/?engine=v2`               | The slice level, to play yourself                                                          |
-| `/play/?engine=v2&demo=win`      | The recorded winning line, played for you (about 90 s at 1×; add `&speed=2` to halve it)   |
+| `/play/?engine=v2&demo=win`      | The recorded winning line, played for you (about 100 s at 1×, about 50 s with `&speed=2`)  |
 | `/play/?engine=v2&demo=slots`    | A losing line: two groups park, a third runs dry with both slots full ("Out of slots")     |
 | `/play/?engine=v2&demo=deadlock` | The quickest loss: two taps leave nothing that can reach the cubes that are left ("Stuck") |
 | add `&cb=1`                      | Colour-blind symbols                                                                       |
 
 Use a phone-sized window (or your phone on the same network) for the intended portrait layout. The
 1×/2× button is a review-build control; the real 2× rule (optional rewarded ad) arrives in M14.3.
-Tapping undo or restart ends a demo. Reduced motion and the sound and haptics settings are honoured.
+Tapping anything yourself, or undo or restart, ends a demo. The demo and the `slice` level are reachable only through `?engine=v2` (`?level=slice` is the default; `demo=lose` is an alias of `demo=slots`). Reduced motion and the sound and haptics settings are honoured.
 
 ## The level
 
@@ -65,7 +65,15 @@ these moves of the winning line, a plausible alternative could not be recovered 
 | 7   | red 11           | cyan 11 → loses at once                                                  |
 | 8   | blue 48          | cyan 11 → loses at once                                                  |
 
-The level has other winning lines, not just this one; the point is that most orders do not win.
+The level has other winning lines, not just this one.
+
+**An honest limit of this level:** the traps are all in the first eight taps. The cheap strategies
+below all lose, but only because none of them opens with the middle column. Once you have made the
+one correct first tap, right-to-left column spam, "resume first then right-most" and "always the
+smallest group" all win, and no later tap can strand you. Random tapping wins 32 of 200 seeded runs
+(16%). So the slice shows real decisions and slot consequences early and gets forgiving afterwards;
+it is not yet the depth the finished levels need (that is the generator and anti-triviality work,
+M12). Please judge it with that in mind.
 
 ## What was checked, and what was not
 
@@ -73,16 +81,17 @@ Checked headlessly (all in `tools/collect/slice.test.ts`, run by `npm run verify
 valid; the recorded winning line wins and delivers all 196 cubes; the two recorded losses lose for
 the stated reasons; the level is solvable by exhaustive search; taking away one slot makes the
 winning line lose; at least three decisions on the winning line have a losing alternative, the very
-first among them; and none of the cheap strategies wins (column-spam left to right, right to left
-and round-robin, resume-first in both directions, always largest, always smallest, always most cubes).
-Random tapping won under 25% of 200 seeded runs and more than none.
+first among them; and each of eight cheap strategies (column-spam left to right, right to left and round-robin,
+resume-first in both directions, always largest, always smallest, always most cubes) ends in a loss
+from the start; given the correct opening, three of them win (see the limit above). Random tapping
+wins 32 of 200 seeded runs.
 
 **Not checked, because only a person can:** whether it _feels_ good (the pace of pick-up and
 deliver, the swarm, the sounds and vibration, the completion), whether the choices are readable
 without reading this page, whether the two-minute length is right, and how it runs on a real phone
 (see `docs/V2_PERF.md`: desktop numbers only). Known rough edges: on a short phone screen the
 browser's own bottom bar can cover the second row of queued groups (the play-screen redesign is
-M14.1), and the picture is placeholder art.
+M14.1); in `two-groups-parked.jpg` a waiting badge is caught mid-move and overlaps the working strip, and the picture is placeholder art.
 
 ## Questions for you (G1)
 
@@ -92,7 +101,7 @@ M14.1), and the picture is placeholder art.
    group was waiting?
 3. Did the first choice feel like a real decision? Did you find the losing lines naturally?
 4. Do the sounds and effects help or annoy? Any you would remove?
-5. Is a run of about 90 seconds right for one level?
+5. Is a level of about 90 seconds of board time at 1× (plus your thinking time) right?
 6. Anything that would make you stop playing?
 
 Please also say explicitly whether the gate is approved (continue to M11, art) or what must change

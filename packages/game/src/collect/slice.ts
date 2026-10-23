@@ -32,9 +32,12 @@ const g = (letter: string, capacity: number): collect.GroupSpec => ({
   capacity,
 });
 
+/** The slice level's id (compared by the demo hook without building the level). */
+export const SLICE_ID = "slice-moonlit-hat";
+
 export function moonlitHat(): collect.CollectLevel {
   return {
-    id: "slice-moonlit-hat",
+    id: SLICE_ID,
     name: "Moonlit Hat",
     width: ART[0]!.length,
     height: ART.length,

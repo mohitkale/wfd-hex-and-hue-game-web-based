@@ -75,37 +75,71 @@ describe("Moonlit Hat (the vertical slice)", () => {
     expect(s.lossReason).toBe("slotsFull");
   });
 
-  it("has at least three real decisions on the way: choices that make the level unwinnable", () => {
+  it("the traps on the winning line are exactly the ones the guide lists (taps 1, 2, 4, 7, 8)", () => {
     const solvable = makeSolvable();
     const s = collect.createCollectState(level);
-    const decisions: { step: number; winning: number; of: number }[] = [];
-    for (const [step, action] of WIN_LINE.entries()) {
+    const decisions: { tap: number; winning: number; of: number }[] = [];
+    const parked: number[] = [];
+    for (const [i, action] of WIN_LINE.entries()) {
       const legal = collect.legalActions(s);
       const winning = legal.filter((a) => solvable(settled(s, a))).length;
-      if (winning < legal.length) decisions.push({ step, winning, of: legal.length });
+      if (winning < legal.length) decisions.push({ tap: i + 1, winning, of: legal.length });
       collect.apply(s, action);
       collect.runUntilSettled(s);
+      if (i === 0 || i === 2) {
+        // After tap 1 and tap 3 a group waits in a slot with this many cubes left.
+        parked.push(
+          ...s.slots
+            .filter((x): x is number => x !== null)
+            .map((x) => s.groups[x]!.capacity - s.groups[x]!.delivered),
+        );
+      }
     }
     expect(s.status).toBe("won");
-    expect(decisions.length).toBeGreaterThanOrEqual(3);
-    // The very first tap is a real decision: only one of the three fronts keeps the level winnable.
-    expect(decisions[0]).toEqual({ step: 0, winning: 1, of: 3 });
-    // A trap can also come late: some step after the halfway point still has a losing option.
-    expect(decisions.some((d) => d.step >= 5)).toBe(true);
+    expect(decisions.map((d) => d.tap)).toEqual([1, 2, 4, 7, 8]);
+    // The very first tap: only one of the three fronts keeps the level winnable.
+    expect(decisions[0]).toEqual({ tap: 1, winning: 1, of: 3 });
+    // Cyan parks with 7 left after tap 1; after tap 3 gold has parked with 6 left beside it.
+    expect(parked).toEqual([7, 7, 6]);
   });
 
-  it("cheap strategies do not win it: column-spam in every order, tidy, largest, smallest, greedy", () => {
-    const playWith = (
-      pick: (s: State, legal: collect.Action[]) => collect.Action,
-    ): collect.GameStatus => {
+  it("cheap strategies lose from the start (each ends in a real loss), and so do most orders", () => {
+    for (const [name, result] of Object.entries(runCheapPlayers(false))) {
+      expect(result.status, name).toBe("lost");
+      expect(result.taps, name).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * An honest limit, pinned so it cannot be forgotten: the traps are all in the first eight taps.
+   * Given the one correct opening, three of the cheap strategies win. Depth after the opening is a
+   * known weakness of this slice level (docs/V2_SLICE.md), to be addressed by the generator work.
+   */
+  it("after the correct opening, right-to-left spam, tidy-right and smallest still win", () => {
+    const results = runCheapPlayers(true);
+    const winners = Object.entries(results)
+      .filter(([, r]) => r.status === "won")
+      .map(([n]) => n)
+      .sort();
+    expect(winners).toEqual(["lastFront", "smallest", "tidyRight"]);
+  });
+
+  function runCheapPlayers(afterOpening: boolean) {
+    const run = (pick: (s: State, legal: collect.Action[]) => collect.Action) => {
       const s = collect.createCollectState(level);
+      let taps = 0;
+      if (afterOpening) {
+        collect.apply(s, WIN_LINE[0]!);
+        collect.runUntilSettled(s);
+      }
       for (let i = 0; i < 60 && s.status === "playing"; i++) {
         const legal = collect.legalActions(s);
         if (legal.length === 0) break;
         collect.apply(s, pick(s, legal));
         collect.runUntilSettled(s);
+        taps++;
       }
-      return s.status;
+      return { status: s.status, taps };
     };
     const fronts = (l: collect.Action[]) => l.filter((a) => a.kind === "select");
     const left = (l: collect.Action[]) => fronts(l)[0] ?? l[0]!;
@@ -115,26 +149,27 @@ describe("Moonlit Hat (the vertical slice)", () => {
       return s.groups[id]!.capacity - s.groups[id]!.delivered;
     };
     const delivered = (s: State, a: collect.Action) => settled(s, a).deliveredTotal;
-    let last = -1;
-    const players: Record<string, (s: State, l: collect.Action[]) => collect.Action> = {
-      firstFront: (_s, l) => left(l),
-      lastFront: (_s, l) => right(l),
-      roundRobin: (_s, l) => {
+    const roundRobin = () => {
+      let last = -1;
+      return (_s: State, l: collect.Action[]) => {
         const cols = fronts(l) as { kind: "select"; column: number }[];
         const next = cols.find((a) => a.column > last) ?? cols[0] ?? l[0]!;
         last = next.kind === "select" ? next.column : last;
         return next;
-      },
+      };
+    };
+    const players: Record<string, (s: State, l: collect.Action[]) => collect.Action> = {
+      firstFront: (_s, l) => left(l),
+      lastFront: (_s, l) => right(l),
+      roundRobin: roundRobin(),
       tidyLeft: (_s, l) => l.find((a) => a.kind === "resume") ?? left(l),
       tidyRight: (_s, l) => l.find((a) => a.kind === "resume") ?? right(l),
       largest: (s, l) => l.reduce((b, a) => (remaining(s, a) > remaining(s, b) ? a : b)),
       smallest: (s, l) => l.reduce((b, a) => (remaining(s, a) < remaining(s, b) ? a : b)),
       mostDelivered: (s, l) => l.reduce((b, a) => (delivered(s, a) > delivered(s, b) ? a : b)),
     };
-    for (const [name, pick] of Object.entries(players)) {
-      expect(playWith(pick), name).not.toBe("won");
-    }
-  });
+    return Object.fromEntries(Object.entries(players).map(([n, p]) => [n, run(p)]));
+  }
 
   it("random tapping rarely wins (under one run in four)", () => {
     let wins = 0;
@@ -150,6 +185,6 @@ describe("Moonlit Hat (the vertical slice)", () => {
       if (s.status === "won") wins++;
     }
     expect(wins).toBeGreaterThan(0); // winnable by luck, not impossible
-    expect(wins / 200).toBeLessThan(0.25);
+    expect(wins).toBe(32); // 16% of these 200 seeded runs (the doc quotes it)
   });
 });

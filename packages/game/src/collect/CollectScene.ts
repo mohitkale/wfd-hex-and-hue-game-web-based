@@ -59,8 +59,8 @@ export class CollectScene extends Phaser.Scene {
   };
   /**
    * `?demo=win|lose` (review builds): taps a recorded line one action at a time whenever the board
-   * has settled, so a reviewer can watch a winning or a losing sequence. Any manual undo or restart
-   * ends it.
+   * has settled, so a reviewer can watch a winning or a losing sequence. Any manual tap, undo or
+   * restart ends it.
    */
   private demo: { line: readonly collect.Action[]; next: number; readyAt: number } | null = null;
   /** The time of the latest frame, for effects started by events between frames. */
@@ -399,7 +399,9 @@ export class CollectScene extends Phaser.Scene {
     });
   }
 
-  private tap(action: collect.Action): void {
+  /** `fromDemo` marks taps made by the demo player; any other tap takes over and ends the demo. */
+  private tap(action: collect.Action, fromDemo = false): void {
+    if (!fromDemo) this.demo = null;
     if (this.overlay.length > 0) return;
     const result = this.session.tap(action);
     if (!result.ok) {
@@ -486,12 +488,13 @@ export class CollectScene extends Phaser.Scene {
   private stepDemo(time: number): void {
     const d = this.demo;
     if (!d || this.overlay.length > 0 || this.session.state.status !== "playing") return;
+    if (d.readyAt === 0) d.readyAt = time + 1200 / this.speed; // let the board be seen first
     if (!collect.isSettled(this.session.state)) {
-      d.readyAt = time + 900;
+      d.readyAt = time + 900 / this.speed;
       return;
     }
     if (time < d.readyAt || d.next >= d.line.length) return;
-    this.tap(d.line[d.next++]!);
+    this.tap(d.line[d.next++]!, true);
   }
 
   /** A finished group: its badge blooms and throws sparks in its own colour. */
