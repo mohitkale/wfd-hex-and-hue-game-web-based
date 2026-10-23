@@ -1,30 +1,36 @@
 import Phaser from "phaser";
-import { FAMILIAR_H, FAMILIAR_W, FRAME_NAMES, frameRgba, type FrameName } from "./familiarArt";
+import { FRAME_NAMES } from "./familiarArt";
+import { atlasFrameName, atlasKey, atlasLayout, atlasRgba } from "./familiarAtlas";
 
-/** Texture key for the familiar sheet of one cube colour. */
-export const familiarKey = (colorHex: string): string => `familiar-${colorHex.toLowerCase()}`;
+const PREFIX = "familiars:";
 
 /**
- * Builds one small canvas texture per cube colour (all frames side by side) and registers each
- * frame by name, with nearest-neighbour filtering so the pixels stay crisp when scaled by a whole
- * number. Cheap: 16 colours × 8 frames of 16×14 pixels. Safe to call repeatedly.
+ * Builds the single packed familiar atlas for a level's colours (one texture, one draw batch,
+ * 128 × 14·n pixels for n ≤ 16 colours) and registers every frame as `"<colourIndex>:<frame>"`
+ * with nearest-neighbour filtering. Atlases of other colour sets are removed, so a level change
+ * never leaves stale textures behind. Safe to call repeatedly. Returns the texture key.
  */
-export function ensureFamiliarTextures(scene: Phaser.Scene, colorsHex: readonly string[]): void {
-  for (const color of colorsHex) {
-    const key = familiarKey(color);
-    if (scene.textures.exists(key)) continue;
-    const tex = scene.textures.createCanvas(key, FAMILIAR_W * FRAME_NAMES.length, FAMILIAR_H);
-    if (!tex) continue;
-    const ctx = tex.getContext();
-    FRAME_NAMES.forEach((name, i) => {
-      const img = ctx.createImageData(FAMILIAR_W, FAMILIAR_H);
-      img.data.set(frameRgba(name, color));
-      ctx.putImageData(img, i * FAMILIAR_W, 0);
-      tex.add(name, 0, i * FAMILIAR_W, 0, FAMILIAR_W, FAMILIAR_H);
-    });
-    tex.refresh();
-    tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+export function ensureFamiliarAtlas(scene: Phaser.Scene, colorsHex: readonly string[]): string {
+  const key = atlasKey(colorsHex);
+  for (const existing of scene.textures.getTextureKeys()) {
+    if (existing.startsWith(PREFIX) && existing !== key) scene.textures.remove(existing);
   }
+  if (scene.textures.exists(key)) return key;
+  const layout = atlasLayout(colorsHex.length);
+  const tex = scene.textures.createCanvas(key, layout.width, layout.height);
+  if (!tex) throw new Error("could not create the familiar atlas texture");
+  const { data } = atlasRgba(colorsHex);
+  const ctx = tex.getContext();
+  const img = ctx.createImageData(layout.width, layout.height);
+  img.data.set(data);
+  ctx.putImageData(img, 0, 0);
+  colorsHex.forEach((_, c) => {
+    for (const name of FRAME_NAMES) {
+      const r = layout.frame(c, name);
+      tex.add(atlasFrameName(c, name), 0, r.x, r.y, r.w, r.h);
+    }
+  });
+  tex.refresh();
+  tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  return key;
 }
-
-export type { FrameName };

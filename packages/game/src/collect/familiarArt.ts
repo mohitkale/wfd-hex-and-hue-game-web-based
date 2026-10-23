@@ -5,6 +5,8 @@
  * wings and the antenna glow are fixed, so one design serves every colour. See docs/art/familiar.md.
  */
 
+import { theme } from "../theme";
+
 export const FAMILIAR_W = 16;
 export const FAMILIAR_H = 14;
 
@@ -84,6 +86,16 @@ const WINGS_MID = halves({
   9: "..xxx...",
 });
 
+/** Wings half open and one step lower: the second beat of the walk's flap. */
+const WINGS_MID_LOW = halves({
+  6: "x.......",
+  7: "xww.....",
+  8: "xwwww...",
+  9: "xwwwww..",
+  10: ".xwwww..",
+  11: "..xxx...",
+});
+
 const WINGS_DOWN = halves({
   5: "...xwww.",
   6: "..xwwww.",
@@ -95,22 +107,52 @@ const WINGS_DOWN = halves({
   12: "x.......",
 });
 
-const ARMS_UP = halves({
-  1: "...mo...",
-  2: "...m....",
-  3: "...m....",
-  4: "...m....",
-  5: "...m....",
+/** Wings folded back behind the body (crouching to pick something up). */
+const WINGS_TUCK = halves({
+  4: "...x....",
+  5: "..xwx...",
+  6: "..xww...",
+  7: "..xww...",
+  8: "...xw...",
 });
 
+/**
+ * Arms raised in a V, holding the cube above the head. Drawn behind the body so the body outline
+ * stays intact; the hands (rows 2-3) sit beside the antennae, outside the cube's footprint.
+ */
+const ARMS_V = halves({
+  2: ".om.....",
+  3: ".om.....",
+  4: ".om.....",
+  5: "..om....",
+  6: "..om....",
+  7: "...om...",
+  8: "...om...",
+});
+
+/** Arms thrown straight up (delivery toss), with a sparkle at each hand. */
+const ARMS_TOSS = halves({
+  0: "g.......",
+  1: "om......",
+  2: "om......",
+  3: "om......",
+  4: "om......",
+  5: "om......",
+  6: ".om.....",
+  7: "..om....",
+  8: "..om....",
+});
+
+/** Arms reaching out and down for a cube on the ground. */
 const ARMS_REACH = halves({
-  8: "..mm....",
-  9: ".mmo....",
-  10: ".mo.....",
+  9: "..om....",
+  10: ".omm....",
+  11: "omm.....",
+  12: "om......",
 });
 
-const FEET_STEP_A = ".....oo.........";
-const FEET_STEP_B = "..........oo.....";
+const FEET_APART = "....oo....oo....";
+const FEET_TOGETHER = "......oooo......";
 
 /** Draws `top` over `base` where `top` is not transparent. */
 function overlay(base: readonly string[], top: readonly string[]): string[] {
@@ -129,24 +171,25 @@ function squash(rows: readonly string[]): string[] {
   return ["................", ...out];
 }
 
-/** Stretched: a torso row is repeated and the empty bottom row is dropped. */
-function stretch(rows: readonly string[]): string[] {
-  const out = [...rows.slice(0, 9), rows[9]!, ...rows.slice(9, 13)];
-  return out.slice(0, FAMILIAR_H);
-}
-
 const stack = (...layers: (readonly string[])[]): string[] =>
   layers.reduce<string[]>((acc, layer) => overlay(acc, layer), blank());
+
+/** The body with its feet row replaced. */
+const bodyWithFeet = (feet: string): string[] => withRow(BODY, 12, feet);
 
 export const FRAMES: Record<FrameName, readonly string[]> = {
   idle0: stack(WINGS_UP, BODY),
   idle1: stack(WINGS_DOWN, BODY),
-  walk0: stack(WINGS_MID, withRow(BODY, 12, FEET_STEP_A)),
-  walk1: stack(WINGS_MID, withRow(BODY, 12, FEET_STEP_B)),
-  carry0: stack(WINGS_UP, BODY, ARMS_UP),
-  carry1: stack(WINGS_DOWN, BODY, ARMS_UP),
-  pickup: stack(squash(WINGS_DOWN), squash(BODY), squash(ARMS_REACH)),
-  deliver: stack(WINGS_UP, stretch(BODY), ARMS_UP),
+  // Walking: feet wide apart, then together; the wings beat between two half-open positions.
+  walk0: stack(WINGS_MID, bodyWithFeet(FEET_APART)),
+  walk1: stack(WINGS_MID_LOW, bodyWithFeet(FEET_TOGETHER)),
+  // Carrying: arms in a V under the cube; wings flap low so they never hide the arms.
+  carry0: stack(WINGS_MID, ARMS_V, BODY),
+  carry1: stack(WINGS_DOWN, ARMS_V, BODY),
+  // Picking up: crouched, wings tucked, arms reaching down.
+  pickup: stack(squash(WINGS_TUCK), squash(ARMS_REACH), squash(BODY)),
+  // Delivering: wings wide, arms thrown up with sparkles. The feet stay on the baseline.
+  deliver: stack(WINGS_UP, ARMS_TOSS, BODY),
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -162,11 +205,6 @@ export const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
   clamp(a[2] + (b[2] - a[2]) * t),
 ];
 
-export function parseHex(hex: string): Rgb {
-  const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
 /** The fixed (colour-independent) parts of the palette. */
 export const FIXED = {
   eyeWhite: [255, 255, 255] as Rgb,
@@ -174,9 +212,47 @@ export const FIXED = {
   wing: [226, 214, 255] as Rgb,
   wingEdge: [150, 130, 220] as Rgb,
   glow: [246, 217, 122] as Rgb,
+  /** A warm pink that reads on every body colour (a derived cheek turned grey on green). */
+  cheek: [255, 172, 205] as Rgb,
 } as const;
 
 const NIGHT: Rgb = [26, 15, 51];
+/** The board panel the familiar is drawn over. */
+export const PANEL: Rgb = [(theme.panel >> 16) & 255, (theme.panel >> 8) & 255, theme.panel & 255];
+/**
+ * The outline must stay at least this much lighter than the panel (WCAG contrast). Same floor as
+ * the art pipeline's panel check (tools/art/check.ts), so every shipped colour can meet it.
+ */
+export const MIN_OUTLINE_CONTRAST = 1.6;
+
+const lin = (c: number) => {
+  const s = c / 255;
+  return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+};
+const luminance = (c: Rgb) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+/** WCAG contrast ratio (1..21). */
+export function contrast(a: Rgb, b: Rgb): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/** Parses `#rrggbb` (anything else throws: a bare or short hex would silently give wrong colours). */
+export function parseHex(hex: string): Rgb {
+  if (!/^#[0-9a-f]{6}$/i.test(hex))
+    throw new Error(`familiar colour must be #rrggbb, got "${hex}"`);
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** A deep tint of the colour for the outline, lightened toward the colour until it shows on the panel. */
+function outlineFor(base: Rgb): Rgb {
+  for (let t = 0.5; t >= 0; t -= 0.05) {
+    const c = mix(base, NIGHT, t);
+    if (contrast(c, PANEL) >= MIN_OUTLINE_CONTRAST) return c;
+  }
+  return base;
+}
 
 /** Colours for each role, for a familiar carrying cubes of `colorHex`. */
 export function palette(colorHex: string): Record<Role, Rgb> {
@@ -186,9 +262,38 @@ export function palette(colorHex: string): Record<Role, Rgb> {
     mid: base,
     light: mix(base, [255, 255, 255], 0.45),
     dark: mix(base, NIGHT, 0.4),
-    outline: mix(base, NIGHT, 0.62),
-    cheek: mix(base, [255, 150, 190], 0.5),
+    outline: outlineFor(base),
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Colourblind badge anchor and phone scale
+// ---------------------------------------------------------------------------------------------
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Where the M6.5 colourblind symbol is drawn on the familiar, in native sprite pixels: the chest,
+ * clear of the eyes and wings. The sprite colour alone cannot carry the matching rule for colour-vision
+ * deficiency, so with colourblind mode on the renderer draws the colour's symbol here. A crouched
+ * (`pickup`) frame has a shorter torso.
+ */
+export function badgeRect(frame: FrameName): Rect {
+  return frame === "pickup" ? { x: 5, y: 8, w: 6, h: 3 } : { x: 5, y: 7, w: 6, h: 4 };
+}
+
+/**
+ * Whole-number device-pixel scale for the sprite so it is about `targetCss` CSS pixels wide (the
+ * 20-28 px band the board is designed for): 2× at dpr 1 (32 px), 3× at dpr 2 (24 px), 5× at dpr 3
+ * (27 px). Integer scales keep nearest-neighbour pixels even.
+ */
+export function familiarScale(dpr: number, targetCss = 24): number {
+  return Math.max(1, Math.round((targetCss * dpr) / FAMILIAR_W));
 }
 
 /** One frame as RGBA bytes (row-major; transparent pixels have alpha 0). */
