@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { isReducedMotion } from "../a11y";
 import { hexToNumber, inkFor, theme } from "../theme";
 import { symbolTexture } from "../view/textures";
+import { bake } from "./bake";
 import { tonesFor } from "./cubePaint";
 
 export interface BadgeOptions {
@@ -36,13 +37,17 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     const { w, h, dpr } = opts;
     const tones = tonesFor(opts.colorHex);
     const radius = Math.min(w, h) * 0.22;
-    const bg = scene.add.graphics();
-    bg.fillStyle(tones.dark, 0.95);
-    bg.fillRoundedRect(-w / 2, -h / 2, w, h, radius);
-    bg.fillStyle(tones.base, 0.35);
-    bg.fillRoundedRect(-w / 2, -h / 2, w, h * 0.55, radius);
-    bg.lineStyle(Math.max(1, dpr * 1.5), tones.light, 0.9);
-    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, radius);
+    const lw = Math.max(1, dpr * 1.5);
+    const key = `badge:${opts.colorHex}:${Math.round(w)}x${Math.round(h)}:${lw}`;
+    bake(scene, key, w, h, (g) => {
+      g.fillStyle(tones.dark, 0.95);
+      g.fillRoundedRect(lw / 2, lw / 2, w - lw, h - lw, radius);
+      g.fillStyle(tones.base, 0.35);
+      g.fillRoundedRect(lw / 2, lw / 2, w - lw, (h - lw) * 0.55, radius);
+      g.lineStyle(lw, tones.light, 0.9);
+      g.strokeRoundedRect(lw / 2, lw / 2, w - lw, h - lw, radius);
+    });
+    const bg = scene.add.image(0, 0, key).setOrigin(0.5);
     this.add(bg);
 
     const horizontal = w >= h * 1.25;

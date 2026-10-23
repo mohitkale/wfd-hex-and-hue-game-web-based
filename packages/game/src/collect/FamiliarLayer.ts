@@ -4,16 +4,19 @@ import { hexToNumber, inkFor } from "../theme";
 import { symbolTexture } from "../view/textures";
 import type { CollectLayout } from "./collectLayout";
 import { spriteScaleForCell } from "./collectLayout";
+import { TEX } from "../view/textures";
+import { bake } from "./bake";
 import { paintCube, type CubeTones } from "./cubePaint";
 import { FAMILIAR_H, FAMILIAR_W, FRAME_NAMES, badgeRect, type FrameName } from "./familiarArt";
+import { CellSpreader, drift, hover as hoverOf, popDuration } from "./swarm";
 import { frameFor, type FamiliarVisual, type VisualModel } from "./visuals";
 
 type CollectEvent = collect.CollectEvent;
 
 interface Entry {
   img: Phaser.GameObjects.Image;
-  shadow: Phaser.GameObjects.Ellipse;
-  cube: Phaser.GameObjects.Graphics;
+  shadow: Phaser.GameObjects.Image;
+  cube: Phaser.GameObjects.Image;
   cubeColor: number;
   /** Colour-blind symbols: one on the chest, one on the carried cube (null when the mode is off). */
   chest: Phaser.GameObjects.Image | null;
@@ -27,6 +30,7 @@ interface Entry {
 }
 
 const D = { shadow: 4, sprite: 5, cube: 6, effect: 8 } as const;
+const SHADOW_ALPHA = 0.35;
 const FRAME_INDEX = Object.fromEntries(FRAME_NAMES.map((n, i) => [n, i])) as Record<
   FrameName,
   number
@@ -47,6 +51,11 @@ export class FamiliarLayer {
   private tickMs = 42;
   /** Frames left in which new sprites appear without the pop-in (after a rebuild mid-game). */
   private quietFrames = 2;
+  private readonly spreader = new CellSpreader();
+  /** One baked texture per palette colour for the carried and delivered cube. */
+  private readonly cubeKeys: string[];
+  /** Counters for the profiler (`?profile=1`): sprites ever created, and the live/pooled counts. */
+  readonly stats = { created: 0, peakLive: 0 };
   /** Called when a cube lands in the portal: (palette index, group id). */
   onDelivered: (colorIndex: number, group: number) => void = () => undefined;
 
@@ -61,6 +70,12 @@ export class FamiliarLayer {
     private readonly symbolPalette: readonly string[] | null = null,
   ) {
     this.frameNames = tones.map((_, c) => FRAME_NAMES.map((f) => `${c}:${f}`));
+    const size = Math.max(4, Math.round(layout.cell * 0.82));
+    this.cubeKeys = tones.map((tone, c) =>
+      bake(scene, `cube:${c}:${tone.base}:${size}`, size, size, (g) =>
+        paintCube(g, 0, 0, size, tone),
+      ),
+    );
   }
 
   private get scale(): number {
@@ -84,12 +99,17 @@ export class FamiliarLayer {
       reused.shadow.setVisible(true);
       return reused;
     }
+    this.stats.created++;
     const img = this.scene.add
       .image(0, 0, this.atlas, "0:idle0")
       .setOrigin(0.5, 0.78)
       .setDepth(D.sprite);
-    const shadow = this.scene.add.ellipse(0, 0, 10, 4, 0x000000, 0.32).setDepth(D.shadow);
-    const cube = this.scene.add.graphics().setDepth(D.cube).setVisible(false);
+    const shadow = this.scene.add
+      .image(0, 0, TEX.glow)
+      .setTint(0x000000)
+      .setAlpha(SHADOW_ALPHA)
+      .setDepth(D.shadow);
+    const cube = this.scene.add.image(0, 0, this.cubeKeys[0]!).setDepth(D.cube).setVisible(false);
     const chest = this.symbolPalette
       ? this.scene.add
           .image(0, 0, symbolTexture(this.scene, 0))
@@ -120,7 +140,7 @@ export class FamiliarLayer {
   private release(e: Entry): void {
     this.scene.tweens.killTweensOf([e.img, e.shadow, e.cube]);
     e.img.setVisible(false).setScale(1).setAlpha(1);
-    e.shadow.setVisible(false).setAlpha(0.32);
+    e.shadow.setVisible(false).setAlpha(SHADOW_ALPHA);
     e.cube.setVisible(false).setAlpha(1);
     e.chest?.setVisible(false);
     e.mark?.setVisible(false);
@@ -157,12 +177,19 @@ export class FamiliarLayer {
     const cubeSize = Math.max(4, Math.round(cell * 0.82));
     const lift = FAMILIAR_H * s * 0.78 + cubeSize * 0.1;
     const quiet = this.quietFrames > 0;
+    // Familiars standing on one cell fan out sideways so none hides another (cosmetic only).
+    const spreader = this.spreader;
+    spreader.begin();
+    for (const v of this.model.familiars.values()) spreader.add(v.id, v.to);
+    spreader.finish();
+    if (this.model.familiars.size > this.stats.peakLive)
+      this.stats.peakLive = this.model.familiars.size;
     for (const v of this.model.familiars.values()) {
       let e = this.entries.get(v.id);
       if (!e) {
         e = this.acquire();
         this.entries.set(v.id, e);
-        if (!this.reduced && !quiet && v.mode !== "retiring") this.popIn(e, s);
+        if (!this.reduced && !quiet && v.mode !== "retiring") this.popIn(e, s, popDuration(v.id));
       }
       const frame = this.frameNames[v.colorIndex]![FRAME_INDEX[frameFor(v, tick)]]!;
       if (e.img.frame.name !== frame) e.img.setFrame(frame);
@@ -175,22 +202,27 @@ export class FamiliarLayer {
         x = this.cx(v.from) + (x - this.cx(v.from)) * t;
         y = this.cy(v.from) + (y - this.cy(v.from)) * t;
       }
-      // A gentle hover while moving or waiting; none for reduced motion.
+      // Each familiar keeps its own small drift off the cell centre and shares a crowded cell
+      // with others; none of it is game state, and reduced motion keeps it (it is not motion).
+      const d = drift(v.id);
+      x += (d.x + spreader.offset(v.id)) * cell;
+      y += d.y * cell;
+      // A gentle hover while moving or waiting, out of step between familiars; none for reduced motion.
+      const h = hoverOf(v.id);
       const hover =
         this.reduced || v.mode === "pickup" || v.mode === "deliver"
           ? 0
-          : Math.sin(timeMs / 110 + v.id * 1.7) * s * 0.7;
+          : Math.sin((timeMs / 110) * h.rate + h.phase) * s * 0.7;
       e.img.setPosition(x, y + hover);
       if (!e.retiring && !e.popping) e.img.setScale(s);
       e.shadow.setPosition(x, y + s * 2.2);
-      if (!e.retiring && !e.popping) e.shadow.setSize(s * 9, s * 3);
+      if (!e.retiring && !e.popping) e.shadow.setDisplaySize(s * 11, s * 4);
 
       // The carried cube rides above the head from the grab until the drop, rising from its cell.
       if (v.carried !== null && v.mode !== "retiring") {
         if (e.cubeColor !== v.carried) {
           e.cubeColor = v.carried;
-          e.cube.clear();
-          paintCube(e.cube, -cubeSize / 2, -cubeSize / 2, cubeSize, this.tones[v.carried]!);
+          e.cube.setTexture(this.cubeKeys[v.carried]!);
         }
         let cubeX = x;
         let cubeY = y - lift + hover;
@@ -250,14 +282,14 @@ export class FamiliarLayer {
       .setVisible(!e.retiring);
   }
 
-  private popIn(e: Entry, s: number): void {
+  private popIn(e: Entry, s: number, ms: number): void {
     e.popping = true;
     e.img.setScale(s * 0.2);
-    e.shadow.setSize(s * 2, s * 1);
+    e.shadow.setAlpha(0);
     this.scene.tweens.add({
       targets: e.img,
       scale: s,
-      duration: 140,
+      duration: ms,
       ease: "Back.easeOut",
       onComplete: () => {
         e.popping = false;
@@ -265,9 +297,8 @@ export class FamiliarLayer {
     });
     this.scene.tweens.add({
       targets: e.shadow,
-      width: s * 9,
-      height: s * 3,
-      duration: 140,
+      alpha: SHADOW_ALPHA,
+      duration: ms,
       ease: "Sine.easeOut",
     });
   }
@@ -309,12 +340,9 @@ export class FamiliarLayer {
     }
     const px = this.cx(this.model.portal);
     const py = this.cy(this.model.portal);
-    const size = Math.max(4, Math.round(this.layout.cell * 0.82));
     const g = this.scene.add
-      .graphics()
-      .setDepth(D.effect)
-      .setPosition(px, py - FAMILIAR_H * this.scale * 0.78);
-    paintCube(g, -size / 2, -size / 2, size, tone);
+      .image(px, py - FAMILIAR_H * this.scale * 0.78, this.cubeKeys[colorIndex]!)
+      .setDepth(D.effect);
     this.scene.tweens.add({
       targets: g,
       y: py,

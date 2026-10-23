@@ -9,7 +9,8 @@ import { ensureTextures, TEX } from "../view/textures";
 import { fadeIn } from "../view/transition";
 import { CubeLayer } from "./CubeLayer";
 import { FamiliarLayer } from "./FamiliarLayer";
-import { PanelsView } from "./PanelsView";
+import { PanelsView, paintPanelFrames } from "./PanelsView";
+import { bake } from "./bake";
 import { cellCenter, computeCollectLayout, type CollectLayout } from "./collectLayout";
 import { tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
@@ -51,6 +52,15 @@ export class CollectScene extends Phaser.Scene {
   private unsubscribe: (() => void)[] = [];
   /** Colour-blind mode (M6.5): each colour also shows its symbol. `?cb=1` forces it for review. */
   private colorblind = false;
+  /** `?profile=1`: records the CPU time of every `update` so a build can be measured (see perf()). */
+  private profile: {
+    ms: Float32Array;
+    render: Float32Array;
+    n: number;
+    rn: number;
+    ticks: number;
+    started: number;
+  } | null = null;
 
   constructor() {
     super("collect");
@@ -96,8 +106,34 @@ export class CollectScene extends Phaser.Scene {
       this.registry.events.off("changedata-reducedMotion", onMotion),
     );
     fadeIn(this);
-    // Dev handle for browser-driven checks of the review build.
-    if (import.meta.env?.DEV) (window as unknown as { __collect?: CollectScene }).__collect = this;
+    if (params.get("profile") === "1") {
+      const profile = {
+        ms: new Float32Array(2400),
+        render: new Float32Array(2400),
+        n: 0,
+        rn: 0,
+        ticks: 0,
+        started: performance.now(),
+      };
+      this.profile = profile;
+      // CPU time Phaser spends submitting a frame (independent of vsync and of the GPU).
+      let renderStart = 0;
+      const onPre = () => (renderStart = performance.now());
+      const onPost = () => {
+        profile.render[profile.rn % profile.render.length] = performance.now() - renderStart;
+        profile.rn++;
+      };
+      this.game.events.on(Phaser.Core.Events.PRE_RENDER, onPre);
+      this.game.events.on(Phaser.Core.Events.POST_RENDER, onPost);
+      this.events.once("shutdown", () => {
+        this.game.events.off(Phaser.Core.Events.PRE_RENDER, onPre);
+        this.game.events.off(Phaser.Core.Events.POST_RENDER, onPost);
+      });
+    }
+    // Handle for browser-driven checks and measurements of the review build.
+    if (import.meta.env?.DEV || this.profile) {
+      (window as unknown as { __collect?: CollectScene }).__collect = this;
+    }
   }
 
   /** Test/review hook: the live session (the same object the board reads). */
@@ -152,7 +188,8 @@ export class CollectScene extends Phaser.Scene {
     const reduced = isReducedMotion(this);
     const tones = level.palette.map(tonesFor);
 
-    this.drawBoardBackground();
+    this.bakeStaticLayer();
+    this.drawPortal();
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
     this.model.resync(state);
     this.cubes = new CubeLayer(this, this.layout, level.palette, state.grid.slice());
@@ -185,10 +222,15 @@ export class CollectScene extends Phaser.Scene {
     if (state.status !== "playing") this.showEnd(0);
   }
 
-  private drawBoardBackground(): void {
+  /**
+   * Everything that never changes while playing (board panel and ring, field and slot outlines, HUD
+   * button circles) is drawn once into a single RenderTexture, so it costs one textured quad per
+   * frame instead of re-tessellating rounded rectangles and circles every frame.
+   */
+  private bakeStaticLayer(): void {
     const l = this.layout;
     const dpr = this.dpr;
-    const g = this.add.graphics().setDepth(0);
+    const g = this.make.graphics({}, false);
     // The ring (where familiars walk) is a faint path around the picture's panel.
     g.fillStyle(theme.dusk, 0.55);
     g.fillRoundedRect(l.boardRect.x, l.boardRect.y, l.boardRect.w, l.boardRect.h, l.cell * 0.8);
@@ -201,7 +243,29 @@ export class CollectScene extends Phaser.Scene {
     );
     g.lineStyle(Math.max(1, dpr), theme.mist, 0.18);
     g.strokeRoundedRect(l.boardRect.x, l.boardRect.y, l.boardRect.w, l.boardRect.h, l.cell * 0.8);
-    // The portal: a glowing gate in the bottom ring.
+    paintPanelFrames(g, l, dpr);
+    const cy = l.hud.y + l.hud.h / 2;
+    const size = Math.round(36 * dpr);
+    for (let i = 0; i < 3; i++) {
+      const x = l.frame.x + l.frame.w - 14 * dpr - size / 2 - (2 - i) * (size + 8 * dpr);
+      g.fillStyle(theme.dusk, 1);
+      g.fillCircle(x, cy, size / 2);
+      g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
+      g.strokeCircle(x, cy, size / 2);
+    }
+    const rt = this.add
+      .renderTexture(l.frame.x, l.frame.y, l.frame.w, l.frame.h)
+      .setOrigin(0, 0)
+      .setDepth(0);
+    rt.draw(g, -l.frame.x, -l.frame.y);
+    rt.render();
+    g.destroy();
+  }
+
+  /** The portal: a glowing gate in the bottom ring (a baked image under a softly pulsing glow). */
+  private drawPortal(): void {
+    const l = this.layout;
+    const dpr = this.dpr;
     const p = cellCenter(l, this.session.state.params.portal);
     this.portalGlow = this.add
       .image(p.x, p.y, TEX.glow)
@@ -209,11 +273,15 @@ export class CollectScene extends Phaser.Scene {
       .setDepth(0.5)
       .setDisplaySize(l.cell * 3.2, l.cell * 3.2)
       .setAlpha(0.8);
-    const gate = this.add.graphics().setDepth(3);
-    gate.fillStyle(0x140b2e, 1);
-    gate.fillEllipse(p.x, p.y, l.cell * 1.6, l.cell * 1.15);
-    gate.lineStyle(Math.max(1, Math.round(dpr * 1.5)), 0xf6d97a, 0.95);
-    gate.strokeEllipse(p.x, p.y, l.cell * 1.6, l.cell * 1.15);
+    const gw = Math.round(l.cell * 1.6) + 4;
+    const gh = Math.round(l.cell * 1.15) + 4;
+    const key = bake(this, `gate:${gw}x${gh}:${dpr}`, gw, gh, (g) => {
+      g.fillStyle(0x140b2e, 1);
+      g.fillEllipse(gw / 2, gh / 2, l.cell * 1.6, l.cell * 1.15);
+      g.lineStyle(Math.max(1, Math.round(dpr * 1.5)), 0xf6d97a, 0.95);
+      g.strokeEllipse(gw / 2, gh / 2, l.cell * 1.6, l.cell * 1.15);
+    });
+    this.add.image(p.x, p.y, key).setDepth(3);
     if (!isReducedMotion(this)) {
       this.tweens.add({
         targets: this.portalGlow,
@@ -261,11 +329,6 @@ export class CollectScene extends Phaser.Scene {
     buttons.forEach(([label, onPress], i) => {
       const x =
         l.frame.x + l.frame.w - 14 * dpr - size / 2 - (buttons.length - 1 - i) * (size + 8 * dpr);
-      const bg = this.add.graphics().setDepth(20);
-      bg.fillStyle(theme.dusk, 1);
-      bg.fillCircle(x, cy, size / 2);
-      bg.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
-      bg.strokeCircle(x, cy, size / 2);
       const text = this.add
         .text(x, cy, label, {
           fontFamily: theme.font,
@@ -386,7 +449,9 @@ export class CollectScene extends Phaser.Scene {
 
   override update(time: number, delta: number): void {
     if (!this.session) return;
+    const profileStart = this.profile ? performance.now() : 0;
     const due = this.clock.advance(delta, this.speed);
+    if (this.profile) this.profile.ticks += due;
     for (let i = 0; i < due; i++) {
       if (this.session.tick() === null) {
         // Nothing is ticking (settled or over): drop the backlog but keep the position inside the
@@ -403,6 +468,56 @@ export class CollectScene extends Phaser.Scene {
       this.clock.tickMs / this.speed,
     );
     this.cubes.flush();
+    if (this.profile) {
+      this.profile.ms[this.profile.n % this.profile.ms.length] = performance.now() - profileStart;
+      this.profile.n++;
+    }
+  }
+
+  /**
+   * Profiler summary (`?profile=1` builds): CPU milliseconds of the scene's own `update` per frame
+   * (ticks, interpolation, sprite placement, cube redraws; not the GPU or Phaser's own rendering),
+   * plus draw-side counters and a check that what is on screen equals the engine.
+   */
+  perf(): Record<string, unknown> {
+    const p = this.profile;
+    const frames = p ? Math.min(p.n, p.ms.length) : 0;
+    const pct = (arr: number[], q: number) =>
+      arr.length ? +arr[Math.min(arr.length - 1, Math.floor(arr.length * q))]!.toFixed(3) : null;
+    const renders = p
+      ? Array.from(p.render.subarray(0, Math.min(p.rn, p.render.length))).sort((a, b) => a - b)
+      : [];
+    const sorted = p ? Array.from(p.ms.subarray(0, frames)).sort((a, b) => a - b) : [];
+    const at = (q: number) =>
+      sorted.length
+        ? +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]!.toFixed(3)
+        : null;
+    const s = this.session.state;
+    const live = [...this.model.familiars.values()].filter((v) => v.mode !== "retiring").length;
+    return {
+      frames,
+      updateMsMedian: at(0.5),
+      updateMsP95: at(0.95),
+      updateMsMax: at(1),
+      renderSubmitMsMedian: pct(renders, 0.5),
+      renderSubmitMsP95: pct(renders, 0.95),
+      renderSubmitMsMax: pct(renders, 1),
+      ticksRun: p?.ticks ?? 0,
+      familiarsLive: s.familiars.length,
+      familiarsDrawn: live,
+      spritesCreated: this.familiars.stats.created,
+      peakFamiliars: this.familiars.stats.peakLive,
+      maxPossible: s.params.squad * s.params.fieldCap,
+      cubeFullPaints: this.cubes.stats.fullPaints,
+      cubePaintMs: +this.cubes.stats.paintMs.toFixed(2),
+      cubeClears: this.cubes.stats.clears,
+      cubeFlushes: this.cubes.stats.flushes,
+      ringRedraws: this.cubes.stats.ringRedraws,
+      tick: s.tick,
+      delivered: s.deliveredTotal,
+      cubesTotal: s.cubesTotal,
+      countsMatch: live === s.familiars.length,
+    };
   }
 
   // -------------------------------------------------------------------------------------------

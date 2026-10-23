@@ -24,6 +24,16 @@ const PEEK = 2;
  * strip (groups with familiars out) and the holding slots (waiting groups). It places one badge per
  * group from the state and moves it when the group changes place. No game rules live here.
  */
+/** Paints the empty field and slot outlines into `g` (the scene bakes them into its static layer). */
+export function paintPanelFrames(
+  g: Phaser.GameObjects.Graphics,
+  l: CollectLayout,
+  dpr: number,
+): void {
+  g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.28);
+  for (const r of [...l.field, ...l.slots]) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.2);
+}
+
 export class PanelsView {
   private readonly tracked = new Map<number, Tracked>();
   private readonly extra: Phaser.GameObjects.GameObject[] = [];
@@ -39,13 +49,9 @@ export class PanelsView {
     this.drawFrames();
   }
 
-  /** Empty-slot and field outlines, plus the label of each row. */
+  /** The label of each row (the outlines are part of the baked static layer). */
   private drawFrames(): void {
     const l = this.layout;
-    const g = this.scene.add.graphics().setDepth(9);
-    g.lineStyle(Math.max(1, this.dpr * 1.5), theme.mist, 0.28);
-    for (const r of [...l.field, ...l.slots]) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.2);
-    this.extra.push(g);
     const label = (text: string, r: { x: number; y: number }) => {
       const t = this.scene.add
         .text(r.x + 6 * this.dpr, r.y + 4 * this.dpr, text, {

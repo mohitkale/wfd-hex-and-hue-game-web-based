@@ -104,10 +104,64 @@ export function demoMoon(): collect.CollectLevel {
   throw new Error("could not deal a valid demo level");
 }
 
+/**
+ * Vertical stripes of one colour each, so every group can always finish (no hidden colours): a pure
+ * load test for the renderer (many cubes, many familiars at once). `size` cells square, `colors`
+ * stripes, groups of about `chunk` cubes dealt at random into columns.
+ */
+export function stripes(
+  id: string,
+  name: string,
+  size: number,
+  colors: number,
+  chunk: number,
+  opts: Partial<collect.CollectLevel> = {},
+): collect.CollectLevel {
+  const stripe = Math.ceil(size / colors);
+  const cells: number[] = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) cells.push(Math.min(colors - 1, Math.floor(x / stripe)));
+  }
+  const counts = new Array<number>(colors).fill(0);
+  for (const c of cells) counts[c]!++;
+  const rng = createRng(7);
+  const groups: collect.GroupSpec[] = [];
+  counts.forEach((n, color) => {
+    let left = n;
+    while (left > 0) {
+      const take =
+        left <= chunk * 1.5 ? left : rng.int(Math.round(chunk * 0.7), Math.round(chunk * 1.3));
+      groups.push({ color, capacity: take });
+      left -= take;
+    }
+  });
+  const dealt = rng.shuffle(groups);
+  const columns: collect.GroupSpec[][] = [[], [], [], [], []];
+  dealt.forEach((g, i) => columns[i % columns.length]!.push(g));
+  return {
+    id,
+    name,
+    width: size,
+    height: size,
+    palette: PALETTE.slice(0, colors),
+    cells,
+    columns,
+    slots: 5,
+    squad: 6,
+    spawnGap: 1,
+    fieldCap: 6,
+    ...opts,
+  };
+}
+
 export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
   parking,
   purple12,
   moon: demoMoon,
+  /** 24×24, a mid-size picture with big squads (worst case for swarm clutter). */
+  swarm: () => stripes("dev-swarm", "Swarm (dev)", 24, 4, 70),
+  /** 40×40 = 1,600 cubes and up to 36 familiars: the renderer's worst case (the board size limit). */
+  big: () => stripes("dev-big", "Big 40×40 (dev)", 40, 5, 130),
 };
 
 export const DEFAULT_DEV_LEVEL = "moon";
