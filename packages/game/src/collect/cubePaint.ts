@@ -53,6 +53,29 @@ export interface RectPainter {
   fillRect(x: number, y: number, w: number, h: number): unknown;
 }
 
+/**
+ * A wax seal over a cube (M13.4): a dark veil, then a small square in the key colour with a pale
+ * rim, so the player can see which colour opens it. Painted on top of the cube, never instead of it.
+ */
+export function paintSeal(
+  g: RectPainter,
+  x: number,
+  y: number,
+  size: number,
+  key: CubeTones,
+): void {
+  g.fillStyle(0x140b2e, 0.5);
+  g.fillRect(x, y, size, size);
+  const dot = Math.max(2, Math.round(size * 0.42));
+  const o = Math.floor((size - dot) / 2);
+  g.fillStyle(0xfff6d8, 0.95);
+  g.fillRect(x + o - 1, y + o - 1, dot + 2, dot + 2);
+  g.fillStyle(key.base);
+  g.fillRect(x + o, y + o, dot, dot);
+  g.fillStyle(key.light);
+  g.fillRect(x + o, y + o, Math.max(1, Math.floor(dot / 2)), 1);
+}
+
 /** Paints one cube of `size` px with its top-left corner at (x, y). */
 export function paintCube(g: RectPainter, x: number, y: number, size: number, t: CubeTones): void {
   const edge = Math.max(1, Math.floor(size / 6));

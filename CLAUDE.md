@@ -89,6 +89,7 @@ npm run levels:report  # dist/levels-report.html: v2 level quality report (docs/
 npm run levels:check   # v2 level gate: unsolvable/trivial/out-of-band fail (in verify/CI)
 npm run measures:report # decision measures + difficulty score per level (docs/V2_MEASURES.md)
 npm run solver:report # solver over the slice and art preview levels (docs/V2_SOLVER.md)
+npm run seals:report # wax seals vs simple players on the art pieces (docs/V2_VARIETY.md)
 npm run density      # cube size per phone and bot play time per board size (docs/V2_ART_DENSITY.md)
 npm run audit:v1      # v1 audit: simple-strategy win rates per level (add -- --decisions for decision profile)
 npm run icons        # regenerate PWA icons (apps/web/public/icons) from tools/icons/icon.ts

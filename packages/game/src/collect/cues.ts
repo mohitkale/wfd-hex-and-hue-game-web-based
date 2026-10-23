@@ -79,7 +79,7 @@ export function planCues(events: readonly CollectEvent[]): Cue[] {
 
 /** The cue for a tap the engine refused, or null when the tap should stay silent. */
 export function rejectionCue(reason: string): Cue | null {
-  return reason === "fieldFull" || reason === "noReachableCube"
+  return reason === "fieldFull" || reason === "noReachableCube" || reason === "sealed"
     ? { sound: "invalid", haptic: "invalid" }
     : null;
 }

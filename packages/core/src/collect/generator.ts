@@ -3,7 +3,8 @@ import { createRng, type Rng } from "../rng";
 import { apply, legalActions } from "./actions";
 import { computeDist, topologyFor } from "./grid";
 import type { CollectLevel, GroupSpec } from "./level";
-import { validateCollectLevel } from "./level";
+import { validateCollectLevel, type SealSpec } from "./level";
+import { openingSealed, sealGate } from "./seals";
 import { runUntilSettled } from "./sim";
 import { CollectSolver, minSlots } from "./solver";
 import { cloneState, createCollectState } from "./state";
@@ -88,6 +89,13 @@ export interface GenerateOptions {
   maxAttempts?: number;
   /** Solver node budget per query (default 20,000). */
   budget?: number;
+  /**
+   * Colours to seal partly (M13.4, docs/V2_VARIETY.md; default 0, which leaves generation exactly as
+   * it was). Part of each chosen colour's cubes get a wax seal that a key colour must unlock. A seal
+   * is kept only if the level stays solvable and some sealed cube is reachable at the opening, so
+   * the seal can actually make a group run dry.
+   */
+  seals?: number;
   /** Hill-climbing steps for profiles that ask for pitfalls (default 24; 0 turns refinement off). */
   refineSteps?: number;
   /**
@@ -154,12 +162,14 @@ export function reachableByColor(level: CollectLevel): number[] {
   const s = createCollectState(level);
   const t = topologyFor(s.params.width, s.params.height);
   const counts = new Array<number>(level.palette.length).fill(0);
+  const sealed = sealGate(s);
   s.grid.forEach((color, cell) => {
     if (color === EMPTY) return;
     for (let k = 0; k < 4; k++) {
       const n = t.neighbors[cell * 4 + k]!;
       if (n >= 0 && s.dist[n]! >= 0) {
-        counts[color]!++;
+        // A sealed cube is not one a familiar could fetch yet.
+        if (!sealed || !sealed(cell)) counts[color]!++;
         return;
       }
     }
@@ -284,14 +294,24 @@ export function generateLevel(
   const attempts = options.maxAttempts ?? 12;
   const refineSteps = options.refineSteps ?? 24;
 
+  const sealCount = Math.max(0, Math.floor(options.seals ?? 0));
+
   // 1. Deal candidates and keep the structurally acceptable ones.
   const found: Generated[] = [];
   for (let attempt = 0; attempt < attempts; attempt++) {
     const rng = createRng(attemptSeed(seed, attempt));
-    const candidate = deal(art, id, name, spec, rng);
-    const result = evaluate(candidate, spec, budget, false);
-    if (result) {
-      found.push({ ...result, attempt, acceptable: 0, score: score(result.metrics) });
+    const dealt = deal(art, id, name, spec, rng);
+    // Seals come from their own random stream, so asking for none changes nothing above.
+    const variants =
+      sealCount > 0
+        ? sealVariants(dealt, sealCount, createRng(attemptSeed(seed, 5000 + attempt)))
+        : [dealt];
+    for (const candidate of variants) {
+      const result = evaluate(candidate, spec, budget, false);
+      if (result) {
+        found.push({ ...result, attempt, acceptable: 0, score: score(result.metrics) });
+        break;
+      }
     }
   }
   const acceptable = found.length;
@@ -321,11 +341,54 @@ export function generateLevel(
       : c.level;
     const result = evaluate({ ...level, slots: 8 }, spec, budget, true);
     if (!result) continue;
+    // Refinement reorders groups, never seals: the seals must still be in the player's way at the start.
+    if (sealCount > 0 && openingSealed(result.level) === 0) continue;
     if (gate && gate(result.level).length > 0) continue;
     const s = score(result.metrics);
     if (!best || s > best.score) best = { ...result, attempt: c.attempt, acceptable, score: s };
   }
   return best;
+}
+
+/**
+ * Up to six versions of `level` with `count` colours partly sealed, in a seeded order: for each such
+ * colour a third to six tenths of its cubes (any depth) get one seal, whose key is another colour of
+ * the picture. Only versions with a sealed cube reachable at the opening are returned; the solver
+ * decides the rest.
+ */
+function sealVariants(level: CollectLevel, count: number, rng: Rng): CollectLevel[] {
+  const cellsOf = new Map<number, number[]>();
+  level.cells.forEach((c, i) => {
+    if (c === EMPTY) return;
+    const list = cellsOf.get(c) ?? [];
+    list.push(i);
+    cellsOf.set(c, list);
+  });
+  const colors = [...cellsOf.keys()].sort((a, b) => a - b);
+  const variants: CollectLevel[] = [];
+  if (colors.length < 2) return variants;
+  for (let tries = 0; tries < 24 && variants.length < 6; tries++) {
+    const seals: SealSpec[] = [];
+    for (const color of rng.shuffle(colors)) {
+      if (seals.length === count) break;
+      const keys = colors.filter((k) => k !== color);
+      const key = keys[rng.int(0, keys.length - 1)]!;
+      const cells = cellsOf.get(color)!;
+      const take = Math.max(1, Math.round(cells.length * (0.35 + 0.25 * rng.next())));
+      seals.push({
+        key,
+        cells: rng
+          .shuffle(cells)
+          .slice(0, take)
+          .sort((a, b) => a - b),
+      });
+    }
+    if (seals.length !== count) continue;
+    const candidate = { ...level, seals };
+    if (validateCollectLevel(candidate).length === 0 && openingSealed(candidate) > 0)
+      variants.push(candidate);
+  }
+  return variants;
 }
 
 /** How often random settled-sequential play (fixed seeds, so deterministic) fails to win the level. */

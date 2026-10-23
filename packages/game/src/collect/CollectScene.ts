@@ -28,6 +28,7 @@ import { demoLineFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
 import { browserStore, readSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
+import { sealMap } from "./sealView";
 import { VisualModel } from "./visuals";
 
 type CollectState = collect.CollectState;
@@ -35,11 +36,14 @@ type CollectState = collect.CollectState;
 /** HUD buttons: undo, retry, speed. The baked circles and the tap zones share `hudButtonX`. */
 const HUD_BUTTONS = 3;
 
+const SEAL_HINT = "Wax-sealed cubes wake once their key colour is gathered";
+
 const REASON_TEXT: Record<Exclude<collect.ActionCheck, "ok">, string> = {
   gameOver: "The game is over",
   unavailable: "Nothing there",
   fieldFull: "Too many groups are working",
   noReachableCube: "No reachable cube of this colour yet",
+  sealed: "Wax-sealed: finish the key colour first",
 };
 
 /**
@@ -131,6 +135,11 @@ export class CollectScene extends Phaser.Scene {
     this.session = new collect.CollectSession(level);
     const line = demoLineFromSearch(search, level);
     if (line) this.demo = { line, next: 0, readyAt: 0 };
+    // The first sealed level of a visit explains the seals once; it never waits on a tap.
+    if (level.seals && !this.registry.get("v2.sealIntro")) {
+      this.registry.set("v2.sealIntro", true);
+      this.time.delayedCall(500, () => this.toast(SEAL_HINT, 4200));
+    }
     this.unsubscribe.push(
       this.session.subscribe((batch) => this.onBatch(batch)),
       this.session.onReplace(() => {
@@ -268,6 +277,7 @@ export class CollectScene extends Phaser.Scene {
       state.grid.slice(),
       shadeTonesGrid(level),
     );
+    this.cubes.setSeals(sealMap(state));
     this.familiars = new FamiliarLayer(
       this,
       this.layout,
@@ -463,7 +473,7 @@ export class CollectScene extends Phaser.Scene {
     this.panels.sync(this.session.state);
   }
 
-  private toast(text: string): void {
+  private toast(text: string, holdMs = 1200): void {
     this.toastText?.destroy();
     const l = this.layout;
     const t = this.add
@@ -474,6 +484,8 @@ export class CollectScene extends Phaser.Scene {
         color: "#ffffff",
         backgroundColor: "#2a1650",
         padding: { x: 10 * this.dpr, y: 5 * this.dpr },
+        align: "center",
+        wordWrap: { width: l.frame.w * 0.9 },
       })
       .setOrigin(0.5, 1)
       .setDepth(40);
@@ -481,7 +493,7 @@ export class CollectScene extends Phaser.Scene {
     this.tweens.add({
       targets: t,
       alpha: 0,
-      delay: 1200,
+      delay: holdMs,
       duration: 300,
       onComplete: () => {
         if (this.toastText === t) this.toastText = null;
@@ -521,8 +533,10 @@ export class CollectScene extends Phaser.Scene {
         marksChanged = this.marks.delete(e.cube) || marksChanged;
       }
       this.familiars.handle(e);
-      if (e.type === "groupCompleted") this.celebrateGroup(e.group);
-      else if (e.type === "won") this.celebrateWin();
+      if (e.type === "groupCompleted") {
+        this.cubes.setSeals(sealMap(this.session.state));
+        this.celebrateGroup(e.group);
+      } else if (e.type === "won") this.celebrateWin();
     }
     playCues(planCues(batch.events), this.sinks);
     if (marksChanged) this.cubes.setMarks(this.marks);

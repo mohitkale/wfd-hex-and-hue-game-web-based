@@ -48,6 +48,26 @@ export const parking = (): collect.CollectLevel =>
     { slots: 1 },
   );
 
+/**
+ * The wax-seal tutorial (M13.4, docs/V2_VARIETY.md): all the gold is sealed by violet, so the gold
+ * group cannot start (the tap says why) until the violet is gathered. One lesson, no
+ * trap: either way round the level is winnable.
+ */
+export const sealsIntro = (): collect.CollectLevel =>
+  fromRows(
+    "dev-seals-intro",
+    "Wax Seals",
+    ["GGGGGG", "GGGGGG", "VVVVVV", "VVVVVV"],
+    "GV",
+    [[["G", 12]], [["V", 12]]],
+    {
+      palette: ["#f2c94c", "#b44ae2"],
+      slots: 2,
+      fieldCap: 2,
+      seals: [{ key: 1, cells: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }],
+    },
+  );
+
 /** Purple 12 with only 7 reachable: it waits showing 5 until the blue is cleared. */
 export const purple12 = (): collect.CollectLevel =>
   fromRows(
@@ -162,6 +182,8 @@ export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
   slice: moonlitHat,
   parking,
   purple12,
+  /** The wax-seal tutorial (M13.4). */
+  seals: sealsIntro,
   moon: demoMoon,
   /** 24×24, a mid-size picture with big squads (worst case for swarm clutter). */
   swarm: () => stripes("dev-swarm", "Swarm (dev)", 24, 4, 70),

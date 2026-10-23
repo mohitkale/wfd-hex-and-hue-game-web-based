@@ -1,16 +1,19 @@
 import type Phaser from "phaser";
 import type { CollectLayout } from "./collectLayout";
-import { paintCube, tonesFor, type CubeTones } from "./cubePaint";
+import { paintCube, paintSeal, tonesFor, type CubeTones } from "./cubePaint";
 
 /**
  * Draws every cube on the board. The cubes are painted once into a RenderTexture (one textured quad
  * per frame, however many cubes there are) and a pickup just clears that cube's cell; the queued
  * edits are flushed once per frame. (A Graphics object would re-run every cube's draw commands on
  * every frame: with 1,600 cubes that was the main source of dropped frames.) Reserved cubes get a
- * thin ring in a second, tiny Graphics that changes far more often.
+ * thin ring in a second, tiny Graphics that changes far more often. Wax seals (M13.4) are a second
+ * RenderTexture painted over the cubes, redrawn only when a seal lifts.
  */
 export class CubeLayer {
   private readonly rt: Phaser.GameObjects.RenderTexture;
+  private readonly sealRt: Phaser.GameObjects.RenderTexture;
+  private sealed = new Map<number, number>();
   private readonly ringG: Phaser.GameObjects.Graphics;
   private readonly size: number;
   private readonly gap: number;
@@ -22,7 +25,7 @@ export class CubeLayer {
   readonly stats = { fullPaints: 0, clears: 0, flushes: 0, ringRedraws: 0, paintMs: 0 };
 
   constructor(
-    scene: Phaser.Scene,
+    private readonly scene: Phaser.Scene,
     private readonly layout: CollectLayout,
     palette: readonly string[],
     private readonly grid: number[],
@@ -40,6 +43,10 @@ export class CubeLayer {
       .renderTexture(boardRect.x + cell, boardRect.y + cell, mosaicW, mosaicH)
       .setOrigin(0, 0)
       .setDepth(1);
+    this.sealRt = scene.add
+      .renderTexture(boardRect.x + cell, boardRect.y + cell, mosaicW, mosaicH)
+      .setOrigin(0, 0)
+      .setDepth(1.05);
     this.ringG = scene.add.graphics().setDepth(1.1);
     this.paintAll(scene);
   }
@@ -61,6 +68,32 @@ export class CubeLayer {
     g.destroy();
     this.stats.fullPaints++;
     this.stats.paintMs += performance.now() - started;
+  }
+
+  /**
+   * The cubes that are sealed now (padded cell → key palette index). Repaints only when the set
+   * changes, which is when a key colour's last group completes.
+   */
+  setSeals(seals: ReadonlyMap<number, number>): void {
+    if (seals.size === this.sealed.size && [...seals].every(([k, v]) => this.sealed.get(k) === v))
+      return;
+    this.sealed = new Map(seals);
+    this.sealRt.clear();
+    if (seals.size > 0) {
+      const { cell, stride } = this.layout;
+      const g = this.scene.make.graphics({}, false);
+      for (const [i, key] of seals) {
+        const x = ((i % stride) - 1) * cell + Math.floor(this.gap / 2);
+        const y = (Math.floor(i / stride) - 1) * cell + Math.floor(this.gap / 2);
+        paintSeal(g, x, y, this.size, this.tones[key]!);
+      }
+      this.sealRt.draw(g, 0, 0);
+      // The draw runs at render time: render before the Graphics goes (as paintAll does).
+      this.sealRt.render();
+      g.destroy();
+    } else {
+      this.sealRt.render();
+    }
   }
 
   /** A cube left the board (picked up): clear its cell in the texture (flushed next frame). */

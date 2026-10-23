@@ -1,3 +1,4 @@
+import { sealGate } from "./seals";
 import { cachesOf, topologyOf, type CollectState } from "./state";
 
 /** What a group's next familiar goes for (GAME_DESIGN_V2 §4). */
@@ -19,9 +20,10 @@ export function nearestTarget(s: CollectState, color: number): Target | null {
   const set = cachesOf(s).accessible[color];
   if (!set) return null;
   const t = topologyOf(s);
+  const sealed = sealGate(s);
   let best: Target | null = null;
   for (const cube of set) {
-    if (s.reserved[cube] === 1) continue;
+    if (s.reserved[cube] === 1 || (sealed && sealed(cube))) continue;
     let standing = -1;
     let d = -1;
     for (let k = 0; k < 4; k++) {
@@ -45,6 +47,7 @@ export function nearestTarget(s: CollectState, color: number): Target | null {
 export function hasAssignable(s: CollectState, color: number): boolean {
   const set = cachesOf(s).accessible[color];
   if (!set) return false;
-  for (const cube of set) if (s.reserved[cube] === 0) return true;
+  const sealed = sealGate(s);
+  for (const cube of set) if (s.reserved[cube] === 0 && !(sealed && sealed(cube))) return true;
   return false;
 }
