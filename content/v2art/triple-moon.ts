@@ -1,0 +1,51 @@
+import type { ArtPiece } from "../../tools/art/piece";
+
+/** Triple Moon (moon). See docs/ART_DIRECTION_V2.md; checked by `npm run art:check`. */
+export const tripleMoon: ArtPiece = {
+  id: "triple-moon",
+  name: "Triple Moon",
+  theme: "moon",
+  lore: "Waxing, full and waning: the three faces of the moon, side by side.",
+  rows: [
+    "....................a...................",
+    "...................aaa..................",
+    "................bbbbabbbc...............",
+    "...............bbb.....ccc..............",
+    ".....ddee.....bb..fffff..cc.....eedd....",
+    "......geeee..bb.fffffffee.ch..feegd.....",
+    ".......eeeeebb.fffffffeeee.hhffegd......",
+    "........ggeeeb.fffffggffee.hffedd.......",
+    ".........geed.ffffffgfffeed.ffed........",
+    ".........geed.ffffggfeeeeed.ffed........",
+    ".........geed.ffffgffeeeeed.ffed........",
+    ".........geed.fffffeeeeeegd.ffed........",
+    ".........gegd.ffeggfeeggegd.eeed........",
+    "........ggggdc.eefffeeefgd.ieeedd.......",
+    ".......gggggcc.eeeeeeeeggd.iieeegd......",
+    "......gggdd..cc.eeeeeggdd.ii..eeddd.....",
+    "..a..dddd.....cc..ddddd..ii.....dddd.a..",
+    ".aaa...........hhh.....iii..........aaa.",
+    "..a.............hhhiiiiii............a..",
+    "...................iii..................",
+  ],
+  legend: {
+    a: ["Gold", "shade"],
+    b: ["Amethyst", "light"],
+    c: ["Amethyst", "base"],
+    d: ["Moonstone", "deep"],
+    e: ["Moonstone", "base"],
+    f: ["Moonstone", "light"],
+    g: ["Moonstone", "shade"],
+    h: ["Amethyst", "shade"],
+    i: ["Amethyst", "deep"],
+  },
+  backdrop: ["Amethyst"],
+  provenance: {
+    author: "Claude",
+    source: "hand-drawn",
+    licence: "original-owner-pending",
+    reviewed: false,
+    notes:
+      "Silhouette and base shading blocked in with geometric drafting aids, then finished by editing the rows cell by cell. Original; no reference sprites or generated bitmaps.",
+  },
+};

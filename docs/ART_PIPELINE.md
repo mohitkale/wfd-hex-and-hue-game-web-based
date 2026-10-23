@@ -4,6 +4,11 @@ How a picture gets from a painter's PNG (or hand-typed rows) to something the ga
 what stops bad art. The rules themselves are [ART_DIRECTION_V2.md](ART_DIRECTION_V2.md); this page is
 the tooling.
 
+## Status
+
+The representative set of M11.3 (six pieces) is in `content/v2art` awaiting the owner's review at
+gate G2 (see [V2_ART_SET.md](V2_ART_SET.md)); none is reviewed or shipped.
+
 ## The pieces
 
 | What              | Where                         | Notes                                                                       |

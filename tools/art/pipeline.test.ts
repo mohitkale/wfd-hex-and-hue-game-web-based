@@ -6,7 +6,9 @@ import { candle, crescent } from "./fixtures";
 import { importFamilies, toPieceSource } from "./importFamilies";
 import { parsePiece, type ArtPiece } from "./piece";
 import { checkPiece } from "./rules";
-import { renderPng, sheetHtml } from "./sheet";
+import { readFileSync } from "node:fs";
+import { PNG } from "pngjs";
+import { CONTACT_DIR, CONTACT_SHEETS, contactSheetPng, renderPng, sheetHtml } from "./sheet";
 
 describe("art:check over the library", () => {
   it("the real library passes (and nothing is shipped before gate G2)", () => {
@@ -144,5 +146,47 @@ describe("review sheets", () => {
     const bare = renderPng(candle, 10, false);
     expect(bare.width).toBe(160);
     expect(bare.data[3]).toBe(0);
+  });
+});
+
+describe("the representative set awaiting gate G2 (M11.3)", () => {
+  it("has 6-8 pieces covering the five themes, each checked and within the art bible", () => {
+    expect(pieces.length).toBeGreaterThanOrEqual(6);
+    expect(pieces.length).toBeLessThanOrEqual(8);
+    expect(new Set(pieces.map((p) => p.theme))).toEqual(
+      new Set(["moon", "ritual", "crystal", "astrology", "familiar"]),
+    );
+    const report = checkLibrary(pieces, SHIPPED);
+    expect(report.ok).toBe(true);
+    for (const r of report.reports) expect(r.warnings, r.piece).toEqual([]);
+  });
+
+  it("sits at hundreds of cubes per piece, 16-40 per side", () => {
+    for (const r of checkLibrary(pieces).reports) {
+      expect(r.metrics!.filled, r.piece).toBeGreaterThanOrEqual(300);
+      expect(Math.max(r.metrics!.width, r.metrics!.height), r.piece).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it("claims no review until the owner approves at G2 (that approval PR updates this test)", () => {
+    for (const p of pieces) expect(p.provenance.reviewed, p.id).toBe(false);
+    expect(SHIPPED).toEqual([]);
+  });
+
+  it("every piece is original work with a recorded author, licence status and workflow", () => {
+    for (const p of pieces) {
+      expect(p.provenance.author, p.id).not.toBe("");
+      expect(p.provenance.licence, p.id).toBe("original-owner-pending");
+      expect(p.provenance.notes, p.id).toContain("drafting aids");
+    }
+  });
+
+  it("the committed contact sheets match the generator (run `npm run art:sheet -- --png`)", () => {
+    for (const { file, pitch } of CONTACT_SHEETS) {
+      const committed = PNG.sync.read(readFileSync(new URL(file, CONTACT_DIR)));
+      const fresh = contactSheetPng(pieces, pitch);
+      expect([committed.width, committed.height], file).toEqual([fresh.width, fresh.height]);
+      expect(Buffer.compare(committed.data, fresh.data), file).toBe(0);
+    }
   });
 });
