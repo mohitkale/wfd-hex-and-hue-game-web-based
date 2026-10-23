@@ -42,6 +42,11 @@ export function replay(
   log: readonly LogEntry[],
   untilTick?: number,
 ): ReplayResult {
+  const errors = validateCollectLevel(level);
+  if (errors.length > 0) throw new Error(`Invalid level: ${errors.join("; ")}`);
+  if (untilTick !== undefined && (!Number.isInteger(untilTick) || untilTick < 0)) {
+    throw new Error(`untilTick must be a non-negative integer, got ${untilTick}`);
+  }
   const state = createCollectState(level);
   const events: CollectEvent[] = [];
   const batches: TickBatch[] = [];
@@ -50,9 +55,15 @@ export function replay(
     events.push(...batch);
     batches.push({ tick, events: batch });
   };
-  const stepOnce = () => push(state.tick + 1, step(state));
+  const stepOnce = () => {
+    const before = state.tick;
+    push(before + 1, step(state));
+  };
 
   for (const [index, entry] of log.entries()) {
+    if (!Number.isInteger(entry.tick) || entry.tick < 0) {
+      throw new ReplayError(index, `tick ${entry.tick} is not a non-negative integer`);
+    }
     if (untilTick !== undefined && entry.tick > untilTick) break;
     if (entry.tick < state.tick) {
       throw new ReplayError(index, `tick ${entry.tick} is before the current tick ${state.tick}`);
@@ -67,7 +78,7 @@ export function replay(
       stepOnce();
     }
     try {
-      push(state.tick, apply(state, entry.action));
+      push(state.tick, apply(state, { ...entry.action }));
     } catch (e) {
       if (e instanceof IllegalActionError) throw new ReplayError(index, e.message, { cause: e });
       throw e;
@@ -98,9 +109,18 @@ export class CollectSession {
   private listeners = new Set<(batch: TickBatch) => void>();
   private replaceListeners = new Set<(reason: "undo" | "restart") => void>();
 
+  /**
+   * @param maxUndo how many actions can be undone
+   * @param onListenerError called when a subscriber throws. The default re-throws asynchronously
+   *   (an unhandled rejection), so one broken view can neither desync the others nor make a
+   *   completed `tap`/`tick` look as if it failed.
+   */
   constructor(
     readonly level: CollectLevel,
     private readonly maxUndo = 50,
+    private readonly onListenerError: (error: unknown) => void = (e) => {
+      void Promise.reject(e);
+    },
   ) {
     const errors = validateCollectLevel(level);
     if (errors.length > 0) throw new Error(`Invalid level: ${errors.join("; ")}`);
@@ -113,7 +133,7 @@ export class CollectSession {
 
   /** The effective action log (truncated by undo). */
   get log(): readonly LogEntry[] {
-    return this.entries;
+    return this.entries.slice();
   }
 
   get canUndo(): boolean {
@@ -143,7 +163,7 @@ export class CollectSession {
     this.history.push({ state: cloneState(this.current), logLength: this.entries.length });
     if (this.history.length > this.maxUndo) this.history.shift();
     const events = apply(this.current, action);
-    this.entries.push({ tick: this.current.tick, action });
+    this.entries.push({ tick: this.current.tick, action: { ...action } });
     this.emit({ tick: this.current.tick, events });
     return { ok: true, reason, events };
   }
@@ -167,7 +187,7 @@ export class CollectSession {
     if (!snap) return false;
     this.current = snap.state;
     this.entries.length = snap.logLength;
-    for (const l of [...this.replaceListeners]) l("undo");
+    this.notifyReplace("undo");
     return true;
   }
 
@@ -175,10 +195,26 @@ export class CollectSession {
     this.current = createCollectState(this.level);
     this.entries = [];
     this.history = [];
-    for (const l of [...this.replaceListeners]) l("restart");
+    this.notifyReplace("restart");
   }
 
   private emit(batch: TickBatch): void {
-    for (const l of [...this.listeners]) l(batch);
+    for (const l of [...this.listeners]) {
+      try {
+        l(batch);
+      } catch (e) {
+        this.onListenerError(e);
+      }
+    }
+  }
+
+  private notifyReplace(reason: "undo" | "restart"): void {
+    for (const l of [...this.replaceListeners]) {
+      try {
+        l(reason);
+      } catch (e) {
+        this.onListenerError(e);
+      }
+    }
   }
 }

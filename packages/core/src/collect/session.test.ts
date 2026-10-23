@@ -30,17 +30,17 @@ function randomGame(level: CollectLevel, seed: number) {
   const session = new CollectSession(level);
   const batches: TickBatch[] = [];
   session.subscribe((b) => batches.push(b));
-  const hashAtTick = new Map<number, string>([[0, hashState(session.state as never)]]);
+  const hashAtTick = new Map<number, string>([[0, hashState(session.state)]]);
   for (let i = 0; i < 20_000 && session.state.status === "playing"; i++) {
     if (isSettled(session.state) || rng.next() < 0.15) {
-      const legal = legalActions(session.state as never);
+      const legal = legalActions(session.state);
       if (legal.length > 0) session.tap(legal[rng.int(0, legal.length - 1)]!);
     }
     if (session.tick() === null && isSettled(session.state)) {
-      const legal = legalActions(session.state as never);
+      const legal = legalActions(session.state);
       if (legal.length === 0) break;
     }
-    hashAtTick.set(session.state.tick, hashState(session.state as never));
+    hashAtTick.set(session.state.tick, hashState(session.state));
   }
   return { session, batches, hashAtTick };
 }
@@ -79,14 +79,14 @@ describe("CollectSession", () => {
     const session = new CollectSession(fixtureB());
     const seen: TickBatch[] = [];
     session.subscribe((b) => seen.push(b));
-    const hash = hashState(session.state as never);
+    const hash = hashState(session.state);
     expect(session.tap(select(9))).toEqual({ ok: false, reason: "unavailable", events: [] });
     expect(session.tap(resume(0))).toEqual({ ok: false, reason: "unavailable", events: [] });
     expect(session.check(select(0))).toBe("ok");
     expect(seen).toEqual([]);
     expect(session.log).toEqual([]);
     expect(session.canUndo).toBe(false);
-    expect(hashState(session.state as never)).toBe(hash);
+    expect(hashState(session.state)).toBe(hash);
   });
 
   it("records the log with the tick each action was applied at", () => {
@@ -109,17 +109,17 @@ describe("CollectSession", () => {
     expect(session.log.map((e) => e.tick)).toEqual([0, 0]);
     settle(session);
     const r = replay(fixtureE(), session.log);
-    expect(hashState(r.state)).toBe(hashState(session.state as never));
+    expect(hashState(r.state)).toBe(hashState(session.state));
   });
 });
 
 describe("undo", () => {
   it("restores the exact state before the last action and truncates the log", () => {
     const session = new CollectSession(fixtureB());
-    const start = hashState(session.state as never);
+    const start = hashState(session.state);
     session.tap(select(0));
     settle(session);
-    const parked = hashState(session.state as never);
+    const parked = hashState(session.state);
     session.tap(select(2));
     settle(session);
     expect(session.log).toHaveLength(2);
@@ -127,12 +127,12 @@ describe("undo", () => {
     const replaced: string[] = [];
     session.onReplace((r) => replaced.push(r));
     expect(session.undo()).toBe(true);
-    expect(hashState(session.state as never)).toBe(parked);
+    expect(hashState(session.state)).toBe(parked);
     expect(session.log).toEqual([{ tick: 0, action: select(0) }]);
     expect(replaced).toEqual(["undo"]);
 
     expect(session.undo()).toBe(true);
-    expect(hashState(session.state as never)).toBe(start);
+    expect(hashState(session.state)).toBe(start);
     expect(session.log).toEqual([]);
     expect(session.canUndo).toBe(false);
     expect(session.undo()).toBe(false);
@@ -155,9 +155,7 @@ describe("undo", () => {
     settle(session);
     expect(session.state.status).toBe("won");
     // The final log replays to the same result.
-    expect(hashState(replay(fixtureB(), session.log).state)).toBe(
-      hashState(session.state as never),
-    );
+    expect(hashState(replay(fixtureB(), session.log).state)).toBe(hashState(session.state));
   });
 
   it("keeps at most maxUndo snapshots", () => {
@@ -174,13 +172,13 @@ describe("undo", () => {
 
   it("restart clears state, log and snapshots", () => {
     const session = new CollectSession(fixtureA());
-    const start = hashState(session.state as never);
+    const start = hashState(session.state);
     session.tap(select(0));
     settle(session);
     const replaced: string[] = [];
     session.onReplace((r) => replaced.push(r));
     session.restart();
-    expect(hashState(session.state as never)).toBe(start);
+    expect(hashState(session.state)).toBe(start);
     expect(session.log).toEqual([]);
     expect(session.canUndo).toBe(false);
     expect(replaced).toEqual(["restart"]);
@@ -198,7 +196,7 @@ describe("replay", () => {
     levels.forEach((level, i) => {
       const { session, batches } = randomGame(level, 5000 + i);
       const r = replay(level, session.log, session.state.tick);
-      expect(hashState(r.state), level.id).toBe(hashState(session.state as never));
+      expect(hashState(r.state), level.id).toBe(hashState(session.state));
       expect(nonEmpty(r.batches), level.id).toEqual(nonEmpty(batches));
       compared++;
     });
@@ -269,6 +267,95 @@ describe("replay", () => {
     } catch (e) {
       expect((e as ReplayError).cause).toBeInstanceOf(IllegalActionError);
     }
+  });
+});
+
+describe("replay details", () => {
+  it("untilTick applies actions logged at exactly that tick, and excludes later ones", () => {
+    const log = [
+      { tick: 0, action: select(0) },
+      { tick: 5, action: select(2) },
+    ];
+    const at0 = replay(fixtureB(), log, 0);
+    expect(at0.state.tick).toBe(0);
+    expect(at0.state.groups[0]!.status).toBe("working");
+    expect(at0.events).toEqual([{ type: "groupSelected", group: 0, column: 0 }]);
+
+    const before5 = replay(fixtureB(), log, 4);
+    expect(before5.state.groups[2]!.status).toBe("queued"); // the tick-5 action is not applied yet
+    const at5 = replay(fixtureB(), log, 5);
+    expect(at5.state.tick).toBe(5);
+    expect(at5.state.groups[2]!.status).toBe("working"); // applied at tick 5, inclusive
+    expect(at5.batches.at(-1)).toEqual({
+      tick: 5,
+      events: [{ type: "groupSelected", group: 2, column: 2 }],
+    });
+  });
+
+  it("applies actions logged at the same tick in log order (observable in the events)", () => {
+    const log = [
+      { tick: 0, action: select(0) },
+      { tick: 0, action: select(1) },
+    ];
+    const forward = replay(fixtureE(), log);
+    expect(forward.batches.slice(0, 2)).toEqual([
+      { tick: 0, events: [{ type: "groupSelected", group: 0, column: 0 }] },
+      { tick: 0, events: [{ type: "groupSelected", group: 1, column: 1 }] },
+    ]);
+    const reversed = replay(fixtureE(), [...log].reverse());
+    expect(reversed.batches.slice(0, 2)).toEqual([
+      { tick: 0, events: [{ type: "groupSelected", group: 1, column: 1 }] },
+      { tick: 0, events: [{ type: "groupSelected", group: 0, column: 0 }] },
+    ]);
+  });
+
+  it("refuses invalid levels and non-integer ticks", () => {
+    expect(() => replay({ ...fixtureA(), slots: 0 }, [])).toThrow("Invalid level");
+    expect(() => replay(fixtureA(), [], -1)).toThrow("untilTick");
+    expect(() => replay(fixtureA(), [], Number.NaN)).toThrow("untilTick");
+    expect(() => replay(fixtureA(), [{ tick: Number.NaN, action: select(0) }])).toThrow(
+      ReplayError,
+    );
+    expect(() => replay(fixtureA(), [{ tick: 1.5, action: select(0) }])).toThrow(
+      "non-negative integer",
+    );
+  });
+});
+
+describe("session robustness", () => {
+  it("a throwing subscriber does not break the tap, the tick or the other subscribers", () => {
+    const errors: unknown[] = [];
+    const session = new CollectSession(fixtureA(), 50, (e) => errors.push(e));
+    const good: TickBatch[] = [];
+    session.subscribe(() => {
+      throw new Error("broken view");
+    });
+    session.subscribe((b) => good.push(b));
+    session.onReplace(() => {
+      throw new Error("broken replace view");
+    });
+    const result = session.tap(select(0));
+    expect(result.ok).toBe(true);
+    expect(session.log).toHaveLength(1);
+    expect(session.canUndo).toBe(true);
+    expect(session.tick()).not.toBeNull();
+    expect(good.map((b) => b.tick)).toEqual([0, 1]);
+    expect(session.undo()).toBe(true);
+    expect(errors.map((e) => (e as Error).message)).toEqual([
+      "broken view",
+      "broken view",
+      "broken replace view",
+    ]);
+  });
+
+  it("hands out copies: mutating the log or an action cannot change the session", () => {
+    const session = new CollectSession(fixtureB());
+    const action = select(0) as { kind: "select"; column: number };
+    session.tap(action);
+    action.column = 2;
+    expect(session.log[0]!.action).toEqual(select(0));
+    (session.log as unknown as { tick: number }[]).length = 0; // mutating a copy
+    expect(session.log).toHaveLength(1);
   });
 });
 
