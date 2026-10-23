@@ -8,7 +8,7 @@ here is `content/difficulty.ts`; M12.3 (simulated players) and M12.6 (CI gate) c
 (`docs/V2_GAMEPLAY_AUDIT.md` §3, §3a, §3b) and from the intent of each tier, and are calibrated in
 M12.4 against the first pool of generated v2 levels and again after human play (G1, G3). Changing a
 number means editing this file and `content/difficulty.ts` together. The level-number to tier
-mapping (§5) is provisional until M12.5.
+mapping (§5) is defined by the curve of [V2_CURVE.md](V2_CURVE.md) (M12.5).
 
 ## 1. Why v1 failed this test
 
@@ -92,7 +92,7 @@ solver (budget 20,000 nodes; `unknown` counts as not doomed) finds no winning li
 
 ## 5. Tier table
 
-Tier by 1-based global level number (provisional until M12.5): tutorial 1–5, easy 6–15, medium 16–30,
+Tier by 1-based global level number (the curve of V2_CURVE.md, M12.5): tutorial 1–5, easy 6–15, medium 16–30,
 hard 31+. Scheduled breather levels may drop one tier. "—" means no requirement.
 
 | Requirement         | Tutorial | Easy        | Medium      | Hard        |

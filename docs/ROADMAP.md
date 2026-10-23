@@ -139,7 +139,7 @@ _Make completion require thinking rather than repetitive tapping, with automated
 - [x] **M12.2** Redesign the level generator — Generate levels from curated art with meaningful structure, deterministically. _Needs M12.1, M11.4._
 - [x] **M12.3** Anti-triviality testing — Automate simulated players and reject levels that simple strategies beat. _Needs M12.1, M8.4._
 - [x] **M12.4** Improve difficulty scoring — Score decisions, not just random losses. _Needs M12.3._
-- [ ] **M12.5** Design the difficulty curve — Define the progression and encode it as machine-checkable bands. _Needs M12.4._
+- [x] **M12.5** Design the difficulty curve — Define the progression and encode it as machine-checkable bands. _Needs M12.4._
 - [ ] **M12.6** Level quality reports and CI gate — Publish a per-level report and reject bad levels in CI. _Needs M12.2, M12.3, M12.4, M12.5._
 
 ### M13 — Magical progression, gameplay variety and engagement

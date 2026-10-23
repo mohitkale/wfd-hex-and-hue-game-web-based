@@ -123,8 +123,9 @@ export const BANDS: Readonly<Record<Tier, TierBand>> = {
 };
 
 /**
- * Tier by 1-based global level number: 1–5 tutorial, 6–15 easy, 16–30 medium, 31+ hard.
- * Provisional until the M12.5 curve is final.
+ * Tier by 1-based global level number: 1–5 tutorial, 6–15 easy, 16–30 medium, 31+ hard. The one
+ * definition of the mapping: the stages of the curve (`curveV2.ts`, docs/V2_CURVE.md) take their
+ * tier from here, and a test checks they change tier only where this does.
  */
 export function tierForLevel(level: number): Tier {
   if (!Number.isInteger(level) || level < 1) throw new Error(`invalid level number ${level}`);
@@ -235,7 +236,9 @@ export const tiersSatisfied = (m: StrategyOutcome): Tier[] =>
  * World-level repetition check over one world's measured levels: for tiers with a cap, no single
  * deterministic player may win more than that share of the world's levels of the tier.
  */
-export function checkWorld(levels: readonly { tier: Tier; metrics: LevelMetrics }[]): string[] {
+export function checkWorld(
+  levels: readonly { tier: Tier; metrics: Pick<LevelMetrics, "wins"> }[],
+): string[] {
   const out: string[] = [];
   for (const [tier, cap] of Object.entries(WORLD_WIN_SHARE_CAP) as [Tier, number][]) {
     const inTier = levels.filter((l) => l.tier === tier);
