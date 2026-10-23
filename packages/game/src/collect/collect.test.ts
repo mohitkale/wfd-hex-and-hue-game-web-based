@@ -338,3 +338,25 @@ describe("visual model stays consistent through mid-flight taps, undo and restar
     expect(ticks).toBe(45_000);
   });
 });
+
+describe("review-build level and demo wiring", () => {
+  it("opens the vertical slice by default and still honours ?level=", async () => {
+    const { levelFromSearch } = await import("./levels");
+    expect(levelFromSearch("?engine=v2").id).toBe("slice-moonlit-hat");
+    expect(levelFromSearch("?engine=v2&level=parking").id).toBe("dev-parking");
+    expect(levelFromSearch("?engine=v2&level=nope").id).toBe("slice-moonlit-hat");
+  });
+
+  it("?demo= picks the recorded line it names, and only on the slice level", async () => {
+    const { demoLineFromSearch, levelFromSearch } = await import("./levels");
+    const { LOSE_LINES, WIN_LINE } = await import("./slice");
+    const slice = levelFromSearch("");
+    expect(demoLineFromSearch("?demo=win", slice)).toBe(WIN_LINE);
+    expect(demoLineFromSearch("?demo=slots", slice)).toBe(LOSE_LINES.slots);
+    expect(demoLineFromSearch("?demo=lose", slice)).toBe(LOSE_LINES.slots);
+    expect(demoLineFromSearch("?demo=deadlock", slice)).toBe(LOSE_LINES.deadlock);
+    expect(demoLineFromSearch("?demo=other", slice)).toBeNull();
+    expect(demoLineFromSearch("", slice)).toBeNull();
+    expect(demoLineFromSearch("?demo=win", levelFromSearch("?level=parking"))).toBeNull();
+  });
+});
