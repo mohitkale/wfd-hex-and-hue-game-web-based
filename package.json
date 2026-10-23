@@ -27,6 +27,7 @@
     "art:check": "tsx tools/art/artcheck.ts",
     "art:sheet": "tsx tools/art/sheet.ts",
     "art:levels": "tsx tools/art/levels.ts",
+    "solver:report": "tsx tools/collect/solverReport.ts",
     "audit:v1": "tsx tools/audit/run.ts",
     "familiar:sheet": "tsx tools/familiar/sheet.ts",
     "icons": "tsx tools/icons/build.ts",
