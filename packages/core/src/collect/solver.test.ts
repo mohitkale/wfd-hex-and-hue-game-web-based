@@ -95,13 +95,13 @@ describe("genuine unwinnable positions", () => {
   it("a position that has already lost is unsolvable at once", () => {
     const state = createCollectState(fixtureB());
     state.status = "lost";
-    expect(new CollectSolver().solveState(state).status).toBe("unsolvable");
+    expect(new CollectSolver(fixtureB()).solveState(state).status).toBe("unsolvable");
   });
 
   it("a won position needs no moves", () => {
     const state = createCollectState(fixtureB());
     state.status = "won";
-    const r = new CollectSolver().solveState(state);
+    const r = new CollectSolver(fixtureB()).solveState(state);
     expect(r).toMatchObject({ status: "solved", line: [] });
   });
 
@@ -111,7 +111,7 @@ describe("genuine unwinnable positions", () => {
     for (let seed = 1; seed <= 400 && doomed < 5; seed++) {
       const level = randomLevel(seed, true);
       if (!level || validateCollectLevel(level).length > 0) continue;
-      const solver = new CollectSolver();
+      const solver = new CollectSolver(level);
       const root = createCollectState(level);
       const verdicts = legalActions(root).map((action) => {
         const next = cloneState(root);
@@ -122,9 +122,7 @@ describe("genuine unwinnable positions", () => {
       if (verdicts.includes("unknown")) continue;
       // The level is winnable exactly when some first move wins now or leaves a winnable state.
       const winnable = verdicts.some((v) => v === "winnable" || v === "won");
-      expect(solver.solve(level, 50_000).status, `seed ${seed}`).toBe(
-        winnable ? "solved" : "unsolvable",
-      );
+      expect(solver.solve(50_000).status, `seed ${seed}`).toBe(winnable ? "solved" : "unsolvable");
       if (verdicts.includes("doomed")) doomed++;
     }
     expect(doomed).toBeGreaterThanOrEqual(1);
@@ -140,15 +138,15 @@ describe("budgets and caching", () => {
   });
 
   it("an exhausted query caches nothing false: a bigger budget on the same solver still finds the win", () => {
-    const solver = new CollectSolver();
-    expect(solver.solve(fixtureB(), 1).status).toBe("unknown");
-    expect(solver.solve(fixtureB(), 10_000).status).toBe("solved");
+    const solver = new CollectSolver(fixtureB());
+    expect(solver.solve(1).status).toBe("unknown");
+    expect(solver.solve(10_000).status).toBe("solved");
   });
 
   it("shares work between queries: the second answer is immediate", () => {
-    const solver = new CollectSolver();
-    const first = solver.solve(fixtureB());
-    const second = solver.solve(fixtureB());
+    const solver = new CollectSolver(fixtureB());
+    const first = solver.solve();
+    const second = solver.solve();
     expect(second.status).toBe(first.status);
     expect(second.line).toEqual(first.line);
     expect(second.nodes).toBe(0);
@@ -160,6 +158,45 @@ describe("budgets and caching", () => {
 
   it("is deterministic", () => {
     expect(solve(fixtureB())).toEqual(solve(fixtureB()));
+  });
+});
+
+describe("a solver belongs to one level", () => {
+  it("rejects a state from another level, a different slot count or different cubes", () => {
+    const solver = new CollectSolver(fixtureB());
+    expect(() => solver.solveState(createCollectState(fixtureA()))).toThrow(
+      "not from this solver's level",
+    );
+    expect(() =>
+      solver.solveState(createCollectState({ ...fixtureB(), slots: fixtureB().slots + 1 })),
+    ).toThrow("not from this solver's level");
+    const recoloured = fixtureB();
+    recoloured.cells = recoloured.cells.map((c) => (c === 1 ? 2 : c));
+    recoloured.columns = [
+      [{ color: 2, capacity: 2 }],
+      [{ color: 2, capacity: 2 }],
+      [{ color: 0, capacity: 16 }],
+    ];
+    expect(() => solver.solveState(createCollectState(recoloured))).toThrow(
+      "not from this solver's level",
+    );
+  });
+
+  it("accepts any state reached by play on that level", () => {
+    const level = fixtureB();
+    const solver = new CollectSolver(level);
+    const s = createCollectState(level);
+    apply(s, legalActions(s)[0]!);
+    runUntilSettled(s);
+    expect(() => solver.solveState(s)).not.toThrow();
+  });
+
+  it("two solvers on different levels never share verdicts", () => {
+    const a = new CollectSolver(deadEnds());
+    const b = new CollectSolver(fixtureB());
+    expect(a.solve().status).toBe("unsolvable");
+    expect(b.solve().status).toBe("solved");
+    expect(a.solve().status).toBe("unsolvable");
   });
 });
 

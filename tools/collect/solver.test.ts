@@ -12,7 +12,7 @@ describe("the solver on the shipped review levels", () => {
   it.each(levels().map((l) => [l.id, l] as const))(
     "%s: solved, the line replays to a win, and so does the fewest-slots line",
     (_id, level) => {
-      const result = new collect.CollectSolver(200_000).solve(level);
+      const result = new collect.CollectSolver(level, 200_000).solve();
       expect(result.status).toBe("solved");
       const won = collect.replayLine(level, result.line!);
       expect(won.state.status).toBe("won");
@@ -30,7 +30,7 @@ describe("the solver on the shipped review levels", () => {
     for (const line of Object.values(LOSE_LINES)) {
       const session = collect.replayLine(level, line);
       expect(session.state.status).toBe("lost");
-      expect(new collect.CollectSolver().solveState(session.state).status).toBe("unsolvable");
+      expect(new collect.CollectSolver(level).solveState(session.state).status).toBe("unsolvable");
     }
   });
 

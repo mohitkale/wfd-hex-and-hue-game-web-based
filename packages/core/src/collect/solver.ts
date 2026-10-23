@@ -1,4 +1,5 @@
 import { apply, legalActions, type Action } from "./actions";
+import { EMPTY } from "../level";
 import type { CollectLevel } from "./level";
 import { CollectSession } from "./session";
 import { isSettled, runUntilSettled } from "./sim";
@@ -13,7 +14,9 @@ import { cloneState, createCollectState, stateKey, type CollectState } from "./s
  * group) followed by ticks until settled. Reachability, blocking, partial groups, slots, summon
  * order, re-entry of parked groups and both losses (`slotsFull`, `deadlock`) are all decided by the
  * engine, never re-implemented here. States are merged by `stateKey` (which ignores tick, slot
- * numbers and routes), and results are cached across queries.
+ * numbers and routes), and results are cached across queries. A solver is bound to **one level**:
+ * `stateKey` does not say which level a state is from (colours, slot count, group sizes), so a
+ * cache shared between levels would be unsound; `solveState` rejects a state from another level.
  *
  * The search is bounded: a query that runs out of its node budget answers `unknown`, never a guess.
  * `unsolvable` and "doomed" are only reported for fully explored subtrees.
@@ -42,9 +45,26 @@ type Cached = Action | false;
 
 export class CollectSolver {
   private readonly memo = new Map<string, Cached>();
+  private readonly opening: CollectState;
+  private readonly openingParams: string;
+  private readonly openingGroups: string;
 
-  constructor(readonly defaultBudget = DEFAULT_NODE_BUDGET) {}
+  constructor(
+    readonly level: CollectLevel,
+    readonly defaultBudget = DEFAULT_NODE_BUDGET,
+  ) {
+    this.opening = createCollectState(level);
+    this.openingParams = JSON.stringify(this.opening.params);
+    this.openingGroups = JSON.stringify(this.opening.groups.map((g) => [g.color, g.capacity]));
+  }
 
+  /** Whether `state` can have been reached from this solver's level (same rules, groups and cubes). */
+  private fromThisLevel(state: CollectState): boolean {
+    if (JSON.stringify(state.params) !== this.openingParams) return false;
+    if (JSON.stringify(state.groups.map((g) => [g.color, g.capacity])) !== this.openingGroups)
+      return false;
+    return state.grid.every((c, i) => c === EMPTY || c === this.opening.grid[i]);
+  }
   /** Cached verdicts (winnable and doomed states). */
   get size(): number {
     return this.memo.size;
@@ -54,13 +74,17 @@ export class CollectSolver {
     this.memo.clear();
   }
 
-  /** Solves a level from its opening position. */
-  solve(level: CollectLevel, budget = this.defaultBudget): SolveResult {
-    return this.solveState(createCollectState(level), budget);
+  /** Solves the level from its opening position. */
+  solve(budget = this.defaultBudget): SolveResult {
+    return this.solveState(this.opening, budget);
   }
 
-  /** Solves from any state (it is first run to a settled state, as the model requires). */
+  /**
+   * Solves from any state of this level (it is first run to a settled state, as the model
+   * requires). Throws for a state from a different level.
+   */
   solveState(start: CollectState, budget = this.defaultBudget): SolveResult {
+    if (!this.fromThisLevel(start)) throw new Error("state is not from this solver's level");
     const root = cloneState(start);
     if (!isSettled(root)) runUntilSettled(root);
     const stats = { nodes: 0, memoHits: 0, losses: 0, exhausted: false, budget };
@@ -147,7 +171,7 @@ export class CollectSolver {
 
 /** Solves a level with a fresh cache (use a `CollectSolver` to share work across queries). */
 export function solve(level: CollectLevel, budget = DEFAULT_NODE_BUDGET): SolveResult {
-  return new CollectSolver(budget).solve(level);
+  return new CollectSolver(level, budget).solve();
 }
 
 /**
@@ -178,7 +202,7 @@ export function minSlots(
   budget = DEFAULT_NODE_BUDGET,
 ): { slots: number | null; unknown: boolean; line: Action[] | null } {
   for (let slots = 1; slots <= level.slots; slots++) {
-    const r = new CollectSolver(budget).solve({ ...level, slots });
+    const r = new CollectSolver({ ...level, slots }, budget).solve();
     if (r.status === "solved") return { slots, unknown: false, line: r.line };
     if (r.status === "unknown") return { slots: null, unknown: true, line: null };
   }

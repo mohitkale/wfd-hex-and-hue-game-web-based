@@ -27,7 +27,10 @@ line in the full engine.
 
 Search is depth-first over a cache keyed by `stateKey` (which ignores tick, slot numbers and
 routes, so reordered independent actions and equivalent parkings merge). Children are tried with
-the most cubes delivered first. Results are cached across queries on one `CollectSolver`.
+the most cubes delivered first. Results are cached across queries on one `CollectSolver`. A solver is bound to one level because
+`stateKey` does not say which level a state is from (colours, slot count, group sizes): sharing a
+cache between levels would be unsound, so `solveState` throws for a state that is not from the
+solver's level.
 
 **Budgets:** a query expands at most `budget` child states (default 20,000). When it runs out it
 answers `unknown`; `unsolvable` and `doomed` are only ever reported for a fully explored subtree,

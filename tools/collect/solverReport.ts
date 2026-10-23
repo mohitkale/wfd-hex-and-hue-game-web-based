@@ -22,8 +22,8 @@ export function report(budget = 200_000): Row[] {
   const levels = [moonlitHat(), ...Object.values(ART_LEVELS).map((make) => make())];
   return levels.map((level) => {
     const started = performance.now();
-    const solver = new collect.CollectSolver(budget);
-    const r = solver.solve(level);
+    const solver = new collect.CollectSolver(level, budget);
+    const r = solver.solve();
     if (r.status === "solved") {
       const session = collect.replayLine(level, r.line!);
       if (session.state.status !== "won") throw new Error(`${level.id}: solution did not replay`);
