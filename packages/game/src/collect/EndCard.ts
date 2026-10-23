@@ -15,6 +15,10 @@ export interface EndCardOptions {
   reduced: boolean;
   onRetry: () => void;
   onUndo: () => void;
+  /** A tutorial win: the way on ("Next", or "Play" after the last tutorial level). */
+  next?: { label: string; onPress: () => void };
+  /** A tutorial loss: Undo is the thing to press, so it becomes the primary button and says why. */
+  emphasizeUndo?: boolean;
 }
 
 /**
@@ -29,7 +33,9 @@ export function buildEndCard(
 ): Phaser.GameObjects.GameObject[] {
   const dpr = l.dpr;
   const cx = l.frame.x + l.frame.w / 2;
-  const { title, detail } = endCardText(o);
+  const text = endCardText(o);
+  const title = text.title;
+  const detail = o.emphasizeUndo && o.canUndo ? "Tap Undo to take it back" : text.detail;
   const shade = scene.add
     .rectangle(cx, l.frame.y + l.frame.h / 2, l.frame.w, l.frame.h, 0x140b2e, 0.72)
     .setDepth(50)
@@ -56,23 +62,44 @@ export function buildEndCard(
     .setDepth(51)
     .setAlpha(0);
   const bw = Math.min(l.frame.w * 0.6, 220 * dpr);
-  const retry = new Button(scene, cx, l.frame.y + l.frame.h * 0.5, bw, "Retry", {
-    dpr,
-    primary: true,
-    onPress: o.onRetry,
-  }).setDepth(51);
+  const lead = o.next ?? null;
+  const undoLeads = !o.won && o.canUndo && o.emphasizeUndo === true;
+  const retry = new Button(
+    scene,
+    cx,
+    l.frame.y + l.frame.h * (lead || undoLeads ? 0.5 + 0.12 : 0.5),
+    bw,
+    "Retry",
+    {
+      dpr,
+      primary: !lead && !undoLeads,
+      onPress: o.onRetry,
+    },
+  ).setDepth(51);
   scene.add.existing(retry);
   retry.setAlpha(0);
   const parts: Phaser.GameObjects.GameObject[] = [shade, heading, sub, retry];
+  if (lead) {
+    const next = new Button(scene, cx, l.frame.y + l.frame.h * 0.5, bw, lead.label, {
+      dpr,
+      primary: true,
+      onPress: lead.onPress,
+    }).setDepth(51);
+    scene.add.existing(next);
+    next.setAlpha(0);
+    parts.push(next);
+  }
   if (!o.won && o.canUndo) {
     const undo = new Button(
       scene,
       cx,
-      l.frame.y + l.frame.h * 0.5 + 60 * dpr,
+      // Normally below Retry; when Undo is what the tutorial points at, it takes the main place.
+      l.frame.y + l.frame.h * 0.5 + (undoLeads ? 0 : 60 * dpr),
       bw,
       "Undo last move",
       {
         dpr,
+        primary: undoLeads,
         onPress: o.onUndo,
       },
     ).setDepth(51);

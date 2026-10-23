@@ -2,6 +2,8 @@ import * as collect from "@hexhue/core/collect";
 import { createRng } from "@hexhue/core";
 import { ART_LEVELS } from "./artLevels";
 import { dailyLevelId, dayNumber, utcDate } from "./daily";
+import { TUTORIAL, TUTORIAL_IDS } from "./tutorialLevels";
+import { nextTutorial, shouldOfferTutorial, type TutorialBook } from "./tutorialBook";
 import { layeredOrb } from "./denseBoard";
 import { LOSE_LINES, SLICE_ID, WIN_LINE, moonlitHat } from "./slice";
 
@@ -196,6 +198,29 @@ export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
   /** 40×40 = 1,600 cubes and up to 36 familiars: the renderer's worst case (the board size limit). */
   big: () => stripes("dev-big", "Big 40×40 (dev)", 40, 5, 130),
 };
+
+// The tutorial levels (M14.2), reachable as `?level=tutorial-summon` and so on.
+for (const t of TUTORIAL) DEV_LEVELS[t.id] = t.make;
+
+/**
+ * The tutorial level to start with (M14.2), or null for none:
+ * - `?level=tutorial-<name>` is that level, and `?level=tutorial` the first one not finished yet
+ *   (the first if all are): an explicit ask always gets the tutorial, even after a skip;
+ * - with no `?level=` at all, a first visit starts in the tutorial unless it was skipped or finished;
+ * - `?demo=` (the recorded slice demo) and every other level never get one.
+ */
+export function tutorialStart(
+  search: string,
+  chosen: string | null | undefined,
+  book: TutorialBook,
+): string | null {
+  const params = new URLSearchParams(search);
+  const name = chosen ?? params.get("level");
+  if (name === "tutorial") return nextTutorial(book) ?? TUTORIAL_IDS[0]!;
+  if (name !== null && TUTORIAL_IDS.includes(name)) return name;
+  if (name === null && !params.has("demo") && shouldOfferTutorial(book)) return nextTutorial(book);
+  return null;
+}
 
 /** Every art piece as a playable preview level (`?level=art-<piece id>`, M11.5). */
 Object.assign(DEV_LEVELS, ART_LEVELS);
