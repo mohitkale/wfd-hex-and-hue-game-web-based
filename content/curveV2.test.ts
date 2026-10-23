@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  LENGTH_STEP_CAP,
   MAX_CUBES,
   MAX_SECONDS,
   MIN_STAGE_STEP,
@@ -12,7 +13,14 @@ import {
   type CurveEntry,
   type Stage,
 } from "./curveV2";
-import { DETERMINISTIC_IDS, TIERS, tierForLevel, type DeterministicId } from "./difficulty";
+import {
+  BANDS,
+  DETERMINISTIC_IDS,
+  TIERS,
+  WORLD_WIN_SHARE_CAP,
+  tierForLevel,
+  type DeterministicId,
+} from "./difficulty";
 
 const wins = (...winners: DeterministicId[]) =>
   Object.fromEntries(DETERMINISTIC_IDS.map((id) => [id, winners.includes(id)])) as Record<
@@ -83,6 +91,32 @@ describe("the stages are a valid schema", () => {
       expect(stageForLevel(n).tier, `level ${n}`).toBe(tierForLevel(n));
   });
 
+  it("takes each stage's tier from the one level-to-tier mapping: it changes only at stage boundaries", () => {
+    for (const s of STAGES) {
+      const last = Number.isFinite(s.to) ? s.to : s.from + 100;
+      for (let n = s.from; n <= last; n++)
+        expect(tierForLevel(n), `${s.id} level ${n}`).toBe(s.tier);
+    }
+  });
+
+  it("states requirements no looser than the tier band for the measures both name", () => {
+    for (const s of STAGES) {
+      const band = BANDS[s.tier];
+      for (const r of s.requires) {
+        const tierRange = (band as unknown as Record<string, { min?: number; max?: number }>)[
+          r.measure
+        ];
+        if (!tierRange) continue; // the measure is not part of the tier table (score, hiddenColors, ...)
+        if (tierRange.min !== undefined)
+          expect(r.min ?? -Infinity, `${s.id} ${r.measure} min`).toBeGreaterThanOrEqual(
+            tierRange.min,
+          );
+        if (tierRange.max !== undefined)
+          expect(r.max ?? Infinity, `${s.id} ${r.measure} max`).toBeLessThanOrEqual(tierRange.max);
+      }
+    }
+  });
+
   it("is monotone: bands and requirements get stricter, tiers never get easier", () => {
     for (let i = 1; i < STAGES.length; i++) {
       const a = STAGES[i - 1]!;
@@ -132,6 +166,12 @@ describe("checkEntry", () => {
     expect(checkEntry(high).join()).toContain("score 60 outside 0..20");
   });
 
+  it("rejects a planning depth of infinity (no lookahead wins): it is not a requirement met", () => {
+    const e = good(40);
+    e.measures = { ...e.measures, planningDepth: Number.POSITIVE_INFINITY };
+    expect(checkEntry(e).join()).toContain("planningDepth ∞ outside 3..5");
+  });
+
   it("flags a missing decision: no blocked colour in stage 2, no tempting choice in stage 4", () => {
     const e = good(7);
     e.measures = { ...e.measures, hiddenColors: 0 };
@@ -143,7 +183,7 @@ describe("checkEntry", () => {
     expect(checkEntry(f).join()).toContain("temptingPoorShare");
     const g = good(60);
     g.measures = { ...g.measures, planningDepth: 2 };
-    expect(checkEntry(g).join()).toContain("planningDepth 2 outside 3..∞");
+    expect(checkEntry(g).join()).toContain("planningDepth 2 outside 3..5");
   });
 
   it("rejects medium and hard levels that column-spam wins (the tier's player rules)", () => {
@@ -177,6 +217,13 @@ describe("checkEntry", () => {
     }
   });
 
+  it("treats a NaN length as over the cap, not as passing it", () => {
+    const e = good(6);
+    e.measures = { ...e.measures, seconds: Number.NaN };
+    expect(checkEntry(e).join()).toContain("length cap");
+    expect(checkEntry({ ...good(6), cubes: Number.NaN }).join()).toContain("cube cap");
+  });
+
   it("treats NaN as a deviation", () => {
     const e = good(6);
     e.measures = { ...e.measures, score: Number.NaN };
@@ -207,6 +254,35 @@ describe("checkCurve", () => {
     const problems = checkCurve([flat(7, 30), flat(20, 30 + MIN_STAGE_STEP - 1)]);
     expect(problems.join()).toContain("must rise at least");
     expect(checkCurve([flat(7, 30), flat(20, 30 + MIN_STAGE_STEP)])).toEqual([]);
+  });
+
+  it("rejects a stage that takes much longer, or has many more cubes, than the one before (difficulty is not length)", () => {
+    const longer = (n: number, seconds: number, cubes: number): CurveEntry => {
+      const e = good(n);
+      e.measures = { ...e.measures, seconds };
+      return { ...e, cubes };
+    };
+    const base = checkCurve([
+      longer(2, 100, 300),
+      longer(8, 100 * LENGTH_STEP_CAP, 300 * LENGTH_STEP_CAP),
+    ]);
+    expect(base).toEqual([]);
+    const slow = checkCurve([longer(2, 100, 300), longer(8, 100 * LENGTH_STEP_CAP + 1, 300)]);
+    expect(slow.join()).toContain("difficulty must not come from length");
+    const big = checkCurve([longer(2, 100, 300), longer(8, 100, 300 * LENGTH_STEP_CAP + 1)]);
+    expect(big.join()).toContain("difficulty must not come from more cubes");
+  });
+
+  it("applies the world-level repetition caps: one cheap player winning most of a tier's levels is rejected", () => {
+    // Hard levels where `largest` wins: the cap is 25 %, but the hard tier's own rule already rejects it.
+    expect(WORLD_WIN_SHARE_CAP.hard).toBe(0.25);
+    const hardEntries = [31, 32, 33, 34].map((n) => good(n));
+    expect(checkCurve(hardEntries)).toEqual([]);
+    const mediumWins: CurveEntry[] = [16, 17, 18, 19].map((n) => {
+      const e = good(n);
+      return { ...e, strategies: { ...e.strategies, wins: wins("largest") } };
+    });
+    expect(checkCurve(mediumWins).join()).toContain("largest wins 4 of 4 medium levels");
   });
 
   it("accepts a partly filled world (a library placed piece by piece) and an empty one", () => {
@@ -243,7 +319,11 @@ describe("docs/V2_CURVE.md matches the code", () => {
   const requires = (s: Stage): string =>
     s.requires.length === 0
       ? "nothing beyond the tier"
-      : s.requires.map((r) => `${r.measure} ≥ ${r.min}`).join("; ");
+      : s.requires
+          .map((r) =>
+            r.max === undefined ? `${r.measure} ≥ ${r.min}` : `${r.measure} ${r.min}–${r.max}`,
+          )
+          .join("; ");
 
   it("lists every stage with its levels, tier, score band and requirements", () => {
     const table = rows();
@@ -265,5 +345,6 @@ describe("docs/V2_CURVE.md matches the code", () => {
     expect(doc).toContain(`**${MAX_SECONDS} s**`);
     expect(doc).toContain(`**${MAX_CUBES} cubes**`);
     expect(doc).toContain(`**${MIN_STAGE_STEP} points**`);
+    expect(doc).toContain(`**${LENGTH_STEP_CAP}x**`);
   });
 });

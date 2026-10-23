@@ -9,13 +9,13 @@ difficulty document is now defined by this curve.
 
 ## The stages
 
-| Stage                           | Levels | Tier     | Score  | Requires                                                         |
-| ------------------------------- | ------ | -------- | ------ | ---------------------------------------------------------------- |
-| Learn collection                | 1–5    | tutorial | 0–20   | nothing beyond the tier                                          |
-| Blocked colours and slots       | 6–15   | easy     | 8–35   | hiddenColors ≥ 1                                                 |
-| Partial groups and dependencies | 16–30  | medium   | 20–55  | hiddenColors ≥ 1; deadEndShare ≥ 0.02                            |
-| Ordering decisions              | 31–50  | hard     | 35–75  | deadEndShare ≥ 0.05; temptingPoorShare ≥ 0.02; planningDepth ≥ 2 |
-| Advanced combinations           | 51+    | hard     | 50–100 | deadEndShare ≥ 0.1; temptingPoorShare ≥ 0.05; planningDepth ≥ 3  |
+| Stage                           | Levels | Tier     | Score  | Requires                                                           |
+| ------------------------------- | ------ | -------- | ------ | ------------------------------------------------------------------ |
+| Learn collection                | 1–5    | tutorial | 0–20   | nothing beyond the tier                                            |
+| Blocked colours and slots       | 6–15   | easy     | 8–35   | hiddenColors ≥ 1; deadEndShare 0.02–0.3                            |
+| Partial groups and dependencies | 16–30  | medium   | 20–55  | hiddenColors ≥ 1; deadEndShare 0.05–0.5                            |
+| Ordering decisions              | 31–50  | hard     | 35–75  | deadEndShare 0.15–0.7; temptingPoorShare ≥ 0.02; planningDepth 3–5 |
+| Advanced combinations           | 51+    | hard     | 50–100 | deadEndShare 0.15–0.7; temptingPoorShare ≥ 0.05; planningDepth 3–5 |
 
 - **What each teaches:** 1–5 the loop (levels 1–3 can never be lost, 4 and 5 introduce a loss, the
   holding slots); 6–15 a colour buried under others and waiting groups; 16–30 a group too big for
@@ -31,42 +31,64 @@ difficulty document is now defined by this curve.
 
 ## Difficulty rises through decisions, not length
 
-- The score never reads length (`seconds`, `cubes`, failure rates are not inputs).
-- Every stage shares the same length cap: a level may take at most **420 s** (the settled-sequential
-  upper bound) and have at most **700 cubes**.
+- The score never reads length (`seconds`, `cubes` and failure rates are not inputs), and a stage
+  requirement may not name a length measure (a test enforces it).
+- Every level of every stage has the same caps: at most **420 s** (the settled-sequential upper
+  bound) and **700 cubes**.
+- A stage's mean length may be at most **1.5x** the previous populated stage's, in seconds and in
+  cubes: difficulty may not creep up by making levels longer.
 - A world's stages must rise: each populated stage's mean score must beat the previous populated
   stage's by at least **3 points**.
+- The world-level repetition caps of DIFFICULTY_V2 §5 apply (no one cheap player may win most of a
+  tier's levels).
 
-## What the pipeline does with it
+## What the curve is, relative to the tier bands
 
-- `checkEntry(entry)` lists every way one level deviates (tier rules, loss rule, score band,
-  requirements, length caps); `checkCurve(entries)` adds unique level numbers and the rising stage
-  means. A deviation fails the build.
-- `tools/art/levels.ts` takes each placed piece's target tier from its level number
-  (`PREVIEW_LEVEL`), and a test runs `checkCurve` over the placed levels.
+The curve is **a layer on top of** the tier bands, not a replacement. Its requirements are never
+looser than the tier's band for the measures both name (a test checks it: dead ends, planning
+depth), but it checks fewer things: the full band of DIFFICULTY_V2 §5 (`checkLevel`: free steps,
+solution count, slack, recovery depth, random win rate...) is the quality gate of M12.6. A level can
+therefore be **on the curve and still fail its tier's full band** (none of the generated levels meets a
+full band: V2_MEASURES.md). The tiers themselves come from one mapping, `tierForLevel`
+(difficulty.ts); the stages take their tier from it and a test checks it changes only at stage
+boundaries.
 
-## Where the art library sits today
+## What reads the curve
 
-| Level | Piece           | Score | Buried colours | Reachable loss | Cubes | Seconds (upper bound) |
-| ----- | --------------- | ----- | -------------- | -------------- | ----- | --------------------- |
-| 1     | crescent-moon   | 3.3   | 0              | no             | 312   | 137                   |
-| 2     | triple-moon     | 3.3   | 0              | no             | 328   | 126                   |
-| 3     | witchs-cauldron | 3.3   | 0              | no             | 486   | 253                   |
-| 6     | black-cat       | 11    | 3              | yes            | 575   | 266                   |
+- `art:levels` (`tools/art/levels.ts`) generates each placed piece for its stage's tier and **throws if
+  the generated level deviates from the curve** (`checkEntry`), so the committed data cannot hold
+  a deviating placed level. Placement is in `tools/art/placement.ts`.
+- `checkEntry(entry)` lists every way one level deviates (the tier's cheap-player rules, the loss
+  rule, the score band, the requirements, the length caps); `checkCurve(entries)` adds unique level
+  numbers, rising stages, the length step and the world caps.
+- A test runs `checkCurve` over the placed levels.
+- **Not yet consumed:** there is no shipped world (M13.1), so no world is checked end to end, and
+  the M12.6 report and CI gate will run `checkCurve` and `checkLevel` over every shipped level.
 
-These four pass the curve. **Two pieces cannot be placed**: the amethyst cluster and Libra are also
-tutorial-grade pictures with no reachable loss, and the first stage has only three lossless slots
-(1–3) while levels 4 and 5 need a loss that none of them can produce. And **nothing reaches stage 3
-or later**: the generator cannot make decisions out of a picture that has none (V2_GENERATOR.md,
-V2_STRATEGIES.md), and the black cat, the only picture with buried colours, tops out at an easy
-level with a score of 11. The curve therefore shows a gap, not a result: the catalogue the roadmap
-plans (M13.1) needs layered pictures to fill levels 16 and up, or hand-designed levels like the
-slice (score 40, which fits stage 4's score band but does not meet its player rules or its
-requirements, because it was not designed against this curve).
+## Where the library sits today
+
+| Level | Piece             | Score | Buried colours | Reachable loss | Cubes | Seconds (upper bound) |
+| ----- | ----------------- | ----- | -------------- | -------------- | ----- | --------------------- |
+| 1     | crescent-moon     | 3.3   | 0              | no             | 312   | 137                   |
+| 2     | triple-moon       | 3.3   | 0              | no             | 328   | 126                   |
+| 3     | witchs-cauldron   | 3.3   | 0              | no             | 486   | 253                   |
+| 16    | slice-moonlit-hat | 40.3  | 3              | yes            | 196   | 82                    |
+
+- **Three generated pieces fit stage 1** (levels 1 to 3, lossless).
+- **The hand-designed slice fits stage 3** at level 16: score 40.3 is inside the medium band, every
+  cheap player loses it, it has buried colours and a dead end rate of 0.15. It misses stage 4
+  because its planning depth is 2, not 3. (An earlier draft of this page said it fit no stage;
+  that was wrong.) So the curve is reachable by hand design; it is the generator that is not there yet.
+- **Three generated pieces cannot be placed.** Amethyst and Libra are tutorial-grade and lossless, and
+  levels 4 and 5 need a loss; the black cat is easy for the cheap players (they win 6 of 9) but has
+  no dead end along its winning line, which stage 2 and the easy band require. So **no generated
+  level reaches stage 2 or later**. The catalogue the roadmap plans (M13.1) needs layered
+  pictures, or hand-designed levels like the slice, to fill levels 6 and up.
 
 ## Limits
 
-- The numbers are first guesses. The score bands in particular rest on seven measured levels.
-- "Requires" thresholds are small and mostly floors; whether they separate real stages is what the
-  M12.6 pool and human play must tell.
+- The numbers are first guesses, calibrated on seven measured levels (the slice and the six art
+  levels; none is a generated stage 3 to 5 level). M12.6 pools and human play (G3) must tell whether
+  they separate real stages.
+- "Requires" are small floors and ceilings; passing them does not make a good level.
 - Special-mechanic levels (M13.4) may add stages or requirements, never relax these.

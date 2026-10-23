@@ -12,9 +12,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import * as collect from "@hexhue/core/collect";
 import { pieces } from "../../content/v2art";
 import { encodeArtLevel, type ArtGenerated } from "../../packages/game/src/collect/artLevelCodec";
-import { stageForLevel } from "../../content/curveV2";
-import type { Tier } from "../../content/difficulty";
+import { checkEntry } from "../../content/curveV2";
+import { curveEntry } from "../collect/curveEntries";
 import { generateForTier } from "../collect/tierGate";
+import { PREVIEW_LEVEL, tierFor } from "./placement";
 import { pieceToArt, type ArtPiece } from "./piece";
 
 export const OUTPUT = new URL(
@@ -22,27 +23,8 @@ export const OUTPUT = new URL(
   import.meta.url,
 );
 
-/**
- * Where each piece sits on the difficulty curve (content/curveV2.ts, docs/V2_CURVE.md): its target
- * level number, from which the curve gives its tier. Only pieces that can meet their stage are
- * placed: the library has five tutorial-grade lossless pictures for the three lossless slots of the
- * first stage, and nothing that reaches stage 3 or later. Unplaced pieces are generated as tutorial
- * levels and are not part of the curve.
- */
-export const PREVIEW_LEVEL: Record<string, number> = {
-  "crescent-moon": 1,
-  "triple-moon": 2,
-  "witchs-cauldron": 3,
-  "black-cat": 6,
-};
-export const DEFAULT_TIER: Tier = "tutorial";
+export { DEFAULT_TIER, PREVIEW_LEVEL, tierFor } from "./placement";
 export const SEED = 1;
-
-/** A piece's target tier: its stage's, if it is on the curve. */
-export const tierFor = (id: string): Tier => {
-  const level = PREVIEW_LEVEL[id];
-  return level === undefined ? DEFAULT_TIER : stageForLevel(level).tier;
-};
 
 export interface ArtLevel {
   level: collect.CollectLevel;
@@ -59,6 +41,13 @@ export function levelForPiece(piece: ArtPiece): ArtLevel {
   const measured = collect.measureLevel(g.level);
   if (!measured) throw new Error(`${piece.id}: the generated level could not be measured`);
   const score = collect.difficultyScore(measured);
+  // A placed piece must be on the curve: a generated level that deviates fails the build here.
+  const placed = PREVIEW_LEVEL[piece.id];
+  if (placed !== undefined) {
+    const problems = checkEntry(curveEntry(g.level, placed));
+    if (problems.length > 0)
+      throw new Error(`${piece.id} deviates from the curve:\n${problems.join("\n")}`);
+  }
   return {
     level: {
       ...g.level,

@@ -1,4 +1,12 @@
-import { checkStrategies, type Range, type StrategyOutcome, type Tier } from "./difficulty";
+import {
+  LOSSLESS_TUTORIAL_LEVELS,
+  checkStrategies,
+  checkWorld,
+  tierForLevel,
+  type Range,
+  type StrategyOutcome,
+  type Tier,
+} from "./difficulty";
 
 /**
  * The v2 difficulty progression (docs/V2_CURVE.md, M12.5): which skills each stretch of levels
@@ -20,7 +28,11 @@ export interface Requirement {
   why: string;
 }
 
-/** The measures the curve reads (a subset of core's `Measures`, plus the score). */
+/**
+ * The measures the curve reads (a subset of core's `Measures`, plus the score). `cubes` and
+ * `seconds` are length: they are read by the length caps, never by a stage requirement (a test
+ * enforces it).
+ */
 export const STAGE_MEASURES = [
   "score",
   "deadEndShare",
@@ -55,7 +67,7 @@ export const STAGES: readonly Stage[] = [
     name: "Learn collection",
     from: 1,
     to: 5,
-    tier: "tutorial",
+    tier: tierForLevel(1),
     teaches: "Send a group, watch it collect and deliver; the first groups that must wait.",
     score: { min: 0, max: 20 },
     requires: [],
@@ -65,22 +77,35 @@ export const STAGES: readonly Stage[] = [
     name: "Blocked colours and slots",
     from: 6,
     to: 15,
-    tier: "easy",
+    tier: tierForLevel(6),
     teaches: "A colour can be buried under others; waiting groups use the holding slots.",
     score: { min: 8, max: 35 },
-    requires: [{ measure: "hiddenColors", min: 1, why: "blocked colours must be present" }],
+    requires: [
+      { measure: "hiddenColors", min: 1, why: "blocked colours must be present" },
+      {
+        measure: "deadEndShare",
+        min: 0.02,
+        max: 0.3,
+        why: "from the easy tier up a poor choice must be able to cost the level",
+      },
+    ],
   },
   {
     id: "partial-and-dependencies",
     name: "Partial groups and dependencies",
     from: 16,
     to: 30,
-    tier: "medium",
+    tier: tierForLevel(16),
     teaches: "A group may be too big for what is open: what to clear first becomes a decision.",
     score: { min: 20, max: 55 },
     requires: [
       { measure: "hiddenColors", min: 1, why: "blocked colours must be present" },
-      { measure: "deadEndShare", min: 0.02, why: "a poor choice must be able to cost the level" },
+      {
+        measure: "deadEndShare",
+        min: 0.05,
+        max: 0.5,
+        why: "a poor choice must be able to cost the level",
+      },
     ],
   },
   {
@@ -88,13 +113,23 @@ export const STAGES: readonly Stage[] = [
     name: "Ordering decisions",
     from: 31,
     to: 50,
-    tier: "hard",
+    tier: tierForLevel(31),
     teaches: "Which group first, and which can wait: choices that look good and are not.",
     score: { min: 35, max: 75 },
     requires: [
-      { measure: "deadEndShare", min: 0.05, why: "dead ends must be common enough to matter" },
+      {
+        measure: "deadEndShare",
+        min: 0.15,
+        max: 0.7,
+        why: "dead ends must be common enough to matter",
+      },
       { measure: "temptingPoorShare", min: 0.02, why: "some poor choices must be tempting" },
-      { measure: "planningDepth", min: 2, why: "the level must need more than greedy play" },
+      {
+        measure: "planningDepth",
+        min: 3,
+        max: 5,
+        why: "the level must need more than greedy play",
+      },
     ],
   },
   {
@@ -102,13 +137,13 @@ export const STAGES: readonly Stage[] = [
     name: "Advanced combinations",
     from: 51,
     to: Number.POSITIVE_INFINITY,
-    tier: "hard",
+    tier: tierForLevel(51),
     teaches: "All of it at once, with little slack.",
     score: { min: 50, max: 100 },
     requires: [
-      { measure: "deadEndShare", min: 0.1, why: "dead ends must be common" },
+      { measure: "deadEndShare", min: 0.15, max: 0.7, why: "dead ends must be common" },
       { measure: "temptingPoorShare", min: 0.05, why: "tempting poor choices must be common" },
-      { measure: "planningDepth", min: 3, why: "the level must need real planning" },
+      { measure: "planningDepth", min: 3, max: 5, why: "the level must need real planning" },
     ],
   },
 ];
@@ -120,6 +155,8 @@ export const STAGES: readonly Stage[] = [
  */
 export const MAX_SECONDS = 420;
 export const MAX_CUBES = 700;
+/** A populated stage's mean length may be at most this many times the previous populated stage's: difficulty is not length. */
+export const LENGTH_STEP_CAP = 1.5;
 /** Each populated stage's mean score must beat the previous populated stage's by at least this much. */
 export const MIN_STAGE_STEP = 3;
 
@@ -156,8 +193,10 @@ export function checkEntry(e: CurveEntry): string[] {
   for (const problem of checkStrategies(e.strategies, stage.tier)) out.push(`${tag}: ${problem}`);
   // Tutorial levels 1-3 are lossless, 4-5 need a loss (the slots lesson).
   if (stage.tier === "tutorial") {
-    if (e.level <= 3 && e.reachableLoss) out.push(`${tag}: levels 1-3 must have no reachable loss`);
-    if (e.level > 3 && !e.reachableLoss) out.push(`${tag}: levels 4-5 need a reachable loss`);
+    if (e.level <= LOSSLESS_TUTORIAL_LEVELS && e.reachableLoss)
+      out.push(`${tag}: levels 1-${LOSSLESS_TUTORIAL_LEVELS} must have no reachable loss`);
+    if (e.level > LOSSLESS_TUTORIAL_LEVELS && !e.reachableLoss)
+      out.push(`${tag}: levels ${LOSSLESS_TUTORIAL_LEVELS + 1}-${stage.to} need a reachable loss`);
   } else if (!e.reachableLoss) out.push(`${tag}: a poor choice must be able to cost something`);
   if (!inRange(e.measures.score, stage.score)) {
     out.push(`${tag}: score ${round(e.measures.score)} outside ${show(stage.score)}`);
@@ -166,15 +205,17 @@ export function checkEntry(e: CurveEntry): string[] {
     const v = read(e, r.measure);
     if (!inRange(v, r)) out.push(`${tag}: ${r.measure} ${round(v)} outside ${show(r)}: ${r.why}`);
   }
-  if (e.measures.seconds > MAX_SECONDS)
+  if (!(e.measures.seconds <= MAX_SECONDS))
     out.push(`${tag}: ${round(e.measures.seconds)} s is over the ${MAX_SECONDS} s length cap`);
-  if (e.cubes > MAX_CUBES) out.push(`${tag}: ${e.cubes} cubes is over the ${MAX_CUBES} cube cap`);
+  if (!(e.cubes <= MAX_CUBES))
+    out.push(`${tag}: ${e.cubes} cubes is over the ${MAX_CUBES} cube cap`);
   return out;
 }
 
 /**
  * Every way a world's levels deviate from the curve (empty = on it): each level against its stage,
- * level numbers unique, and stage means rising by at least `MIN_STAGE_STEP`. `entries` need not cover every level number (a library is placed on the curve piece
+ * level numbers unique, stage means rising by at least `MIN_STAGE_STEP`, length not growing from stage
+ * to stage, and the world-level repetition caps of `checkWorld`. `entries` need not cover every level number (a library is placed on the curve piece
  * by piece), but a populated stage's mean is only compared with the stages before it.
  */
 export function checkCurve(entries: readonly CurveEntry[]): string[] {
@@ -193,12 +234,41 @@ export function checkCurve(entries: readonly CurveEntry[]): string[] {
   for (let i = 1; i < populated.length; i++) {
     const before = mean(populated[i - 1]!.levels.map((e) => e.measures.score));
     const now = mean(populated[i]!.levels.map((e) => e.measures.score));
-    if (now < before + MIN_STAGE_STEP) {
+    if (!(now >= before + MIN_STAGE_STEP)) {
       out.push(
         `stage ${populated[i]!.stage.id} (mean score ${round(now)}) must rise at least ${MIN_STAGE_STEP} above ${populated[i - 1]!.stage.id} (${round(before)})`,
       );
     }
   }
+  // Length must not be how difficulty rises: no stage takes much longer, or has many more cubes, than
+  // the one before it.
+  for (let i = 1; i < populated.length; i++) {
+    const prev = populated[i - 1]!.levels;
+    const cur = populated[i]!.levels;
+    const seconds = [
+      mean(prev.map((e) => e.measures.seconds)),
+      mean(cur.map((e) => e.measures.seconds)),
+    ];
+    const cubes = [mean(prev.map((e) => e.cubes)), mean(cur.map((e) => e.cubes))];
+    const id = populated[i]!.stage.id;
+    if (!(seconds[1]! <= seconds[0]! * LENGTH_STEP_CAP))
+      out.push(
+        `stage ${id} takes ${round(seconds[1]!)} s on average, over ${LENGTH_STEP_CAP}x the previous stage's ${round(seconds[0]!)} s: difficulty must not come from length`,
+      );
+    if (!(cubes[1]! <= cubes[0]! * LENGTH_STEP_CAP))
+      out.push(
+        `stage ${id} has ${round(cubes[1]!)} cubes on average, over ${LENGTH_STEP_CAP}x the previous stage's ${round(cubes[0]!)}: difficulty must not come from more cubes`,
+      );
+  }
+  // The world-level repetition caps (no one cheap player may win most of a tier's levels).
+  out.push(
+    ...checkWorld(
+      entries.map((e) => ({
+        tier: stageForLevel(e.level).tier,
+        metrics: { wins: e.strategies.wins },
+      })),
+    ),
+  );
   return out;
 }
 

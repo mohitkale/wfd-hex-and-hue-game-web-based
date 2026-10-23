@@ -1,7 +1,8 @@
 import * as collect from "@hexhue/core/collect";
 import type { CurveEntry } from "../../content/curveV2";
 import { ART_LEVELS } from "../../packages/game/src/collect/artLevels";
-import { PREVIEW_LEVEL } from "../art/levels";
+import { EXTRA_LEVEL, PREVIEW_LEVEL } from "../art/placement";
+import { moonlitHat } from "../../packages/game/src/collect/slice";
 
 /** A level measured and expressed for the curve checks (`content/curveV2.ts`). */
 export function curveEntry(level: collect.CollectLevel, number: number): CurveEntry {
@@ -27,9 +28,14 @@ export function curveEntry(level: collect.CollectLevel, number: number): CurveEn
   };
 }
 
-/** The art library's levels that are placed on the curve, in level order. */
+/** The levels placed on the curve (library pieces and the slice), in level order. */
 export function placedEntries(): CurveEntry[] {
-  return Object.entries(PREVIEW_LEVEL)
-    .map(([pieceId, number]) => curveEntry(ART_LEVELS[`art-${pieceId}`]!(), number))
-    .sort((a, b) => a.level - b.level);
+  const pieces = Object.entries(PREVIEW_LEVEL).map(([pieceId, number]) =>
+    curveEntry(ART_LEVELS[`art-${pieceId}`]!(), number),
+  );
+  const extra = Object.entries(EXTRA_LEVEL).map(([id, number]) => {
+    if (id !== "slice-moonlit-hat") throw new Error(`unknown extra level ${id}`);
+    return curveEntry(moonlitHat(), number);
+  });
+  return [...pieces, ...extra].sort((a, b) => a.level - b.level);
 }
