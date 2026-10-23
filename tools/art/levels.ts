@@ -72,7 +72,13 @@ export function levelForPiece(piece: ArtPiece): ArtLevel {
           slotPressure: round(measured.slotPressure),
           hiddenColors: measured.hiddenColors,
           recoveryDepth: measured.recoveryDepth,
+          recoverableShare: round(measured.recoverableShare),
+          strategyGap: round(measured.strategyGap),
           seconds: Math.round(measured.seconds),
+          truncated:
+            measured.truncated.winningShare ||
+            measured.truncated.solutions ||
+            measured.truncated.planning,
         },
       },
     },

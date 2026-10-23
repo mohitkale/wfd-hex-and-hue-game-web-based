@@ -70,7 +70,12 @@ export interface Measures {
 
 const share = (n: number, d: number): number => (d === 0 ? 0 : n / d);
 
-const TICKS_PER_SECOND = 24;
+const sameAction = (a: Action, b: Action): boolean =>
+  a.kind === b.kind &&
+  (a.kind === "select" ? a.column === (b as typeof a).column : a.slot === (b as typeof a).slot);
+
+/** Ticks per second at 1x (the board's clock, `tickClock.ts`). */
+export const TICKS_PER_SECOND = 24;
 
 /** A settled copy of `state` after one action. */
 function after(state: CollectState, action: Action): CollectState {
@@ -158,15 +163,14 @@ export function measureLevel(level: CollectLevel, options: MeasureOptions = {}):
   let state = cloneState(root);
   for (const lineAction of solved.line) {
     const legal = legalActions(state);
+    const lineIndex = legal.findIndex((a) => sameAction(a, lineAction));
+    if (lineIndex < 0) throw new Error("the solver's line has an action that is not legal");
     const own = after(state, lineAction);
     let winnable = 0;
     let stepDoomed = 0;
-    for (const a of legal) {
-      const next =
-        a === lineAction || JSON.stringify(a) === JSON.stringify(lineAction)
-          ? own
-          : after(state, a);
-      const isLine = next === own;
+    for (const [index, a] of legal.entries()) {
+      const isLine = index === lineIndex;
+      const next = isLine ? own : after(state, a);
       let good: boolean;
       if (next.status === "won") good = true;
       else if (next.status === "lost") {
@@ -179,8 +183,13 @@ export function measureLevel(level: CollectLevel, options: MeasureOptions = {}):
         if (!good) {
           doomedAlternatives++;
           stepDoomed++;
-          // Tempting: the greedy player (most cubes now) would rather take this than the line's move.
-          if (next.deliveredTotal >= own.deliveredTotal) temptingPoor++;
+          // Tempting: the greedy player (most cubes now) would rather take this than the line's move
+          // (a tie goes to the earlier action in list order, as the greedy player breaks it).
+          if (
+            next.deliveredTotal > own.deliveredTotal ||
+            (next.deliveredTotal === own.deliveredTotal && index < lineIndex)
+          )
+            temptingPoor++;
         }
       }
     }
@@ -203,32 +212,38 @@ export function measureLevel(level: CollectLevel, options: MeasureOptions = {}):
     } else if (next.status === "playing" && solver.verdict(next) === "doomed") doomedFirst++;
   }
 
-  // winningShare: breadth-first to depth 3 (or the node cap): among non-lost nodes at the deepest
-  // fully enumerated depth, the share that are not doomed.
+  // winningShare: breadth-first to depth 3 (or the node cap): among the non-lost nodes at the deepest
+  // fully enumerated depth (a won node counts as not doomed), the share that are not doomed.
   const cap = options.winningNodes ?? 1500;
-  let level_: CollectState[] = [root];
-  let deepest: CollectState[] = [root];
+  let frontier: CollectState[] = [root];
+  let deepestPlaying: CollectState[] = [root];
+  let deepestWon = 0;
   let winningTruncated = false;
   let counted = 0;
   for (let depth = 1; depth <= 3 && !winningTruncated; depth++) {
-    const nextLevel: CollectState[] = [];
-    for (const s of level_) {
-      for (const a of legalActions(s)) {
+    const nextFrontier: CollectState[] = [];
+    let won = 0;
+    for (const st of frontier) {
+      for (const a of legalActions(st)) {
         if (++counted > cap) {
           winningTruncated = true;
           break;
         }
-        const n = after(s, a);
-        if (n.status === "playing") nextLevel.push(n);
+        const n = after(st, a);
+        if (n.status === "playing") nextFrontier.push(n);
+        else if (n.status === "won") won++;
       }
       if (winningTruncated) break;
     }
-    if (winningTruncated || nextLevel.length === 0) break;
-    deepest = nextLevel;
-    level_ = nextLevel;
+    if (winningTruncated || nextFrontier.length + won === 0) break;
+    deepestPlaying = nextFrontier;
+    deepestWon = won;
+    frontier = nextFrontier;
   }
-  const notDoomed = deepest.filter((s) => solver.verdict(s) !== "doomed").length;
-  const winningShare = deepest.length === 0 ? 1 : notDoomed / deepest.length;
+  const notDoomed =
+    deepestWon + deepestPlaying.filter((st) => solver.verdict(st) !== "doomed").length;
+  const nonLost = deepestWon + deepestPlaying.length;
+  const winningShare = nonLost === 0 ? 1 : notDoomed / nonLost;
 
   // solutions: distinct parking signatures among winning lines (depth-first in list order).
   const maxLines = options.solutionLines ?? 64;
@@ -277,10 +292,13 @@ export function measureLevel(level: CollectLevel, options: MeasureOptions = {}):
   let lossesRun = 0;
   let recoverable = 0;
   let witnessedLoss = false;
-  const consider = (r: ReturnType<typeof runPlayer>) => {
+  const addDelivered = (r: ReturnType<typeof runPlayer>) =>
     delivered.push(r.cubes === 0 ? 0 : r.delivered / r.cubes);
-    if (r.won || !r.states) return;
-    if (r.lost && r.lost !== "tooLong") witnessedLoss = true;
+  /** Losses of `most-delivered` and random play feed the recovery measures. */
+  const consider = (r: ReturnType<typeof runPlayer>) => {
+    addDelivered(r);
+    if (r.won || r.lost === "tooLong" || !r.states) return; // a run that ran out of actions is not a loss
+    witnessedLoss = true;
     // How many actions back is the nearest position that is not doomed?
     const last = r.states.length - 1;
     let depth = 0;
@@ -297,12 +315,11 @@ export function measureLevel(level: CollectLevel, options: MeasureOptions = {}):
   for (const id of DETERMINISTIC_PLAYERS) {
     const r = runPlayer(level, id, 0, { states: id === "most-delivered" });
     wins[id] = r.won;
-    delivered.push(r.cubes === 0 ? 0 : r.delivered / r.cubes);
-    if (id === "most-delivered") {
-      delivered.pop();
-      consider(r);
+    if (id === "most-delivered") consider(r);
+    else {
+      addDelivered(r);
+      if (r.lost && r.lost !== "tooLong") witnessedLoss = true;
     }
-    if (r.lost && r.lost !== "tooLong") witnessedLoss = true;
   }
   const randomRuns = options.randomRuns ?? RANDOM_RUNS;
   let randomWon = 0;
@@ -320,7 +337,10 @@ export function measureLevel(level: CollectLevel, options: MeasureOptions = {}):
   for (let d = 1; d <= planningMax; d++) {
     const w = lookaheadWins(level, d, planningNodes);
     if (w === null) {
+      // Out of budget at depth d: depths below d failed, so the true depth is at least d. Reported
+      // as that lower bound and flagged (never as "beyond reach"), and not scored.
       planningTruncated = true;
+      planningDepth = d;
       break;
     }
     if (w) {
@@ -379,8 +399,10 @@ export interface ScoreComponent {
   normalised: number;
   /** Share of the total (the weights sum to 1). */
   weight: number;
-  /** `normalised x weight x 100`. */
+  /** `normalised x weight x 100`, before renormalising when a component is left out. */
   points: number;
+  /** Why the component is left out of the total (a budget cut the measure short), if it is. */
+  excluded?: string;
 }
 
 export interface DifficultyScore {
@@ -409,14 +431,14 @@ export const SCORE_SPEC: readonly {
     id: "dead-ends",
     label: "Poor choices that cost the level",
     measure: "deadEndShare",
-    weight: 0.25,
+    weight: 0.3,
     unit: (m) => clamp01(m.deadEndShare / 0.5),
   },
   {
     id: "planning",
     label: "Planning depth needed",
     measure: "planningDepth",
-    weight: 0.2,
+    weight: 0.25,
     unit: (m) => planningUnit(m.planningDepth),
   },
   {
@@ -447,20 +469,21 @@ export const SCORE_SPEC: readonly {
     weight: 0.1,
     unit: (m) => clamp01(m.hiddenShare),
   },
-  {
-    id: "recovery",
-    label: "Mistakes that cannot be undone",
-    measure: "recoverableShare",
-    weight: 0.05,
-    unit: (m) => (m.reachableLoss ? 1 - clamp01(m.recoverableShare) : 0),
-  },
-  {
-    id: "gap",
-    label: "Gap between good and cheap play",
-    measure: "strategyGap",
-    weight: 0.05,
-    unit: (m) => clamp01(m.strategyGap),
-  },
+];
+
+/**
+ * Measures recorded for every level but **not scored** because they depend on how players happen to
+ * fail (`strategyGap`, `recoveryDepth`, `recoverableShare`) or on the length of play (`seconds`).
+ */
+export const UNSCORED: readonly (keyof Measures)[] = [
+  "randomRate",
+  "wins",
+  "reachableLoss",
+  "strategyGap",
+  "recoveryDepth",
+  "recoverableShare",
+  "ticks",
+  "seconds",
 ];
 
 /**
@@ -474,7 +497,7 @@ export function difficultyScore(m: Measures): DifficultyScore {
   const components = SCORE_SPEC.map((c): ScoreComponent => {
     const normalised = clamp01(c.unit(m));
     const raw = m[c.measure] as number;
-    return {
+    const out: ScoreComponent = {
       id: c.id,
       label: c.label,
       measure: c.measure,
@@ -483,6 +506,14 @@ export function difficultyScore(m: Measures): DifficultyScore {
       weight: c.weight,
       points: normalised * c.weight * 100,
     };
+    // A lower bound is not a measurement: leave it out and rescale the rest rather than score it.
+    if (c.id === "planning" && m.truncated.planning) {
+      out.excluded = "planning search ran out of budget";
+    }
+    return out;
   });
-  return { total: components.reduce((sum, c) => sum + c.points, 0), components };
+  const used = components.filter((c) => !c.excluded);
+  const weight = used.reduce((n, c) => n + c.weight, 0);
+  const points = used.reduce((n, c) => n + c.points, 0);
+  return { total: weight === 0 ? 0 : points / weight, components };
 }

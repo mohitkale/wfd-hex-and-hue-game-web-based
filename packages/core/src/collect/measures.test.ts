@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { apply, legalActions, type Action } from "./actions";
 import { board, fixtureA, fixtureB, randomLevel } from "./fixtures";
 import { validateCollectLevel, type CollectLevel } from "./level";
-import { SCORE_SPEC, difficultyScore, measureLevel, type Measures } from "./measures";
+import { SCORE_SPEC, UNSCORED, difficultyScore, measureLevel, type Measures } from "./measures";
 import { replayLine, solve } from "./solver";
 import { runUntilSettled } from "./sim";
 import { cloneState, createCollectState, type CollectState } from "./state";
@@ -257,23 +257,48 @@ describe("the difficulty score", () => {
     expect(score.total).toBeLessThanOrEqual(100);
   });
 
-  it("failure rates never enter it: no component reads a win rate, and changing them changes nothing", () => {
-    for (const c of SCORE_SPEC) {
-      expect(["randomRate", "wins"]).not.toContain(c.measure);
-    }
+  it("failure-derived measures never enter it: no component reads them, and changing them changes nothing", () => {
+    for (const c of SCORE_SPEC) expect(UNSCORED, c.id).not.toContain(c.measure);
     const base = difficultyScore(m).total;
+    // Vary every measure that depends on how players fail, or on how long play takes, at once.
     const failMore: Measures = {
       ...m,
       randomRate: 0,
       wins: Object.fromEntries(Object.keys(m.wins).map((k) => [k, false])) as Measures["wins"],
+      strategyGap: 1,
+      recoveryDepth: 9,
+      recoverableShare: 0,
+      reachableLoss: true,
+      ticks: m.ticks * 10,
+      seconds: m.seconds * 10,
     };
     const failLess: Measures = {
       ...m,
       randomRate: 1,
       wins: Object.fromEntries(Object.keys(m.wins).map((k) => [k, true])) as Measures["wins"],
+      strategyGap: 0,
+      recoveryDepth: 0,
+      recoverableShare: 1,
+      reachableLoss: false,
+      ticks: 1,
+      seconds: 0,
     };
     expect(difficultyScore(failMore).total).toBe(base);
     expect(difficultyScore(failLess).total).toBe(base);
+  });
+
+  it("a measure cut short by a budget is left out and the rest rescaled, never scored as maximum difficulty", () => {
+    const cut: Measures = { ...m, planningDepth: 3, truncated: { ...m.truncated, planning: true } };
+    const score = difficultyScore(cut);
+    const planning = score.components.find((c) => c.id === "planning")!;
+    expect(planning.excluded).toContain("budget");
+    const others = score.components.filter((c) => !c.excluded);
+    const weight = others.reduce((n, c) => n + c.weight, 0);
+    expect(score.total).toBeCloseTo(others.reduce((n, c) => n + c.points, 0) / weight, 9);
+    // Planning depth is a lower bound when truncated; it is never reported as unreachable (infinity).
+    const real = measureLevel(fixtureB(), { ...quick, planningNodes: 1 })!;
+    expect(real.truncated.planning).toBe(true);
+    expect(Number.isFinite(real.planningDepth)).toBe(true);
   });
 
   it("a level with no decisions scores below one with real dead ends, whatever random play does", () => {
@@ -294,9 +319,131 @@ describe("the difficulty score", () => {
       difficultyScore(trivial).total,
     );
   }, 120_000);
+});
 
-  it("no decisions means no recovery points even if a loss were reachable elsewhere", () => {
-    const noLoss: Measures = { ...m, reachableLoss: false, recoverableShare: 0 };
-    expect(difficultyScore(noLoss).components.find((c) => c.id === "recovery")!.points).toBe(0);
+// ---------------------------------------------------------------------------------------------
+// The remaining measures against crafted levels and independent oracles
+// ---------------------------------------------------------------------------------------------
+
+/** Independent depth-d lookahead player (the difficulty document's rule), plain recursion. */
+function oracleLookahead(level: CollectLevel, depth: number): boolean {
+  let s = createCollectState(level);
+  for (let moves = 0; s.status === "playing" && moves < 3 * s.groups.length; moves++) {
+    const legal = legalActions(s);
+    if (legal.length === 0) break;
+    const value = (st: CollectState, d: number): number => {
+      if (st.status === "won") return Infinity;
+      if (st.status === "lost") return -Infinity;
+      const acts = d === 0 ? [] : legalActions(st);
+      if (d === 0 || acts.length === 0)
+        return st.deliveredTotal + 2 * st.slots.filter((x) => x === null).length;
+      return Math.max(...acts.map((a) => value(settle(st, a), d - 1)));
+    };
+    let best = legal[0]!;
+    let bestValue = -Infinity;
+    for (const a of legal) {
+      const v = value(settle(s, a), depth - 1);
+      if (v > bestValue) {
+        bestValue = v;
+        best = a;
+      }
+    }
+    s = settle(s, best);
+  }
+  return s.status === "won";
+}
+
+describe("planning depth, winning share, solutions, recovery and reachable loss", () => {
+  const small = (seed: number): CollectLevel | null => {
+    const level = randomLevel(seed, seed % 2 === 0);
+    if (!level || validateCollectLevel(level).length > 0) return null;
+    if (level.columns.reduce((n, c) => n + c.length, 0) > 5) return null;
+    if (solve(level, 50_000).status !== "solved") return null;
+    return level;
+  };
+
+  it("planningDepth equals the smallest depth at which an independent lookahead player wins", () => {
+    let checked = 0;
+    let deeper = 0;
+    for (let seed = 1; seed <= 1500 && checked < 30; seed++) {
+      const level = small(seed);
+      if (!level) continue;
+      const got = measureLevel(level, { randomRuns: 5, planningMax: 4 })!;
+      let want = Infinity;
+      for (let d = 1; d <= 4; d++) {
+        if (oracleLookahead(level, d)) {
+          want = d;
+          break;
+        }
+      }
+      expect(got.planningDepth, `seed ${seed}`).toBe(want);
+      if (want > 1) deeper++;
+      checked++;
+    }
+    expect(checked).toBe(30);
+    expect(deeper).toBeGreaterThanOrEqual(1); // the comparison included levels that need planning
+  }, 120_000);
+
+  it("winningShare equals the share of non-doomed positions at depth 3, with won positions counted as not doomed", () => {
+    // Seeds 396, 656 and 1446 are levels (found by search) where some depth-3 positions are doomed;
+    // the others are ordinary small levels where every position is still winnable.
+    const seeds = [396, 656, 1446, 3, 4, 5, 6, 7, 8, 9];
+    let below = 0;
+    for (const seed of seeds) {
+      const level = randomLevel(seed, seed % 2 === 0);
+      if (!level || validateCollectLevel(level).length > 0) continue;
+      if (solve(level, 50_000).status !== "solved") continue;
+      const got = measureLevel(level, { randomRuns: 5, planningMax: 1, winningNodes: 100_000 })!;
+      // Independent enumeration to depth 3 (stopping early only when a depth has no non-lost node).
+      let frontier: CollectState[] = [createCollectState(level)];
+      let deepest: { playing: CollectState[]; won: number } = { playing: frontier, won: 0 };
+      for (let depth = 1; depth <= 3; depth++) {
+        const next: CollectState[] = [];
+        let won = 0;
+        for (const st of frontier) {
+          for (const a of legalActions(st)) {
+            const n = settle(st, a);
+            if (n.status === "playing") next.push(n);
+            else if (n.status === "won") won++;
+          }
+        }
+        if (next.length + won === 0) break;
+        deepest = { playing: next, won };
+        frontier = next;
+      }
+      const total = deepest.playing.length + deepest.won;
+      const good = deepest.won + deepest.playing.filter(winnable).length;
+      const want = total === 0 ? 1 : good / total;
+      expect(got.winningShare, `seed ${seed}`).toBeCloseTo(want, 9);
+      if (want < 1) below++;
+    }
+    expect(below).toBeGreaterThanOrEqual(2);
+  }, 300_000);
+
+  it("fixture B: three kinds of winning line (nothing parks, red parks, green parks), so solutions is 3", () => {
+    expect(measureLevel(fixtureB(), quick)!.solutions).toBe(3);
+    expect(measureLevel(fixtureA(), quick)!.solutions).toBe(1);
+  });
+
+  it("fixture B: losses (a second park with one slot) are one action from a position that can still win", () => {
+    const m = measureLevel(fixtureB(), quick)!;
+    expect(m.reachableLoss).toBe(true);
+    expect(m.recoveryDepth).toBeGreaterThanOrEqual(1);
+    expect(m.recoveryDepth).toBeLessThanOrEqual(2);
+    expect(m.recoverableShare).toBe(1);
+  });
+
+  it("reachableLoss is false when nothing can go wrong and true when a player loses", () => {
+    expect(
+      measureLevel(board(["RR"], [[["R", 2]]], { colors: "R", slots: 1 }), quick)!.reachableLoss,
+    ).toBe(false);
+    expect(measureLevel(fixtureB(), quick)!.reachableLoss).toBe(true);
+  });
+
+  it("a run that ran out of actions is not a loss for the recovery measures", () => {
+    // No level here hits the cap, so check the accounting through a level with no losses at all.
+    const m = measureLevel(fixtureA(), quick)!;
+    expect(m.recoveryDepth).toBe(0);
+    expect(m.recoverableShare).toBe(1);
   });
 });

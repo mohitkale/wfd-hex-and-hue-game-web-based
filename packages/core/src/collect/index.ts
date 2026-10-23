@@ -70,6 +70,8 @@ export {
 } from "./players";
 export {
   SCORE_SPEC,
+  TICKS_PER_SECOND,
+  UNSCORED,
   difficultyScore,
   measureLevel,
   type DifficultyScore,

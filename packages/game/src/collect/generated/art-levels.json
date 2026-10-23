@@ -147,9 +147,7 @@
      "temptation": 0,
      "opening": 0,
      "slots": 3.333,
-     "hidden": 0,
-     "recovery": 0,
-     "gap": 0
+     "hidden": 0
     },
     "measures": {
      "deadEndShare": 0,
@@ -160,7 +158,10 @@
      "slotPressure": 0.333,
      "hiddenColors": 0,
      "recoveryDepth": 0,
-     "seconds": 137
+     "recoverableShare": 1,
+     "strategyGap": 0,
+     "seconds": 137,
+     "truncated": false
     }
    }
   }
@@ -303,9 +304,7 @@
      "temptation": 0,
      "opening": 0,
      "slots": 3.333,
-     "hidden": 0,
-     "recovery": 0,
-     "gap": 0
+     "hidden": 0
     },
     "measures": {
      "deadEndShare": 0,
@@ -316,7 +315,10 @@
      "slotPressure": 0.333,
      "hiddenColors": 0,
      "recoveryDepth": 0,
-     "seconds": 126
+     "recoverableShare": 1,
+     "strategyGap": 0,
+     "seconds": 126,
+     "truncated": false
     }
    }
   }
@@ -481,9 +483,7 @@
      "temptation": 0,
      "opening": 0,
      "slots": 3.333,
-     "hidden": 0,
-     "recovery": 0,
-     "gap": 0
+     "hidden": 0
     },
     "measures": {
      "deadEndShare": 0,
@@ -494,7 +494,10 @@
      "slotPressure": 0.333,
      "hiddenColors": 0,
      "recoveryDepth": 0,
-     "seconds": 253
+     "recoverableShare": 1,
+     "strategyGap": 0,
+     "seconds": 253,
+     "truncated": false
     }
    }
   }
@@ -643,9 +646,7 @@
      "temptation": 0,
      "opening": 0,
      "slots": 3.333,
-     "hidden": 0,
-     "recovery": 0,
-     "gap": 0
+     "hidden": 0
     },
     "measures": {
      "deadEndShare": 0,
@@ -656,7 +657,10 @@
      "slotPressure": 0.333,
      "hiddenColors": 0,
      "recoveryDepth": 0,
-     "seconds": 299
+     "recoverableShare": 1,
+     "strategyGap": 0,
+     "seconds": 299,
+     "truncated": false
     }
    }
   }
@@ -816,9 +820,7 @@
      "temptation": 0,
      "opening": 0,
      "slots": 3.333,
-     "hidden": 2.5,
-     "recovery": 0,
-     "gap": 0
+     "hidden": 2.5
     },
     "measures": {
      "deadEndShare": 0,
@@ -829,7 +831,10 @@
      "slotPressure": 0.333,
      "hiddenColors": 1,
      "recoveryDepth": 0,
-     "seconds": 238
+     "recoverableShare": 1,
+     "strategyGap": 0,
+     "seconds": 238,
+     "truncated": false
     }
    }
   }
@@ -1013,16 +1018,14 @@
     "randomRate": 0.85
    },
    "difficulty": {
-    "score": 12.974,
+    "score": 11,
     "components": {
      "dead-ends": 0,
      "planning": 0,
      "temptation": 0,
      "opening": 0,
      "slots": 5,
-     "hidden": 6,
-     "recovery": 0,
-     "gap": 1.974
+     "hidden": 6
     },
     "measures": {
      "deadEndShare": 0,
@@ -1033,7 +1036,10 @@
      "slotPressure": 0.5,
      "hiddenColors": 3,
      "recoveryDepth": 1,
-     "seconds": 266
+     "recoverableShare": 1,
+     "strategyGap": 0.395,
+     "seconds": 266,
+     "truncated": false
     }
    }
   }

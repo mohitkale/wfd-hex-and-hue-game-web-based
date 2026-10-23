@@ -18,7 +18,8 @@ export const PHONES: [string, number, number, number][] = [
   ["Pixel 7", 412, 915, 2.625],
 ];
 export const SIZES = [16, 24, 32, 36, 40];
-export const TICKS_PER_SECOND = 24;
+export { TICKS_PER_SECOND } from "../../packages/core/src/collect/measures";
+import { TICKS_PER_SECOND as TPS } from "../../packages/core/src/collect/measures";
 
 /** CSS pixels per cube (cell pitch, gap included) for a `size`×`size` board on a phone. */
 export function cubeCss(
@@ -66,7 +67,7 @@ if (process.argv[1]?.endsWith("density.ts")) {
     const cubes = level.cells.filter((c) => c >= 0).length;
     const fast = botPlay(level, true);
     const slow = botPlay(level, false);
-    const sec = (t: number) => `${(t / TICKS_PER_SECOND).toFixed(0)} s`;
+    const sec = (t: number) => `${(t / TPS).toFixed(0)} s`;
     console.log(
       `${String(size).padStart(4)}  ${String(cubes).padStart(5)}  ${fast.status} ${sec(fast.ticks).padStart(6)}   ${slow.status} ${sec(slow.ticks).padStart(6)}`,
     );
