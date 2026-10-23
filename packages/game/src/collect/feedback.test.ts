@@ -4,7 +4,8 @@ import { AudioEngine, type AudioLike } from "../audio";
 import { MOTES, moteAt } from "./ambient";
 import { planCues, playCues, rejectionCue, type Cue } from "./cues";
 import { Emitter, Particles } from "./particles";
-import { bump } from "./swarm";
+import { PENTATONIC, soundSpec } from "../audio/sounds";
+import { bump, leaveScale, squashX, squashY } from "./swarm";
 
 type Ev = collect.CollectEvent;
 
@@ -55,11 +56,40 @@ describe("sound and vibration are planned from events", () => {
     ]);
   });
 
-  it("emptying a group plays a rising run: lower remaining is a higher note", () => {
-    const run = [3, 2, 1, 0].map(
-      (n) => planCues([delivered(0, n)])[0]!.options!.chargeLeft as number,
-    );
-    expect(run).toEqual([3, 2, 1, 0]);
+  it("emptying a group plays a rising run: each delivery is a higher note than the last", () => {
+    const freqs = [9, 5, 3, 2, 1, 0].map((n) => {
+      const cue = planCues([delivered(0, n)])[0]!;
+      return soundSpec(cue.sound, cue.options)[0]!.freq;
+    });
+    for (let i = 1; i < freqs.length; i++) expect(freqs[i]!).toBeGreaterThan(freqs[i - 1]!);
+    expect(freqs.at(-1)).toBe(PENTATONIC.at(-1));
+  });
+
+  it("when two groups deliver in one tick, the one closest to finishing is heard, whatever the order", () => {
+    const a = planCues([delivered(0, 2), delivered(1, 7)]).find((c) => c.sound === "collect");
+    const b = planCues([delivered(1, 7), delivered(0, 2)]).find((c) => c.sound === "collect");
+    expect(a?.options).toEqual({ chargeLeft: 2 });
+    expect(b?.options).toEqual({ chargeLeft: 2 });
+    // Equal remaining: still exactly one note.
+    expect(
+      planCues([delivered(0, 4), delivered(1, 4)]).filter((c) => c.sound === "collect"),
+    ).toHaveLength(1);
+  });
+
+  it("a light delivery tick never cancels a stronger vibration in the same batch", () => {
+    const park = planCues([
+      { type: "groupParked", group: 0, slot: 0, remaining: 1 },
+      delivered(1, 3),
+    ]);
+    expect(park.filter((c) => c.haptic).map((c) => c.haptic)).toEqual(["park"]);
+    const lose = planCues([delivered(1, 3), { type: "lost", reason: "slotsFull", group: 0 }]);
+    expect(lose.filter((c) => c.haptic).map((c) => c.haptic)).toEqual(["lose"]);
+    const win = planCues([delivered(1, 0), { type: "groupCompleted", group: 1 }, { type: "won" }]);
+    expect(win.filter((c) => c.haptic).map((c) => c.haptic)).toEqual(["win"]);
+    // Both sounds still play; only the weaker vibration is dropped.
+    expect(lose.map((c) => c.sound)).toContain("collect");
+    // Alone, a delivery does vibrate.
+    expect(planCues([delivered(1, 3)])[0]!.haptic).toBe("collect");
   });
 
   it("winning replaces the completion chime of the same tick; completing alone chimes", () => {
@@ -261,13 +291,16 @@ describe("effects", () => {
     expect(life(one.ps)).toBe(2 * life(two.ps));
   });
 
-  it("sparks fan out and a win throws one fan per colour", () => {
-    const { ps, e } = make(false);
+  it("sparks fan out and a win throws one fan per colour, each half a tick after the last", () => {
+    const { ps, e } = make(false, 40);
     e.sparks(10, 10, 1, 6, 0);
     expect(ps.count(1)).toBe(6);
     ps.clear();
-    e.fountain(0, 0, [1, 2, 3], 0);
-    expect(ps.count(50)).toBe(18);
+    e.fountain(0, 0, [1, 2, 3], 100);
+    expect(ps.count(150)).toBe(18);
+    const births: number[] = [];
+    ps.forEachLive(150, (p) => births.push(p.born));
+    expect([...new Set(births)].sort((a, b) => a - b)).toEqual([100, 120, 140]);
   });
 
   it("reduced motion: no trails, sparks or fountain; a completion is a stationary fade", () => {
@@ -288,13 +321,6 @@ describe("effects", () => {
     const { ps, e } = make(false);
     e.bloom(5, 5, 1, 0);
     ps.forEachLive(10, (p) => expect(p.s1).toBeGreaterThan(p.s0));
-  });
-
-  it("can switch to reduced motion without being rebuilt", () => {
-    const { ps, e } = make(false);
-    e.setReduced(true);
-    e.sparks(0, 0, 1, 6, 0);
-    expect(ps.count(1)).toBe(0);
   });
 });
 
@@ -320,6 +346,20 @@ describe("environment motion and the pickup squash", () => {
     for (let i = 0; i < MOTES; i++) {
       expect(moteAt(i, 0, true)).toEqual(moteAt(i, 123_456, true));
     }
+  });
+
+  it("the squash flattens and widens at its peak, and rests at the plain scale", () => {
+    expect(squashX(4, 0)).toBe(4);
+    expect(squashY(4, 0)).toBe(4);
+    expect(squashX(4, 1)).toBeGreaterThan(4);
+    expect(squashY(4, 1)).toBeLessThan(4);
+  });
+
+  it("a finished group's badge swells, a dropped one shrinks, and reduced motion never scales", () => {
+    expect(leaveScale(true, false)).toBeGreaterThan(1);
+    expect(leaveScale(false, false)).toBeLessThan(1);
+    expect(leaveScale(true, true)).toBe(1);
+    expect(leaveScale(false, true)).toBe(1);
   });
 
   it("the squash swells from nothing to a peak and back, and is zero outside its moment", () => {

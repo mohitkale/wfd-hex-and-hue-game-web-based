@@ -109,12 +109,16 @@ Keep the page visible while measuring: a hidden page does not run animation fram
 ## M10.4 effects (trails, sparks, blooms, motes)
 
 All decorative particles live in one fixed ring buffer (160 entries, `particles.ts`) drawn by a fixed
-pool of 160 additive glow images (`ParticleLayer.ts`): a busy board recycles the oldest particle and
-never allocates per frame or grows. The 14 background motes are placed from a pure function of time.
-Trails are only left by carrying familiars (at most one puff per carrier every 1.5 ticks); sparks and
-blooms come from deliveries and completions. Lifetimes are counted in ticks, so 2× plays the same
-show in half the milliseconds. Reduced motion emits no trails, sparks or fountains and keeps the
-motes still; a completion is a short stationary fade of light.
+pool of 160 additive glow images (`ParticleLayer.ts`). Per frame, `ParticleLayer.update` and the
+buffer walk allocate nothing and nothing grows: a full buffer recycles the oldest particle. (Emitting
+a particle does build a small object, and a win builds one closure and a colour list; those happen
+per event, not per frame.) The 14 background motes are placed from a pure function of time and stay
+put (no per-frame work) with reduced motion. Trails are only left by carrying familiars (at most one
+puff per carrier every 1.5 ticks); sparks and blooms come from deliveries and completions. Particle
+lifetimes are counted in ticks, so they last half as many milliseconds at 2×; the 150 ms cube flight
+into the portal and the badge tweens use fixed milliseconds and do not scale with speed. Reduced
+motion emits no trails, sparks or fountains and skips the squash; a completion is a short stationary
+fade of light.
 
 Measured on the desktop dev server (`?profile=1&level=big`, 18 familiars out, up to 70 live
 particles): scene `update` median 0.3 ms / p95 2.4 ms, frame-submit median 0.7 ms / p95 1.4 ms. As

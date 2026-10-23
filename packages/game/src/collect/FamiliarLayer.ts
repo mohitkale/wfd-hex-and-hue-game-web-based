@@ -12,6 +12,8 @@ import type { Emitter } from "./particles";
 import {
   CellSpreader,
   bump,
+  squashX,
+  squashY,
   drawnCoord,
   drift,
   ease,
@@ -266,7 +268,7 @@ export class FamiliarLayer {
         // Pickup squash: flatten a little and spring back over a couple of ticks (never delays play).
         if (timeMs < e.squashUntil) {
           const b = bump(1 - (e.squashUntil - timeMs) / (this.tickMs * SQUASH_TICKS));
-          e.img.setScale(s * (1 + 0.14 * b), s * (1 - 0.2 * b));
+          e.img.setScale(squashX(s, b), squashY(s, b));
         } else {
           e.img.setScale(s);
         }

@@ -101,12 +101,8 @@ export class Emitter {
   constructor(
     readonly particles: Particles,
     private readonly cellPx: number,
-    private reduced: boolean,
+    private readonly reduced: boolean,
   ) {}
-
-  setReduced(reduced: boolean): void {
-    this.reduced = reduced;
-  }
 
   /**
    * A soft puff behind a carrying familiar. `lastAt` is when this carrier last left one; returns the

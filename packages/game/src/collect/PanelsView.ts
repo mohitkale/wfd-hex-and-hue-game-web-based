@@ -3,6 +3,7 @@ import type Phaser from "phaser";
 import { theme } from "../theme";
 import type { CollectLayout } from "./collectLayout";
 import { GroupBadge } from "./GroupBadge";
+import { leaveScale } from "./swarm";
 
 type CollectState = collect.CollectState;
 
@@ -184,7 +185,7 @@ export class PanelsView {
     this.scene.tweens.killTweensOf(t.badge);
     this.scene.tweens.add({
       targets: t.badge,
-      scale: this.reduced ? 1 : completed ? 1.25 : 0.6,
+      scale: leaveScale(completed, this.reduced),
       alpha: 0,
       duration: completed ? 260 : 140,
       ease: "Sine.easeOut",

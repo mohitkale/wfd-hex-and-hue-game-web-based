@@ -38,12 +38,13 @@ export const newMote = (): Mote => ({ x: 0, y: 0, glow: 0 });
 export class AmbientLayer {
   private readonly images: Phaser.GameObjects.Image[];
   private readonly scratch = newMote();
+  private placed = false;
 
   constructor(
     scene: Phaser.Scene,
     private readonly frame: { x: number; y: number; w: number; h: number },
     texture: string,
-    private still: boolean,
+    private readonly still: boolean,
     cellPx: number,
   ) {
     this.images = Array.from({ length: MOTES }, (_, i) => {
@@ -57,11 +58,9 @@ export class AmbientLayer {
     this.update(0);
   }
 
-  setStill(still: boolean): void {
-    this.still = still;
-  }
-
   update(timeMs: number): void {
+    if (this.still && this.placed) return;
+    this.placed = true;
     const f = this.frame;
     for (let i = 0; i < this.images.length; i++) {
       const m = moteAt(i, timeMs, this.still, this.scratch);

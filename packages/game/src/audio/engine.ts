@@ -27,11 +27,12 @@ export interface AudioSettings {
 }
 
 /**
- * Minimum spacing for rapid repeats (a wisp sweeping a lane would otherwise stack dozens). Short
- * enough that 2× speed (a step every 30 ms) keeps nearly every note of a rising collect run.
+ * Minimum spacing for rapid repeats (a wisp sweeping a lane would otherwise stack dozens). `collect`
+ * is shorter than a v2 tick at 2× (about 21 ms) so a rising run keeps its notes; `pickup` pops are
+ * deliberately thinned to about one every other tick at 1×.
  */
 const THROTTLE: Partial<Record<SoundName, number>> = {
-  collect: 0.025,
+  collect: 0.015,
   pickup: 0.06,
   invalid: 0.15,
 };

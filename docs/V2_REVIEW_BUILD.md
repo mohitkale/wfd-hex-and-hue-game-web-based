@@ -51,7 +51,7 @@ changed. The build fails if that property is lost (`tools/perf/check.ts`).
 
 ## Known rough edges (M10.3 and later)
 
-Sound, trails and haptics (M10.4); swarm spacing and a mid-range-device frame-time measurement
-including a 40×40 board (M10.3). With the maximum of 8 holding slots on a 320 px phone each slot is
+A mid-range-device frame-time measurement (M15.3; desktop numbers are in `docs/V2_PERF.md`). Sound,
+haptics, trails and completion effects arrived in M10.4 and have not been judged by a human yet (G1). With the maximum of 8 holding slots on a 320 px phone each slot is
 narrower than the 44 px tap guideline; real levels use 3–5. The 1×/2× button and `&speed=2` exist
 only in review builds and are removed or gated when the real 2× rule lands (M14.3).

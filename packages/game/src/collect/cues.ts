@@ -21,7 +21,10 @@ export interface CueSinks {
  * batch, and one delivery note, the one from the group closest to finishing (the highest pitch,
  * so a group being emptied still plays a rising run). Everything that marks a decision or an end
  * (summon, park, completion, win, loss) always plays. A win replaces the completion chime of the
- * same batch. Pure and in event order, so sound scheduling is testable without audio.
+ * same batch. The delivery tick is a light vibration, so it is dropped when the batch already has
+ * a stronger one (a new vibration replaces the one in progress). Decisions come first, then pickup,
+ * delivery and the finish; sounds all start at the same audio time, so the order is for readers and
+ * tests, not for hearing. Pure, so scheduling is testable without audio.
  */
 export function planCues(events: readonly CollectEvent[]): Cue[] {
   const cues: Cue[] = [];
@@ -64,7 +67,11 @@ export function planCues(events: readonly CollectEvent[]): Cue[] {
     }
   }
   if (pickup) cues.push({ sound: "pickup" });
-  if (delivery) cues.push(delivery);
+  if (delivery) {
+    const stronger = cues.some((c) => c.haptic) || won || completion !== null;
+    const { haptic, ...quiet } = delivery;
+    cues.push(stronger || !haptic ? quiet : delivery);
+  }
   if (won) cues.push({ sound: "win", haptic: "win" });
   else if (completion) cues.push(completion);
   return cues;
