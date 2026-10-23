@@ -27,7 +27,15 @@ import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, dailyFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
-import { dailyMoment, readDailyBook, recordDaily, saveDailyBook, shareOrCopy } from "./dailyBook";
+import {
+  dailyMoment,
+  practiceLine,
+  readDailyBook,
+  recordDaily,
+  saveDailyBook,
+  shareOrCopy,
+} from "./dailyBook";
+import { utcDate } from "./daily";
 import { browserStore, readSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
 import { sealMap } from "./sealView";
 import { VisualModel } from "./visuals";
@@ -90,10 +98,11 @@ export class CollectScene extends Phaser.Scene {
     isNew: boolean;
     saved: boolean;
     world: WorldMoment | null;
-    daily: { line: string; shareText: string } | null;
+    daily: { line: string; shareText: string | null } | null;
   } | null = null;
   /** The UTC date of the daily challenge being played (M13.5), or null on any other level. */
   private dailyDate: string | null = null;
+  private sharing = false;
   /** The reveal has finished or been skipped once for this win: a relayout must not replay it. */
   private revealSeen = false;
   private portalGlow: Phaser.GameObjects.Image | null = null;
@@ -134,6 +143,7 @@ export class CollectScene extends Phaser.Scene {
     // `?level=daily`: today's challenge, remembered by its date so the win is recorded for that day.
     const daily = dailyFromSearch(search, Date.now(), chosen);
     this.dailyDate = daily?.date ?? null;
+    this.sharing = false;
     const level = levelFromSearch(search, daily ? daily.levelId : chosen);
     const params = new URLSearchParams(search);
     if (params.get("speed") === "2") this.speed = 2;
@@ -708,9 +718,11 @@ export class CollectScene extends Phaser.Scene {
   }
 
   /** Records today's daily (first completion of a day counts) and says what the win card shows. */
-  private recordDaily(): { line: string; shareText: string } | null {
+  private recordDaily(): { line: string; shareText: string | null } | null {
     const date = this.dailyDate;
     if (!date) return null;
+    // Only today's challenge counts: any other day (`?date=`) is practice and leaves no trace.
+    if (date !== utcDate(Date.now())) return { line: practiceLine(date), shareText: null };
     const store = browserStore();
     const read = readDailyBook(store);
     const moves = Math.max(1, this.session.log.length);
@@ -722,12 +734,18 @@ export class CollectScene extends Phaser.Scene {
 
   /** Shares the daily's text (share sheet, else clipboard) and says what happened on the card. */
   private share(text: string): void {
+    // One share at a time: a second tap while a sheet is open would only be refused.
+    if (this.sharing) return;
+    this.sharing = true;
     const nav = typeof navigator === "undefined" ? null : navigator;
-    void shareOrCopy(text, nav).then((r) =>
+    void shareOrCopy(text, nav).then((r) => {
+      this.sharing = false;
+      // A dismissed share sheet needs no note.
+      if (r === "cancelled") return;
       this.reveal?.note(
         r === "copied" ? "Copied to clipboard" : r === "shared" ? "Shared" : "Could not share",
-      ),
-    );
+      );
+    });
   }
 
   private openSpellbook(): void {

@@ -7,8 +7,9 @@ Review build only (`?engine=v2`); the shipped game is untouched.
 ## Try it
 
 - `/play/?engine=v2&level=daily`: today's challenge (UTC date).
-- `...&level=daily&date=2026-10-26`: another day, for review or to replay one (a bad date falls back
-  to today).
+- `...&level=daily&date=2026-10-26`: another day, as **practice**: it plays that day's level but
+  records nothing and shows no streak or share (a bad date falls back to today). Only today's
+  challenge counts, so a streak or total can only come from days played on their day.
 - Spellbook → **Daily** button: plays today's challenge; the header says whether it is done, the
   streak and the total.
 
@@ -41,7 +42,9 @@ unreadable book is never overwritten. Storage trouble never blocks play.
 On a daily the win card adds a line ("Daily complete · 3-day streak", "Today's daily was already
 complete", or "could not be saved") and a **Share** button beside Spellbook. Share uses the system
 share sheet when there is one, else copies to the clipboard, and says which ("Shared", "Copied to
-clipboard", "Could not share"); it never throws.
+clipboard", "Could not share"); it never throws. A dismissed share sheet (or one already open) is
+left alone: no note, and the clipboard is not overwritten behind the player's back. A second tap
+while a share is pending is ignored. A practice run has no Share button.
 
 The text is only the day, the result and the streak:
 
@@ -64,7 +67,9 @@ card with the daily line and both buttons fitting, Share degrading to "Could not
 no clipboard), and the Spellbook header and Daily button.
 
 **Not checked:** the real share sheet and clipboard on a phone, a day rolling over while the game is
-open (the date is taken when the level starts), and anything over several real days.
+open (the date is read each time the board is built, so "Back to the board" after midnight UTC starts
+the new day's puzzle), and anything over several real days. The move count is the length of the
+attempt's log, so an undo lowers it; there is no leaderboard to cheat.
 
 **Open:** with six pictures a cycle is six days, so the daily repeats every week or so until the
 worlds are filled (docs/V2_WORLDS.md); that is a content limit, not a schedule one. Seals

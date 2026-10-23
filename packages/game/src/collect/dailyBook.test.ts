@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { artLevelForPiece, ART_PIECE_IDS } from "./artLevels";
 import {
   DAILY_KEY,
   dailyMoment,
   dailyStatus,
+  practiceLine,
   completedCount,
   emptyDailyBook,
   isDone,
@@ -128,21 +128,20 @@ describe("the share text", () => {
     );
   });
 
-  it("is spoiler-free: it never contains a picture's id, name or lore, for any level of the pool", () => {
-    const text = shareText({ date: "2026-10-24", moves: 9, streak: 3 });
-    for (const id of ART_PIECE_IDS) {
-      const level = artLevelForPiece(id)!;
-      const lower = text.toLowerCase();
-      expect(lower).not.toContain(id);
-      expect(lower).not.toContain(level.subject!.name.toLowerCase());
-      for (const word of level
-        .subject!.lore.toLowerCase()
-        .split(/\W+/)
-        .filter((w) => w.length > 5))
-        expect(lower, `${id}: ${word}`).not.toContain(word);
-    }
-    // Only these facts, nothing else: day, move count, streak.
-    expect(text.split("\n")).toHaveLength(3);
+  it("is spoiler-free by construction: exactly the day, a move count and a streak, whatever the picture", () => {
+    for (const streakN of [0, 1, 2, 30])
+      for (const moves of [1, 2, 99]) {
+        const text = shareText({ date: "2026-10-24", moves, streak: streakN });
+        expect(text).toMatch(
+          /^Hex & Hue Daily · \d{4}-\d{2}-\d{2}\n✦ Solved in \d+ moves?(\n🔥 \d+-day streak)?$/,
+        );
+      }
+    // The picture library is not an input at all: nothing about a level can leak into the text.
+    expect(shareText.length).toBe(1);
+  });
+
+  it("a practice run (a day that is not today) records and shares nothing", () => {
+    expect(practiceLine("2026-10-26")).toBe("Practice run for 2026-10-26: not recorded");
   });
 });
 
@@ -153,18 +152,32 @@ describe("sharing", () => {
     expect(await shareOrCopy("hi", nav)).toBe("shared");
     expect(sent).toEqual(["hi"]);
   });
-  it("copies when sharing is missing or dismissed", async () => {
+  it("copies when sharing is missing or fails for another reason", async () => {
     const copied: string[] = [];
     const clipboard = { writeText: async (t: string) => void copied.push(t) };
     expect(await shareOrCopy("a", { clipboard })).toBe("copied");
-    const cancelled = {
+    const refused = {
       share: async () => {
-        throw new Error("AbortError");
+        throw Object.assign(new Error("no"), { name: "NotAllowedError" });
       },
       clipboard,
     };
-    expect(await shareOrCopy("b", cancelled)).toBe("copied");
+    expect(await shareOrCopy("b", refused)).toBe("copied");
     expect(copied).toEqual(["a", "b"]);
+  });
+  it("a dismissed share sheet, or one already open, is cancelled: the clipboard is left alone", async () => {
+    const copied: string[] = [];
+    const clipboard = { writeText: async (t: string) => void copied.push(t) };
+    for (const name of ["AbortError", "InvalidStateError"]) {
+      const nav = {
+        share: async () => {
+          throw Object.assign(new Error(name), { name });
+        },
+        clipboard,
+      };
+      expect(await shareOrCopy("x", nav), name).toBe("cancelled");
+    }
+    expect(copied).toEqual([]);
   });
   it("never rejects: no API, or a denied clipboard, is just `failed`", async () => {
     expect(await shareOrCopy("x", null)).toBe("failed");
@@ -204,15 +217,11 @@ describe("what the cards say", () => {
   });
 
   it("the Spellbook header: waiting, done, streak and total", () => {
-    expect(dailyStatus(emptyDailyBook(), "2026-10-24")).toBe("Daily: today's is waiting");
-    expect(dailyStatus(done("2026-10-24"), "2026-10-24")).toBe(
-      "Daily: today's is done ✓ · 1 in all",
-    );
+    expect(dailyStatus(emptyDailyBook(), "2026-10-24")).toBe("Daily waiting");
+    expect(dailyStatus(done("2026-10-24"), "2026-10-24")).toBe("Daily ✓ · 1 total");
     expect(dailyStatus(done("2026-10-22", "2026-10-23", "2026-10-24"), "2026-10-24")).toBe(
-      "Daily: today's is done ✓ · 3-day streak · 3 in all",
+      "Daily ✓ · 3-day streak · 3 total",
     );
-    expect(dailyStatus(done("2026-10-23"), "2026-10-24")).toBe(
-      "Daily: today's is waiting · 1 in all",
-    );
+    expect(dailyStatus(done("2026-10-23"), "2026-10-24")).toBe("Daily waiting · 1 total");
   });
 });

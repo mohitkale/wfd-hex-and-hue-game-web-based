@@ -112,13 +112,22 @@ describe("the schedule is fair", () => {
     },
   );
 
-  it("works for days before 1970 too (negative day numbers)", () => {
-    for (let day = -50; day < 0; day++) {
-      const i = dailyIndex(day, 6);
-      expect(i).toBeGreaterThanOrEqual(0);
-      expect(i).toBeLessThan(6);
-    }
-  });
+  it.each([3, 6, 7])(
+    "works across 1970 and before it (pool of %i): once per cycle, never twice running",
+    (size) => {
+      let prev = dailyIndex(-3000, size);
+      for (let cycle = -300; cycle < 300; cycle++) {
+        const seen = new Set<number>();
+        for (let k = 0; k < size; k++) seen.add(dailyIndex(cycle * size + k, size));
+        expect(seen.size, `cycle ${cycle}`).toBe(size);
+      }
+      for (let day = -2999; day < 3000; day++) {
+        const now = dailyIndex(day, size);
+        expect(now, `day ${day}`).not.toBe(prev);
+        prev = now;
+      }
+    },
+  );
 
   it("every level of the pool comes up within a cycle of the real pool", () => {
     const seen = new Set<string>();
@@ -148,6 +157,8 @@ describe("?level=daily", () => {
     expect(dailyFromSearch("?level=art-black-cat", now)).toBeNull();
     expect(dailyFromSearch("", now)).toBeNull();
     expect(dailyFromSearch("?level=art-black-cat", now, "daily")?.date).toBe("2026-10-24");
+    // The Spellbook's Daily button is always today, even with a review ?date= left in the address.
+    expect(dailyFromSearch("?level=daily&date=2026-10-26", now, "daily")?.date).toBe("2026-10-24");
     expect(dailyFromSearch("?level=daily", now, "art-libra-scales")).toBeNull();
   });
 

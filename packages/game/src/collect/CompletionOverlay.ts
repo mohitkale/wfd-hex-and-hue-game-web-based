@@ -28,7 +28,7 @@ export interface CompletionOptions {
   /** The picture's world: its line, seal and backdrop (null if no world claims it, or it was not saved). */
   world: WorldMoment | null;
   /** Today's daily challenge (M13.5): its line and the text to share; null on any other level. */
-  daily: { line: string; shareText: string } | null;
+  daily: { line: string; shareText: string | null } | null;
   onShare: (text: string) => void;
   /** Show the finished picture at once (a relayout after the reveal was already seen or skipped). */
   instant: boolean;
@@ -63,6 +63,7 @@ export class CompletionOverlay {
   private readonly y0: number;
   private readonly ring: Phaser.GameObjects.Graphics;
   private dailyLine: Phaser.GameObjects.Text | null = null;
+  private noteTimer: Phaser.Time.TimerEvent | null = null;
   private pulseOn = false;
   private pulseStart = 0;
   private startedAt = -1;
@@ -163,10 +164,10 @@ export class CompletionOverlay {
       book.y + book.height + 24 * dpr + 24 * dpr,
     );
     // On a daily the Spellbook button shares its row with Share.
-    const half = o.daily ? Math.min(l.frame.w * 0.84, 340 * dpr) / 2 - 5 * dpr : bw;
+    const half = o.daily?.shareText ? Math.min(l.frame.w * 0.84, 340 * dpr) / 2 - 5 * dpr : bw;
     const spellbook = new Button(
       scene,
-      o.daily ? cx - half / 2 - 5 * dpr : cx,
+      o.daily?.shareText ? cx - half / 2 - 5 * dpr : cx,
       by,
       half,
       "Spellbook",
@@ -174,10 +175,11 @@ export class CompletionOverlay {
     )
       .setDepth(54)
       .setAlpha(0);
-    const share = o.daily
+    // A practice run has nothing to share.
+    const share = o.daily?.shareText
       ? new Button(scene, cx + half / 2 + 5 * dpr, by, half, "Share", {
           dpr,
-          onPress: () => o.onShare(o.daily!.shareText),
+          onPress: () => o.onShare(o.daily!.shareText!),
         })
           .setDepth(54)
           .setAlpha(0)
@@ -214,7 +216,9 @@ export class CompletionOverlay {
     const original = this.o.daily?.line;
     if (!line || !line.active || original === undefined) return;
     line.setText(message);
-    this.scene.time.delayedCall(ms, () => line.active && line.setText(original));
+    // A newer note takes over: only the latest timer puts the line back.
+    this.noteTimer?.remove();
+    this.noteTimer = this.scene.time.delayedCall(ms, () => line.active && line.setText(original));
   }
 
   /** Jumps to the finished picture; the text and buttons follow. */

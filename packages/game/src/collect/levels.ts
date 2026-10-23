@@ -224,7 +224,8 @@ export function dailyFromSearch(
 ): { date: string; levelId: string } | null {
   const params = new URLSearchParams(search);
   if ((chosen ?? params.get("level")) !== "daily") return null;
-  const asked = params.get("date") ?? "";
+  // A day picked in the address bar is for review or practice; the Spellbook's Daily button is today.
+  const asked = chosen ? "" : (params.get("date") ?? "");
   const date = dayNumber(asked) !== null ? asked : utcDate(now);
   const levelId = dailyLevelId(date, Object.keys(ART_LEVELS));
   return levelId ? { date, levelId } : null;

@@ -137,16 +137,21 @@ export function dailyMoment(
   return { line, shareText: shareText({ date, moves, streak: n }) };
 }
 
-/** One line for the Spellbook header: whether today's daily is done and the running totals. */
+/** One short line for the Spellbook header: today's state and the running totals. */
 export function dailyStatus(book: DailyBook, today: string): string {
   const total = completedCount(book);
   const n = streak(book, today);
-  const state = isDone(book, today) ? "today's is done ✓" : "today's is waiting";
-  const bits = [`Daily: ${state}`];
+  const bits = [isDone(book, today) ? "Daily ✓" : "Daily waiting"];
   if (n >= 2) bits.push(`${n}-day streak`);
-  if (total > 0) bits.push(`${total} in all`);
+  if (total > 0) bits.push(`${total} total`);
   return bits.join(" · ");
 }
+
+/**
+ * What the win card says when the day played is not today's (a `?date=` replay): a practice run that
+ * records nothing, so a streak or total can only come from days actually played on their day.
+ */
+export const practiceLine = (date: string): string => `Practice run for ${date}: not recorded`;
 
 /** The slice of `navigator` that sharing uses (a test double or the real one). */
 export interface ShareTarget {
@@ -156,19 +161,26 @@ export interface ShareTarget {
 
 /**
  * Shares `text` with the system share sheet, else copies it. Resolves to what happened and never
- * rejects: a cancelled share, a missing API or a denied clipboard just report `"failed"`.
+ * rejects:
+ * - `"shared"` / `"copied"`: done;
+ * - `"cancelled"`: the player dismissed the share sheet (or one is already open): nothing else is
+ *   done, so their clipboard is never overwritten behind their back;
+ * - `"failed"`: no way to share, or the browser refused.
+ * Copying is the fallback only when sharing is missing or fails for another reason.
  */
 export async function shareOrCopy(
   text: string,
   nav: ShareTarget | null,
-): Promise<"shared" | "copied" | "failed"> {
-  try {
-    if (nav?.share) {
+): Promise<"shared" | "copied" | "cancelled" | "failed"> {
+  if (nav?.share) {
+    try {
       await nav.share({ text });
       return "shared";
+    } catch (e) {
+      const name = (e as { name?: unknown } | null)?.name;
+      // AbortError: dismissed. InvalidStateError: a share sheet is already open.
+      if (name === "AbortError" || name === "InvalidStateError") return "cancelled";
     }
-  } catch {
-    // A dismissed share sheet is not an error worth showing: fall through to copying.
   }
   try {
     if (nav?.clipboard) {

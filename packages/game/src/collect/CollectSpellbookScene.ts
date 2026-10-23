@@ -184,6 +184,8 @@ export class CollectSpellbookScene extends Phaser.Scene {
           fontFamily: theme.font,
           fontSize: `${Math.round(13 * dpr)}px`,
           color: "#f6d97a",
+          align: "center",
+          wordWrap: { width: frame.w - 2 * side },
         },
       )
       .setOrigin(0.5, 0)
