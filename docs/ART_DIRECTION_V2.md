@@ -182,6 +182,7 @@ What the checker can see of these (exact definitions in section 5a):
   (P-3).
 - **A-33 [check] Backdrop share:** a declared backdrop family is at most 35 % of filled cells and
   has at least two shades (P-2).
+- **A-35 [check] Features:** a piece may declare legend characters as deliberate one-cell features (an eye glint, a rune dot), which are exempt from A-30 and A-34. The exemption is bounded: features are at most 2 % of the filled cells and each connected group of one feature character is at most 4 cells, so it cannot be used to switch the noise rules off.
 - **A-34 [check] Fragments:** same-family pieces smaller than 3 cells are at most 4 % of filled
   cells. Anything that must read at phone size (an eye, a rune, a gem) should be at least 2×2
   cells on grids of 24 or more; that part is hand-judged at G2.
@@ -202,7 +203,7 @@ stated.
 - **A-32 dither cell:** a filled cell whose four neighbours are all filled and all of a different
   family. (Empty and out-of-grid neighbours disqualify the cell, which is what separates it from an
   orphan.) The mean horizontal run is over maximal runs of consecutive identical _filled_ cells in a row; empty cells do not form runs.
-- **A-31 rectangle:** the largest axis-aligned rectangle made only of one legend character.
+- **A-31 rectangle and top shade:** a _shade_ is a (family, role), however many legend characters spell it; the rectangle is the largest axis-aligned one made only of one shade, and the top-shade share counts cells per shade.
 - **A-34 fragment:** a 4-connected group of same-family cells of fewer than 3 cells.
 - **A-13 / A-14** are evaluated on the shades a piece actually uses; "consecutive" means adjacent
   among the used roles in deep, shade, base, light, glint order.

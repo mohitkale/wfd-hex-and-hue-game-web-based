@@ -18,7 +18,7 @@ import { importFamilies, toPieceSource } from "./importFamilies";
 import { checkPiece } from "./rules";
 import { MAX_IMPORT_COLORS, quantize, toAsciiSource } from "./quantize";
 
-const USAGE = `usage: npm run art:import -- <file.png> <name> [--max-colors 1..${MAX_IMPORT_COLORS}] [--block N]`;
+const USAGE = `usage: npm run art:import -- <file.png> <name> [--max-colors 1..${MAX_IMPORT_COLORS}] [--block N]\n       npm run art:import -- <file.png> <kebab-id> --families --author "Name" [--max-families 1..8] [--max-error 1..400] [--block N]`;
 const fail = (msg: string): never => {
   console.error(`${msg}\n${USAGE}`);
   process.exit(1);
@@ -57,7 +57,8 @@ try {
       maxFamilies: int("max-families", 8, 1, 8),
       maxMeanError: int("max-error", 45, 1, 400),
     });
-    const author = flags.get("author") || "unknown";
+    const author = flags.get("author")?.trim();
+    if (!author) fail('--families needs --author "Name" (who drew it)');
     console.log(toPieceSource(name, result, author));
     console.error(
       `${result.width}×${result.height}, ${Object.keys(result.legend).length} shades; ` +
@@ -67,7 +68,7 @@ try {
       id: name,
       name: name,
       theme: "other" as const,
-      lore: "imported",
+      lore: "(lore to be written)",
       rows: result.rows,
       legend: result.legend,
       provenance: {
@@ -77,6 +78,7 @@ try {
         reviewed: false,
       },
     };
+    // A report only: a draft may fail rules until it is finished, so this never sets the exit code.
     for (const f of checkPiece(piece).findings)
       if (!f.ok && !f.id.startsWith("PR-"))
         console.error(`${f.severity === "error" ? "✗" : "⚠"} ${f.id}: ${f.measured}`);

@@ -8,7 +8,15 @@ import {
   luminanceRatio,
   type Role,
 } from "./families";
-import { LICENCES, SOURCES, parsePiece, type ArtPiece, type Cell, type ParsedPiece } from "./piece";
+import {
+  LICENCES,
+  SOURCES,
+  contentHash,
+  parsePiece,
+  type ArtPiece,
+  type Cell,
+  type ParsedPiece,
+} from "./piece";
 
 /**
  * The machine-checkable rules of docs/ART_DIRECTION_V2.md (ids match the document; definitions are
@@ -52,6 +60,8 @@ export interface Metrics {
 export interface CheckOptions {
   /** The piece is referenced by a world (M13+): it must be reviewed and licensed. */
   shipped?: boolean;
+  /** Release gate (G4): a shipped piece may no longer have an undecided licence. */
+  release?: boolean;
 }
 
 /** Thresholds, in one place so the document, the checks and the tests agree (document §3-§5a). */
@@ -86,7 +96,13 @@ export const LIMITS = {
   confusableDeuteranopia: 30,
   confusableLuminance: 1.4,
   maxLore: 140,
+  /** Deliberate one-cell features (`features`) may be at most this share of the picture. */
+  maxFeatures: 0.02,
+  maxFeatureGroup: 4,
 } as const;
+
+/** Words that mean "not filled in yet" (authors, lore). */
+const PLACEHOLDER = /^(unknown|todo|tbd|imported|none|n\/a)\b/i;
 
 const N4: [number, number][] = [
   [1, 0],
@@ -134,30 +150,54 @@ function checkProvenance(piece: ArtPiece, options: CheckOptions, add: Add): void
     "PR-lore",
     piece.lore.trim().length > 0 &&
       piece.lore.length <= LIMITS.maxLore &&
-      !/^todo/i.test(piece.lore.trim()),
+      !PLACEHOLDER.test(piece.lore.trim()),
     `lore ${piece.lore.length} characters`,
   );
-  add("PR-author", p.author.trim().length > 0, p.author ? `author "${p.author}"` : "no author");
+  add(
+    "PR-author",
+    p.author.trim().length > 0 && !PLACEHOLDER.test(p.author.trim()),
+    p.author ? `author "${p.author}"` : "no author",
+  );
   add("PR-source", SOURCES.includes(p.source), `source "${p.source}"`);
   add("PR-licence", LICENCES.includes(p.licence), `licence "${p.licence}"`);
   add(
     "PR-licence-pending",
     !(options.shipped && p.licence === "original-owner-pending"),
     options.shipped
-      ? "shipped with a licence the owner has not chosen (decide before release, G4)"
+      ? "shipped with a licence the owner has not chosen (an error with --release, gate G4)"
       : "not shipped",
-    "warning",
+    options.release ? "error" : "warning",
   );
   // CI, solvers, simulated players and the model itself are never reviewers (CLAUDE.md gates).
+  // This is a tripwire, not proof: the fields are plain data, and the real protection is the human
+  // gate (G2/G4) and review of the PR that sets them.
+  const isDate = (s: string | undefined) => {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    const t = new Date(s).getTime();
+    return !Number.isNaN(t) && new Date(t).toISOString().startsWith(s);
+  };
   const reviewerOk =
     !p.reviewed ||
     (!!p.reviewedBy?.trim() &&
-      !/\b(claude|anthropic|ai|bot|ci|solver|auto|simulat\w*)\b/i.test(p.reviewedBy) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(p.reviewedOn ?? ""));
+      !PLACEHOLDER.test(p.reviewedBy.trim()) &&
+      !/\b(claude|sonnet|opus|haiku|anthropic|assistant|gpt|gemini|ai|bot|ci|actions|solver|auto|simulat\w*)\b/i.test(
+        p.reviewedBy,
+      ) &&
+      isDate(p.reviewedOn));
   add(
     "PR-reviewer",
     reviewerOk,
     p.reviewed ? `reviewed by "${p.reviewedBy ?? ""}" on ${p.reviewedOn ?? "?"}` : "not reviewed",
+  );
+  const hash = contentHash(piece);
+  add(
+    "PR-hash",
+    !p.reviewed || p.reviewedHash === hash,
+    p.reviewed
+      ? p.reviewedHash === hash
+        ? `review matches the picture (${hash})`
+        : `the picture changed since review: reviewedHash is ${p.reviewedHash ?? "missing"}, the picture is ${hash}; review it again`
+      : "not reviewed",
   );
   add(
     "PR-draft",
@@ -387,11 +427,16 @@ function checkPicture(piece: ArtPiece, parsed: ParsedPiece, add: Add): Metrics {
 
   let largest = 0;
   const heights = new Array<number>(W).fill(0);
-  const chars = new Set(filled.map((f) => f[2].ch));
-  for (const ch of chars) {
+  // A shade is a (family, role), whatever legend characters spell it.
+  const shadeOf = (x: number, y: number) => {
+    const c = at(x, y);
+    return c ? `${c.family}/${c.role}` : null;
+  };
+  const shades = new Set(filled.map(([x, y]) => shadeOf(x, y)!));
+  for (const shade of shades) {
     heights.fill(0);
     for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) heights[x] = at(x, y)?.ch === ch ? heights[x]! + 1 : 0;
+      for (let x = 0; x < W; x++) heights[x] = shadeOf(x, y) === shade ? heights[x]! + 1 : 0;
       for (let i = 0; i < W; i++) {
         let min = Infinity;
         for (let j = i; j < W; j++) {
@@ -402,9 +447,9 @@ function checkPicture(piece: ArtPiece, parsed: ParsedPiece, add: Add): Metrics {
       }
     }
   }
-  const byChar = new Map<string, number>();
-  for (const [, , c] of filled) byChar.set(c.ch, (byChar.get(c.ch) ?? 0) + 1);
-  const top = Math.max(...byChar.values()) / F;
+  const byShade = new Map<string, number>();
+  for (const [x, y] of filled) byShade.set(shadeOf(x, y)!, (byShade.get(shadeOf(x, y)!) ?? 0) + 1);
+  const top = Math.max(...byShade.values()) / F;
   add(
     "A-31",
     largest / (W * H) <= LIMITS.maxFlatRect && top <= LIMITS.maxTopShade,
@@ -473,6 +518,37 @@ function checkPicture(piece: ArtPiece, parsed: ParsedPiece, add: Add): Metrics {
     if (group.length < 3) fragments += group.filter((g) => !features.has(g.ch)).length;
   }
   add("A-34", fragments / F <= LIMITS.maxFragments, `fragments ${pct(fragments / F)}`);
+
+  // A-35: the `features` exemption is bounded, so it cannot switch the noise rules off.
+  if (features.size > 0) {
+    const featureCells = filled.filter(([, , c]) => features.has(c.ch));
+    const seenF = new Set<number>();
+    let biggest = 0;
+    for (const [x, y, c] of featureCells) {
+      if (seenF.has(y * W + x)) continue;
+      const stack: [number, number][] = [[x, y]];
+      seenF.add(y * W + x);
+      let size = 0;
+      while (stack.length) {
+        const [cx, cy] = stack.pop()!;
+        size++;
+        for (const [dx, dy] of N4) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (at(nx, ny)?.ch === c.ch && !seenF.has(ny * W + nx)) {
+            seenF.add(ny * W + nx);
+            stack.push([nx, ny]);
+          }
+        }
+      }
+      biggest = Math.max(biggest, size);
+    }
+    add(
+      "A-35",
+      featureCells.length / F <= LIMITS.maxFeatures && biggest <= LIMITS.maxFeatureGroup,
+      `features ${pct(featureCells.length / F)} of cells, largest group ${biggest}`,
+    );
+  } else add("A-35", true, "no features");
 
   return {
     width: W,

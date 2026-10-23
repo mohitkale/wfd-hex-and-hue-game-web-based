@@ -5,6 +5,7 @@
  *
  *   npm run art:check             # the library
  *   npm run art:check -- --all    # also print every passing rule
+ *   npm run art:check -- --release  # release gate (G4): shipped pieces need a decided licence
  */
 import { pathToFileURL } from "node:url";
 import { pieces, SHIPPED } from "../../content/v2art";
@@ -21,6 +22,7 @@ export interface LibraryReport {
 export function checkLibrary(
   library: readonly ArtPiece[],
   shipped: readonly string[] = [],
+  release = false,
 ): LibraryReport {
   const problems: string[] = [];
   const ids = new Set<string>();
@@ -29,7 +31,7 @@ export function checkLibrary(
     ids.add(piece.id);
   }
   for (const id of shipped) if (!ids.has(id)) problems.push(`shipped piece "${id}" does not exist`);
-  const reports = library.map((p) => checkPiece(p, { shipped: shipped.includes(p.id) }));
+  const reports = library.map((p) => checkPiece(p, { shipped: shipped.includes(p.id), release }));
   return {
     reports,
     problems,
@@ -60,7 +62,7 @@ export function formatReport(report: LibraryReport, all = false): string {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const report = checkLibrary(pieces, SHIPPED);
+  const report = checkLibrary(pieces, SHIPPED, process.argv.includes("--release"));
   console.log(formatReport(report, process.argv.includes("--all")));
   if (!report.ok) process.exit(1);
 }

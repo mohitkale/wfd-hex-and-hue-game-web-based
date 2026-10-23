@@ -4,7 +4,7 @@ import { candle, crescent } from "./fixtures";
 import { HOUSE_BASES, HOUSE_FAMILIES, houseRamp, nearestHouseShade } from "./families";
 import { parseHex } from "./color";
 import { checkPiece, type Finding } from "./rules";
-import { parsePiece, pieceToArt, type ArtPiece } from "./piece";
+import { contentHash, parsePiece, pieceToArt, type ArtPiece } from "./piece";
 
 const byId = (findings: Finding[], id: string) => findings.find((f) => f.id === id)!;
 const edit = (piece: ArtPiece, over: Partial<ArtPiece>): ArtPiece => ({ ...piece, ...over });
@@ -42,7 +42,7 @@ describe("the worked examples of the art bible", () => {
     const report = checkPiece(piece);
     expect(report.errors).toEqual([]);
     expect(report.warnings).toEqual([]);
-    expect(report.findings.filter((f) => f.id.startsWith("A-"))).toHaveLength(20);
+    expect(report.findings.filter((f) => f.id.startsWith("A-"))).toHaveLength(21);
   });
 
   it("measures what the scorecards in the document say", () => {
@@ -220,6 +220,72 @@ describe("rules fail on bad art", () => {
   });
 });
 
+describe("the features exemption cannot switch the noise rules off", () => {
+  const speckled: ArtPiece = {
+    ...candle,
+    legend: { ...candle.legend, q: ["Gold", "light"] },
+    rows: candle.rows.map((row, y) =>
+      [...row].map((c, x) => (c === "m" && (x * 3 + y * 5) % 7 === 0 ? "q" : c)).join(""),
+    ),
+  };
+
+  it("speckle fails; declaring it a feature fails too, because features are bounded", () => {
+    expect(failing(speckled)).toContain("A-30");
+    const declared = edit(speckled, { features: "q" });
+    expect(failing(declared)).toContain("A-35");
+  });
+
+  it("a few real one-cell features (an eye, a rune dot) are fine", () => {
+    const eye = rows2(candle, (r) =>
+      r.map((row, y) => (y === 8 ? row.replace("mmsmm", "mmqmm") : row)),
+    );
+    const piece = edit(eye, { legend: { ...eye.legend, q: ["Gold", "light"] }, features: "q" });
+    expect(checkPiece(piece).findings.find((f) => f.id === "A-35")!.ok).toBe(true);
+  });
+
+  it("a feature group larger than a few cells is a shape, not a feature", () => {
+    const blob = rows2(candle, (r) =>
+      r.map((row, y) => (y >= 8 && y <= 12 ? row.replace("mmm", "qqq") : row)),
+    );
+    const piece = edit(blob, { legend: { ...blob.legend, q: ["Gold", "light"] }, features: "q" });
+    expect(failing(piece)).toContain("A-35");
+  });
+});
+
+function rows2(piece: ArtPiece, f: (r: string[]) => string[]): ArtPiece {
+  return { ...piece, rows: f([...piece.rows]) };
+}
+
+describe("flat areas are measured per shade, not per legend character", () => {
+  it("two characters spelling one shade still make one flat area", () => {
+    const split = edit(candle, {
+      legend: { ...candle.legend, z: ["Moonstone", "base"] },
+      rows: candle.rows.map((r) => r.replace(/mmmmm/g, "mmzmm")),
+    });
+    const a = checkPiece(candle).findings.find((f) => f.id === "A-31")!.measured;
+    const b = checkPiece(split).findings.find((f) => f.id === "A-31")!.measured;
+    expect(b).toBe(a);
+  });
+});
+
+describe("custom ramps", () => {
+  it("cannot redefine a house family, and must be real #rrggbb colours", () => {
+    const red = edit(candle, { families: { Moonstone: { base: "#ff0000" } } });
+    expect(failing(red)).toEqual(["STRUCT"]);
+    const structMessage = (piece: ArtPiece) =>
+      checkPiece(piece).findings.find((f) => f.id === "STRUCT")!.measured;
+    expect(structMessage(red)).toContain("house family");
+    const short = edit(candle, { families: { Mud: { base: "#fff" } } });
+    expect(structMessage(short)).toContain("not #rrggbb");
+    const same = edit(candle, { families: { Moonstone: { base: "#c9bde6" } } });
+    expect(failing(same)).toEqual([]);
+  });
+
+  it("rejects characters that take more than one text unit", () => {
+    expect(failing(edit(candle, { rows: ["😀😀", "😀😀"] }))).toEqual(["STRUCT"]);
+  });
+});
+
 describe("provenance", () => {
   const ok = (over: Partial<ArtPiece["provenance"]>): ArtPiece =>
     edit(candle, { provenance: { ...candle.provenance, ...over } });
@@ -235,7 +301,12 @@ describe("provenance", () => {
 
   it("warns when a shipped piece still has the owner's licence undecided", () => {
     const report = checkPiece(
-      ok({ reviewed: true, reviewedBy: "Mohit", reviewedOn: "2026-10-23" }),
+      ok({
+        reviewed: true,
+        reviewedBy: "Mohit",
+        reviewedOn: "2026-10-23",
+        reviewedHash: contentHash(candle),
+      }),
       { shipped: true },
     );
     expect(report.errors).toEqual([]);
@@ -253,9 +324,62 @@ describe("provenance", () => {
     expect(failing(ok({ reviewed: true, reviewedBy: "Mohit", reviewedOn: "yesterday" }))).toContain(
       "PR-reviewer",
     );
-    expect(failing(ok({ reviewed: true, reviewedBy: "Mohit", reviewedOn: "2026-10-23" }))).toEqual(
-      [],
+    expect(
+      failing(
+        ok({
+          reviewed: true,
+          reviewedBy: "Mohit",
+          reviewedOn: "2026-10-23",
+          reviewedHash: contentHash(candle),
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("a review is bound to the picture: changing it afterwards fails until reviewed again", () => {
+    const approved = ok({
+      reviewed: true,
+      reviewedBy: "Mohit",
+      reviewedOn: "2026-10-23",
+      reviewedHash: contentHash(candle),
+    });
+    expect(failing(approved)).toEqual([]);
+    const changed = edit(approved, { rows: approved.rows.map((r) => r.replace("YYYYY", "YYYWY")) });
+    const ids = failing(changed);
+    expect(ids).toContain("PR-hash");
+    expect(checkPiece(changed).findings.find((f) => f.id === "PR-hash")!.measured).toContain(
+      "review it again",
     );
+    expect(
+      failing(ok({ reviewed: true, reviewedBy: "Mohit", reviewedOn: "2026-10-23" })),
+    ).toContain("PR-hash");
+  });
+
+  it("rejects placeholder authors and lore, impossible dates and more model/bot names", () => {
+    expect(failing(ok({ author: "unknown" }))).toContain("PR-author");
+    expect(failing(edit(candle, { lore: "imported" }))).toContain("PR-lore");
+    expect(failing(edit(candle, { lore: "(lore to be written)" }))).toEqual([]);
+    const reviewed = (by: string, on = "2026-10-23") =>
+      ok({ reviewed: true, reviewedBy: by, reviewedOn: on, reviewedHash: contentHash(candle) });
+    expect(failing(reviewed("Mohit", "2026-99-99"))).toContain("PR-reviewer");
+    for (const name of ["Sonnet", "GPT-5", "github-actions", "assistant", "Gemini", "unknown"])
+      expect(failing(reviewed(name)), name).toContain("PR-reviewer");
+  });
+
+  it("an undecided licence on shipped art is a warning, and an error at the release gate", () => {
+    const approved = ok({
+      reviewed: true,
+      reviewedBy: "Mohit",
+      reviewedOn: "2026-10-23",
+      reviewedHash: contentHash(candle),
+    });
+    expect(checkPiece(approved, { shipped: true }).warnings.map((f) => f.id)).toEqual([
+      "PR-licence-pending",
+    ]);
+    expect(checkPiece(approved, { shipped: true, release: true }).errors.map((f) => f.id)).toEqual([
+      "PR-licence-pending",
+    ]);
+    expect(checkPiece(approved, { release: true }).errors).toEqual([]);
   });
 
   it("a generated draft can be neither reviewed nor shipped", () => {

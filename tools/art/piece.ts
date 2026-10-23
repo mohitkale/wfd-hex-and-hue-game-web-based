@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Art } from "@hexhue/core";
 import { HOUSE_FAMILIES, ROLES, type PartialRamp, type Role } from "./families";
 
@@ -31,6 +32,11 @@ export interface Provenance {
   reviewedBy?: string;
   /** Required when `reviewed`: `YYYY-MM-DD`. */
   reviewedOn?: string;
+  /**
+   * Required when `reviewed`: `contentHash(piece)` at the time of review, so a change to the
+   * picture after approval makes the check fail until a human reviews it again.
+   */
+  reviewedHash?: string;
   notes?: string;
 }
 
@@ -72,9 +78,24 @@ export interface ParsedPiece {
   ramps: Record<string, PartialRamp>;
 }
 
-/** Resolves a family's ramp: the piece's own, else the house one. */
+/** Hash of everything that makes up the picture (not the metadata): the thing a review approves. */
+export function contentHash(piece: ArtPiece): string {
+  const body = JSON.stringify([
+    piece.rows,
+    Object.entries(piece.legend).sort(([a], [b]) => a.localeCompare(b)),
+    Object.entries(piece.families ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+    piece.backdrop ?? [],
+    piece.features ?? "",
+  ]);
+  return createHash("sha256").update(body).digest("hex").slice(0, 16);
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/** Resolves a family's ramp: the house one, else the piece's own custom ramp. */
 export function rampOf(piece: Pick<ArtPiece, "families">, family: string): PartialRamp | undefined {
-  return piece.families?.[family] ?? HOUSE_FAMILIES[family];
+  // A house name always means the house ramp (parsePiece rejects a different redefinition).
+  return HOUSE_FAMILIES[family] ?? piece.families?.[family];
 }
 
 /** Structural errors that make a piece unreadable at all (rules are checked on parsed pieces). */
@@ -87,6 +108,18 @@ export function parsePiece(piece: ArtPiece): ParsedPiece {
   piece.rows.forEach((row, y) => {
     if (row.length !== width) fail(`row ${y} has ${row.length} cells, expected ${width}`);
   });
+  if (piece.rows.some((row) => [...row].length !== row.length))
+    fail("rows may only use single-unit characters");
+  for (const [name, ramp] of Object.entries(piece.families ?? {})) {
+    for (const [role, hex] of Object.entries(ramp)) {
+      if (!ROLES.includes(role as Role)) fail(`family "${name}" has unknown role "${role}"`);
+      if (!HEX.test(hex)) fail(`family "${name}" ${role} "${hex}" is not #rrggbb`);
+    }
+    // A house name is the house ramp: a redefinition could dodge the neutral-family exemptions.
+    const house = HOUSE_FAMILIES[name];
+    if (house && ROLES.some((r) => ramp[r] !== undefined && ramp[r]!.toLowerCase() !== house[r]))
+      fail(`family "${name}" is a house family: pick another name for a custom ramp`);
+  }
   const ramps: Record<string, PartialRamp> = {};
   const cells: (Cell | null)[] = [];
   for (const row of piece.rows) {
