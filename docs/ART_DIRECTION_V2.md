@@ -36,10 +36,10 @@ small, deliberate illustrations of witchy things, and must stay readable when ev
 | Hero             | 32-40         | 600-1,000                  | World finales; the engine's limit is 40×40 |
 
 - **A-01 [check]** Grid 16-40 per side and 120-1,000 filled cells; outside that needs a written reason.
-- A piece fills its grid: the subject's bounding box spans at least 85 % of the grid in its larger
-  dimension, so no tiny picture swims in a big frame **[check A-02]**.
-- At least 3 of the 4 corner cells are empty (the silhouette rule), and at least 10 % of all cells
-  are empty **[check A-03]**.
+- **A-02 [check]** A piece fills its grid: the subject's bounding box spans at least 85 % of the
+  grid's width or of its height, so no tiny picture swims in a big frame.
+- **A-03 [check]** At least 3 of the 4 corner cells are empty (the silhouette rule), and at least
+  10 % of all cells are empty.
 - Smallest cube on a 320 px-wide phone: decided by M11.2 from measurement (hypothesis: 8 CSS px,
   which makes 32 per side the practical default and 40 a hero-only size).
 - Play time is part of the design: a 600-cube piece is about five minutes at 1×. M11.2 reports
@@ -69,27 +69,32 @@ panel (`#0f0824`, floor 1.6).
 | Moonstone | `#736690` | `#998cb6` | `#c9bde6` | `#dcd4ef` | `#ece8f6` | 3.7          |
 | Night     | `#3d335d` | `#4b426c` | `#5d5680` | `#9691ac` | `#c6c4d3` | 1.7          |
 
-Measured on the table above (redmean distance, the metric `tools/art/color.ts` already uses): the
-closest two **base** colours are 127 apart (Ember/Gold); consecutive shades within a family are
-46-169 apart; the largest hue drift from a base is 21°. Cross-family distance between any two
-shades from the safe subset (deep, shade, base, light; Night without light) is at least 53. Glints
-are weaker (Ember/Gold glints are 45 apart) and are used sparingly (below).
+Measured on the table above with `tools/art/color.ts` (redmean distance): the closest two **base**
+colours are 127 apart (Ember/Gold); consecutive shades within a family are 46-164 apart; the
+largest hue drift from a base is 21°.
+
+**Shades that cannot share a piece** (cross-family distance below 50; the checker rejects a piece
+that uses both): Ruby glint / Rose light (48), Ember glint / Gold glint (45), Sapphire glint /
+Moonstone light (49), Amethyst glint / Moonstone base (43), Amethyst glint / Moonstone light (27),
+Moonstone shade / Night light (18), Moonstone base / Night glint (32). All other pairs of the 50
+house shades are at least 50 apart. In practice: use glints sparingly, and a piece with both
+Moonstone and Night leaves out Night's light and glint.
 
 Custom ramps are allowed when a subject needs one (a particular skin, a specific stone), but they
 must pass the same checks and are added to this table when they ship.
 
 ### Rules
 
-- **A-10 [check] Families per piece: 3-8.** More than eight and players stop being able to match
-  by eye; fewer than three is not a picture. (Engine ceiling is 16 colours, section 7.)
+- **A-10 [check] Families per piece: 3-8** (tutorial pieces, 24 per side or less, may use 2). More
+  than eight and players stop being able to match by eye; fewer than three is hardly a picture.
+  (Engine ceiling is 16 colours, section 7.)
 - **A-11 [check] Shades per family: 1-5.** Four is the working number. A family used for the
   background or a flat object may have 1-2.
 - **A-12 [check] Family separation:** the base colours of any two families in one piece are at
   least 90 apart (the rule M6.5 shipped, kept at base level only).
 - **A-13 [check] Cross-family shade separation: ≥ 50.** Any shade of one family and any shade of
-  another family used in the same piece are at least 50 apart, so a light shade is never mistaken
-  for a different family's base. (Night's light shade and Moonstone's shade collide on purpose
-  here: a piece using both leaves one of them out.)
+  another family _used in the same piece_ are at least 50 apart, so a light shade is never mistaken
+  for a different family's base. The house pairs that fail are listed above.
 - **A-14 [check] Visible steps:** consecutive shades in a ramp are 40-180 apart. Closer is
   invisible on a phone; farther reads as a different colour.
 - **A-15 [check] Same hue:** a shade's hue is within 25° of its base (neutral Moonstone/Night
@@ -98,14 +103,21 @@ must pass the same checks and are added to this table when they ship.
 - **A-16 [check] Readable on the board:** every shade has contrast ≥ 1.6 against the panel
   (`#0f0824`), the same floor `tools/art/check.ts` enforces today. **No pure or near black.** A
   black cat is Night deep/shade/base with a Moonstone glint, never `#000`.
-- **A-17 [check] Colour-blind safety is not hue alone.** Families must stay at least 60 apart
-  (redmean) under simulated deuteranopia; a pair below that is allowed only if the pieces tell them
-  apart in value (their bases differ by contrast ratio ≥ 1.4). The M6.5 symbols cover the rest.
-  (M10.1 measured the familiar sheet's eight colours at about 66 at their closest pair under deuteranopia.)
+- **A-17 [check, warning] Colour-blind pairs.** Matching must not rest on hue alone, and the
+  game already has the answer: the M6.5 colour-blind symbols. This rule makes the exposure
+  visible instead of forbidding it. The check simulates deuteranopia (Machado et al. 2009,
+  severity 1.0, applied in linear RGB: the same matrix as `tools/familiar/familiar.test.ts`) and
+  reports every pair of base colours in the piece that ends up less than 30 redmean apart **and**
+  has a luminance contrast ratio below 1.4. Today that is two house pairs: **Teal/Rose** (15,
+  ratio 1.16) and **Sapphire/Amethyst** (22, ratio 1.11). A piece may contain such a pair, but the
+  review sheet flags it and the pair should not touch each other, so the symbols are the only thing
+  telling them apart in a small area. Re-tuning those two ramps for value is a candidate change if
+  playtesting (G3) shows trouble.
 - **Light comes from the upper left.** Lights and glints sit on upper-left faces and edges, shades
-  and deeps on lower-right. One light, everywhere in the picture. **A-18 [check, heuristic]:**
-  within a family of three or more shades, the light/glint cells' mean row is above (smaller than)
-  the shade/deep cells'.
+  and deeps on lower-right. One light, everywhere in the picture. **A-18 [check]:** for each family
+  with three or more shades and at least six light/glint cells and six shade/deep cells, the
+  light/glint centroid's `x + y` is smaller than the shade/deep centroid's (so it is up, left or
+  both; light from the upper right fails).
 - **Glints are rare.** Glint cells are at most 4 % of a piece's cells **[check A-19]**, and each
   has a reason (a wet highlight, a flame core, a star point), not scattered to look sparkly.
 
@@ -113,17 +125,17 @@ must pass the same checks and are added to this table when they ship.
 
 1. **Silhouette first.** Fill the whole subject in base colours and hide everything else: can you
    still name it? If not, redraw the silhouette before adding detail. A crescent is a crescent,
-   not "a yellow area". Hand-judged at G2; **A-20 [check]** keeps the shape stable at small size:
-   downsampled to half size (majority family per 2×2 block) and back, at least 80 % of the filled
-   cells stay in the same place.
+   not "a yellow area". Hand-judged at G2; **A-20 [check]** keeps the shape stable at small size
+   (definition in section 5a).
 2. **Volume from ramps.** A round thing has a light side, a base, a shade side and a deep crease,
    in that order across the form. Flat unshaded areas of one shade are allowed only for small
    parts (a buckle, an eye), see A-31.
 3. **Selective outline.** The silhouette edge, where a form meets empty board, gets a 1-cell edge
    in the family's **deep** (or shade) tone, never black and never a separate outline colour.
    Interior boundaries are drawn by a change of shade or family, not by a dark line. Not every edge
-   needs the outline: light-side edges may stay light, which makes the form glow. **A-21 [check]**:
-   outline cells are deep or shade of their family, and at most 60 % of edge cells use deep.
+   needs the outline: light-side edges may stay light, which makes the form glow. **A-21 [check]**
+   (definition in section 5a): at least 35 % of the piece's edge cells are deep or shade, and no
+   more than 60 % are deep, so a piece with no shaded edge fails and so does a black-outlined one.
 4. **Texture is shape.** Bark, stone, cloth, fur are shown with a few repeated structured marks that
    follow the form (stripes along a limb, facets on a crystal, folds along a cloak), not with
    random speckle. Texture may use at most one extra shade per family.
@@ -157,16 +169,39 @@ picture better. The following are prohibited:
 - **P-7** Borrowed material: any trace of Food Hunt art, a reference sprite, an image model's
   bitmap or a copied pixel layout. Everything is drawn here, and its source is recorded (section 6).
 
-What the checker can see of these:
+What the checker can see of these (exact definitions in section 5a):
 
-- **A-30 [check] Orphans:** cells with no 4-neighbour of the same family are at most 1 % of filled
-  cells (intentional one-cell features, such as an eye glint, are marked in the source).
-- **A-31 [check] Flat areas:** the largest axis-aligned rectangle of one shade is at most 8 % of
-  the grid area, and no one shade exceeds 35 % of filled cells (P-1, P-2).
-- **A-32 [check] Dither:** cells whose four neighbours all differ in family from them are at most
-  2 % of filled cells; the mean horizontal run of one shade is at least 2.0 (P-3).
-- **A-33 [check] Backdrop share:** if a piece has a backdrop family, it is at most 35 % of filled
-  cells and has at least two shades (P-2).
+- **A-30 [check] Orphans:** at most 1 % of filled cells.
+- **A-31 [check] Flat areas:** the largest one-shade rectangle is at most 8 % of the grid, and no
+  one shade is more than 45 % of the filled cells (P-1, P-2).
+- **A-32 [check] Dither:** at most 2 % of filled cells, and a mean horizontal run of at least 2.0
+  (P-3).
+- **A-33 [check] Backdrop share:** a declared backdrop family is at most 35 % of filled cells and
+  has at least two shades (P-2).
+- **A-34 [check] Fragments:** same-family pieces smaller than 3 cells are at most 4 % of filled
+  cells. Anything that must read at phone size (an eye, a rune, a gem) should be at least 2×2
+  cells on grids of 24 or more; that part is hand-judged at G2.
+
+### 5a. Definitions the checker uses
+
+So two implementations cannot disagree. A cell is _filled_ if it is not empty. Neighbours are the
+four orthogonal ones; outside the grid counts as empty. Percentages are of filled cells unless
+stated.
+
+- **Edge cell:** a filled cell with at least one empty neighbour. **A-21:** let _E_ be the edge
+  cells; deep-or-shade cells in _E_ ≥ 35 % of _E_, and deep cells in _E_ ≤ 60 % of _E_.
+- **A-20, silhouette stability:** cut the grid into 2×2 blocks from the top left (an odd edge
+  block is padded with empty cells); a block is _filled_ if at least 2 of its cells are filled.
+  Build the filled/empty mask of the blocks, scaled back to cells. The intersection-over-union of
+  that mask with the original filled mask must be ≥ 0.75.
+- **A-30 orphan:** a filled cell with no neighbour of its own family.
+- **A-32 dither cell:** a filled cell whose four neighbours are all filled and all of a different
+  family. (Empty and out-of-grid neighbours disqualify the cell, which is what separates it from an
+  orphan.) The mean horizontal run is over maximal runs of consecutive identical cells in a row.
+- **A-31 rectangle:** the largest axis-aligned rectangle made only of one legend character.
+- **A-34 fragment:** a 4-connected group of same-family cells of fewer than 3 cells.
+- **A-13 / A-14** are evaluated on the shades a piece actually uses; "consecutive" means adjacent
+  among the used roles in deep, shade, base, light, glint order.
 
 ## 6. How a piece is made and tracked
 
@@ -189,12 +224,26 @@ caps families at 8 for readability, so the engine ceiling is never the binding l
 holds a palette of plain colours with no shade; carrying shades alongside families is the engine
 and pipeline work in M11.2 and M11.4.
 
+**What the later tasks inherit** (also recorded in the roadmap): M11.2 adds the per-cell shade to
+the level model and renderer (family still decides gameplay) alongside the larger grids. M11.4 adds
+`npm run art:check` implementing every rule marked **[check]** with the section 5a definitions,
+reports A-17 as a warning, enforces the provenance fields of section 6, and **replaces** the single
+distance-90 rule in `tools/art/check.ts`, which would otherwise reject every multi-shade ramp
+(shade steps are 46-164). Until then v1 art keeps using `check.ts` unchanged.
+
 ## 8. Worked before / after
+
+Both "after" pictures were scored with a throwaway script that implements the section 5a
+definitions, and the scorecards below are its output. They prove the rules can be satisfied and
+that the numbers are not contradictory. They do **not** prove the thresholds are right: A-20 and
+A-31's 45 % shade cap were set after scoring these two pictures (see the calibration log), and M11.3's
+real pieces will test them properly. A-17 (the colour-blind warning) concerns pairs of families and
+is not triggered by either picture.
 
 ### Example 1: the candle (volume, ramps, silhouette)
 
-**Before** (v1 `candleJar`, 10×12, 62 cells, 4 flat colours: orange flame, gold flame core, purple jar,
-white wax; every part one tone, a rectangle for a body):
+**Before** (v1 `candleJar`, 10×12, 62 cells, 4 flat colours: orange flame, gold flame core, purple
+jar, white wax; every part one tone, a rectangle for a body):
 
 ```
 ....ff....
@@ -211,40 +260,68 @@ white wax; every part one tone, a rectangle for a body):
 .pppppppp.
 ```
 
-**After** (illustrative, 14×16, 108 cells, 3 families, 12 shades; light from the upper left):
+**After** (illustrative, 16×20, 152 cells, 3 families, 13 shades; light from the upper left):
 
 ```
-......yy......
-.....yYYy.....
-....yYWWYy....
-....yYWWYY....
-....YYYYYO....
-.....YYYO.....
-......kk......
-....hmmmss....
-....hmmmss....
-...hmmmmmss...
-...hmmmmmss...
-...hmmmmmss...
-...hmmmmmss...
-.aaaaaaaaaaaa.
-.AAAAAAAAAAvv.
-..vvvvvvvvuu..
+.......yy.......
+......yYYO......
+.....yYWWYO.....
+.....yYWWYO.....
+.....YYYYYO.....
+......YYYO......
+.......kk.......
+....hmmmmmsd....
+....hmmmmmsd....
+....hmmsmmsd....
+....hmmsmmsd....
+....hmmmmmsd....
+....hmmmmssd....
+....hhmmmmsd....
+....hmmmmmsd....
+....hmmmmsdd....
+.aaaaaaaaaaaaaa.
+.AAAAAAAAAAAAvu.
+..vvvvvvvvvvvu..
+...uuuuuuuuuu...
 ```
 
 | Key | Family / role           | Key | Family / role        |
 | --- | ----------------------- | --- | -------------------- |
-| `y` | Gold light              | `m` | Moonstone base       |
-| `Y` | Gold base               | `h` | Moonstone light      |
+| `y` | Gold light              | `h` | Moonstone light      |
+| `Y` | Gold base               | `m` | Moonstone base       |
 | `W` | Gold glint (flame core) | `s` | Moonstone shade      |
-| `O` | Gold shade              | `a` | Amethyst light (lip) |
-| `k` | Gold deep (wick)        | `A` | Amethyst base        |
-| `v` | Amethyst shade          | `u` | Amethyst deep        |
+| `O` | Gold shade              | `d` | Moonstone deep       |
+| `k` | Gold deep (wick)        | `a` | Amethyst light (lip) |
+| `A` | Amethyst base           | `v` | Amethyst shade       |
+| `u` | Amethyst deep           |     |                      |
 
-What changed and why it passes: a **flame with a core** (the four glint cells are 3.7 % of the 108,
-under A-19's 4 % cap); a **wax column lit from the left** (light edge, base, shade edge) instead of
-a flat white block; a **dish** with a lit lip and a shaded underside instead of a pot rectangle; no
-sky, no ground bar, no scattered dots.
+What changed: a flame with a core, a wax column lit from the left with a shaded right edge and a
+drip, and a dish with a lit lip and a deep underside, instead of one tone per part. No sky, no
+ground bar, no scattered dots.
+
+Scorecard (every rule passes):
+
+| Rule | Measured                                                                 | Result |
+| ---- | ------------------------------------------------------------------------ | ------ |
+| A-01 | 16×20, 152 cells                                                         | pass   |
+| A-02 | spans 100 %                                                              | pass   |
+| A-03 | 4/4 corners empty, 53 % empty                                            | pass   |
+| A-10 | 3 families                                                               | pass   |
+| A-11 | Gold 5, Moonstone 4, Amethyst 4                                          | pass   |
+| A-12 | closest bases 203                                                        | pass   |
+| A-13 | closest cross-family shades 79                                           | pass   |
+| A-14 | steps 58-146                                                             | pass   |
+| A-15 | max hue drift 8°                                                         | pass   |
+| A-16 | lowest contrast 2.20                                                     | pass   |
+| A-18 | light < shade in all three families (x+y 8.6/12.9, 15.3/21.1, 23.5/26.3) | pass   |
+| A-19 | glint 2.6 % (4 cells)                                                    | pass   |
+| A-20 | IoU 0.88                                                                 | pass   |
+| A-21 | 56 edge cells: 54 % deep/shade, 41 % deep                                | pass   |
+| A-30 | orphans 0 %                                                              | pass   |
+| A-31 | largest flat rectangle 15 cells = 4.7 %; top shade 26 %                  | pass   |
+| A-32 | dither 0 %, mean run 2.30                                                | pass   |
+| A-33 | no backdrop                                                              | pass   |
+| A-34 | fragments 0 %                                                            | pass   |
 
 ### Example 2: the crescent (silhouette and backdrop)
 
@@ -252,34 +329,66 @@ sky, no ground bar, no scattered dots.
 starlight dots): a full-rectangle sky, a crescent of one tone, stars as scattered single cells.
 This breaks P-2 (giant flat background), P-3 (random dots) and A-31.
 
-**After** (illustrative, 16×16, 99 cells, 2 families, 4 shades, no backdrop):
+**After** (illustrative, 24×24, 219 cells, 3 families, 10 shades; no sky: the only backdrop is a
+thin Amethyst halo arc on the lit side, 24 % of the cells):
 
 ```
-................
-.............m..
-.....LLLL...mmm.
-...LLLYYYS...m..
-..LLYYYS........
-..LYYYS.........
-.LLYYYS.........
-.LYYYYS.........
-.LYYYYS.........
-.LYYYYS.........
-.LYYYYYS.....m..
-..LYYYYYSS..mmm.
-..LLYYYYYYSS.m..
-...LLYYYYYYYS...
-....SSSSSSSS....
-................
+........................
+.......a................
+.....aaA............s...
+....aaAA..LLLSK....sms..
+...aAA.WLLLSSK......s...
+..aaA.WLYYSK............
+..aA.LLYYYS.............
+.aAALLYYYSK.............
+.aA.LYYYYS..............
+.aALLYYYYS..............
+.AALYYYYYS..............
+.A.LYYYYYS..............
+.A.LYYYYYS..............
+.v.LYYYYYYS.............
+.vvLYYYYYYS.............
+.vvSYYYYYYYS............
+.vv.LYYYYYYYS...........
+.vvvSYYYYYYYYLLS..LS....
+..vv.SYYYYYYYYYYLLSK.s..
+..vvv.SYYYYYYYYYSSK.sms.
+...vvv.SSSYYYYSSK....s..
+....vvvv..SSSSK.........
+.....vvv................
+.......v................
 ```
 
-`L` Gold light, `Y` Gold base, `S` Gold shade, `m` Moonstone base. The crescent is the silhouette
-with a lit outer limb (upper left) and a shaded inner curve; the two stars are three-by-three
-plus shapes with a purpose (they balance the open side of the crescent), not random dots; the
-four corners are empty. The first draft of this example was generated from two discs and shaded
-automatically; it had a stray light cell on the bottom edge and a star overlapping the crescent's
-tip. It was corrected by hand, which is the point of section 6: a generated shape is the
-sketch, never the picture.
+`W` Gold glint, `L` Gold light, `Y` Gold base, `S` Gold shade, `K` Gold deep; `a` Amethyst light,
+`A` Amethyst base, `v` Amethyst shade; `m` Moonstone base, `s` Moonstone shade (the star arms).
+
+The moon is the silhouette, with a lit outer limb, a shaded inner curve and a deep tip; the halo
+frames the lit side only; the two stars are plus shapes with a lit centre that balance the open
+side, not scattered dots; all four corners are empty.
+
+Scorecard (every rule passes):
+
+| Rule | Measured                                                  | Result |
+| ---- | --------------------------------------------------------- | ------ |
+| A-01 | 24×24, 219 cells                                          | pass   |
+| A-02 | spans 96 %                                                | pass   |
+| A-03 | 4/4 corners empty, 62 % empty                             | pass   |
+| A-10 | 3 families                                                | pass   |
+| A-11 | Gold 5, Amethyst 3, Moonstone 2                           | pass   |
+| A-12 | closest bases 203                                         | pass   |
+| A-13 | closest cross-family shades 79                            | pass   |
+| A-14 | steps 86-146                                              | pass   |
+| A-15 | max hue drift 8°                                          | pass   |
+| A-16 | lowest contrast 3.11                                      | pass   |
+| A-18 | light < shade in Gold (17.0/25.5) and Amethyst (7.9/21.9) | pass   |
+| A-19 | glint 0.9 % (2 cells)                                     | pass   |
+| A-20 | IoU 0.79                                                  | pass   |
+| A-21 | 106 edge cells: 60 % deep/shade, 8 % deep                 | pass   |
+| A-30 | orphans 0 %                                               | pass   |
+| A-31 | largest flat rectangle 40 cells = 6.9 %; top shade 40 %   | pass   |
+| A-32 | dither 0 %, mean run 2.03                                 | pass   |
+| A-33 | Amethyst halo 24 % of filled, 3 shades                    | pass   |
+| A-34 | fragments 0 %                                             | pass   |
 
 ## 9. Review checklist (what G2 asks)
 
@@ -292,6 +401,10 @@ sketch, never the picture.
 
 ## Calibration log
 
-| Date       | Rule | Initial | Now | Why                                                                 |
-| ---------- | ---- | ------- | --- | ------------------------------------------------------------------- |
-| 2026-10-23 | all  | (set)   | -   | First version; revised only by M11.2 measurements and M11.3 pieces. |
+| Date       | Rule | Initial               | Now              | Why                                                                                         |
+| ---------- | ---- | --------------------- | ---------------- | ------------------------------------------------------------------------------------------- |
+| 2026-10-23 | all  | (set)                 | -                | First version; revised only by M11.2 measurements and M11.3 pieces.                         |
+| 2026-10-23 | A-20 | IoU 0.80              | 0.75             | The first crescent scored 0.79; a thin halo and tips lose cells at half size.               |
+| 2026-10-23 | A-31 | top shade 35 %        | 45 %             | A mostly-gold subject has a natural base share; the backdrop cap (A-33) stays 35 %.         |
+| 2026-10-23 | A-13 | stated for all shades | used shades only | Seven house glint/light pairs fail 50; listed in section 3.                                 |
+| 2026-10-23 | A-17 | hard fail at 60       | warning          | Two house pairs collapse under deuteranopia; the M6.5 symbols are the answer (as in M10.1). |
