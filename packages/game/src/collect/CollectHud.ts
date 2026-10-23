@@ -2,6 +2,7 @@ import type Phaser from "phaser";
 import { theme } from "../theme";
 import { HUD_ZONE_CSS, hudButtonX, type CollectLayout } from "./collectLayout";
 import { progressFill, progressTrack } from "./progress";
+import type { SpeedView } from "./speedRule";
 
 export interface HudHandlers {
   onUndo: () => void;
@@ -15,7 +16,7 @@ export interface HudHandlers {
  * Everything is added to the scene, so the board's rebuild clears it.
  */
 export class CollectHud {
-  private readonly speedLabel: Phaser.GameObjects.Text;
+  private readonly speedLabel: Phaser.GameObjects.Text | null;
   private readonly bar: Phaser.GameObjects.Graphics;
   private shown = -1;
 
@@ -23,7 +24,7 @@ export class CollectHud {
     private readonly scene: Phaser.Scene,
     private readonly layout: CollectLayout,
     name: string,
-    speed: number,
+    speed: SpeedView,
     handlers: HudHandlers,
   ) {
     const l = layout;
@@ -39,11 +40,12 @@ export class CollectHud {
       .setOrigin(0, 0.5)
       .setDepth(20);
     const zone = Math.round(HUD_ZONE_CSS * dpr);
+    // The speed button exists only when there is something to offer (docs/V2_SPEED.md).
     const buttons: [string, () => void][] = [
       ["↶", handlers.onUndo],
       ["⟲", handlers.onRestart],
-      [`${speed}×`, handlers.onSpeed],
     ];
+    if (speed.show) buttons.push([speed.label, handlers.onSpeed]);
     let speedLabel: Phaser.GameObjects.Text | null = null;
     buttons.forEach(([label, onPress], i) => {
       const x = hudButtonX(l, i, buttons.length);
@@ -51,7 +53,7 @@ export class CollectHud {
         .text(x, cy, label, {
           fontFamily: theme.font,
           fontStyle: "bold",
-          fontSize: `${Math.round(17 * dpr)}px`,
+          fontSize: `${Math.round((label.length > 2 ? 12 : 17) * dpr)}px`,
           color: theme.text,
         })
         .setOrigin(0.5)
@@ -64,12 +66,14 @@ export class CollectHud {
         .setInteractive({ useHandCursor: true });
       hit.on("pointerdown", onPress);
     });
-    this.speedLabel = speedLabel!;
+    this.speedLabel = speedLabel;
     this.bar = scene.add.graphics().setDepth(20);
   }
 
-  setSpeed(speed: number): void {
-    this.speedLabel.setText(`${speed}×`);
+  setSpeedLabel(label: string): void {
+    this.speedLabel
+      ?.setText(label)
+      .setFontSize(Math.round((label.length > 2 ? 12 : 17) * this.layout.dpr));
   }
 
   /** Draws the progress bar for `fraction` (0..1); does nothing when it has not changed. */

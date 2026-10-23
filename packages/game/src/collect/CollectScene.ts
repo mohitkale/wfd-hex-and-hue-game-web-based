@@ -18,7 +18,16 @@ import { AmbientLayer } from "./ambient";
 import { atmosphereForTheme } from "./worldIdentity";
 import { planCues, playCues, rejectionCue, type CueSinks } from "./cues";
 import { Emitter, Particles } from "./particles";
+import { getRewards, safeShow } from "../rewards";
 import { CollectHud } from "./CollectHud";
+import {
+  applyAdResult,
+  enterLevel,
+  initialSpeedState,
+  speedView,
+  type SpeedState,
+  type SpeedView,
+} from "./speedRule";
 import { PortalView } from "./PortalView";
 import { buildEndCard } from "./EndCard";
 import { Toast } from "./Toast";
@@ -64,9 +73,6 @@ import { VisualModel } from "./visuals";
 
 type CollectState = collect.CollectState;
 
-/** HUD buttons: undo, retry, speed. The baked circles and the tap zones share `hudButtonX`. */
-const HUD_BUTTONS = 3;
-
 const SEAL_HINT = "Wax-sealed cubes wake once their key colour is gathered";
 
 const REASON_TEXT: Record<Exclude<collect.ActionCheck, "ok">, string> = {
@@ -109,6 +115,10 @@ export class CollectScene extends Phaser.Scene {
   /** 24 ticks a second at 1× (one cell per tick): crossing a 20-cell board takes under a second. */
   private readonly clock = new TickClock(24);
   private speed: 1 | 2 = 1;
+  /** The 2× rule (M14.3): per level, through an optional rewarded ad; kept across scene restarts. */
+  private speedState: SpeedState = initialSpeedState();
+  /** How many HUD buttons there are: undo and retry, plus speed when something is offered. */
+  private hudButtons = 2;
   private marks = new Map<number, number>();
   private toaster!: Toast;
   private overlay: Phaser.GameObjects.GameObject[] = [];
@@ -181,7 +191,17 @@ export class CollectScene extends Phaser.Scene {
     this.tutorialSaved = false;
     const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     const params = new URLSearchParams(search);
-    if (params.get("speed") === "2") this.speed = 2;
+    // 2× is unlocked for this level only (a retry keeps it, another level starts at 1×).
+    const kept = this.registry.get("v2.speedState") as SpeedState | undefined;
+    this.speedState = enterLevel(kept ?? initialSpeedState(), level.id);
+    this.speed =
+      this.speedState.unlockedFor === level.id && this.registry.get("v2.speed") === 2 ? 2 : 1;
+    // `?speed=2` is a review override (it is not an ad reward): it unlocks 2× for the level it opens.
+    if (params.get("speed") === "2") {
+      this.speedState = { ...this.speedState, unlockedFor: level.id };
+      this.speed = 2;
+    }
+    this.saveSpeed();
     // `?view=spellbook` opens the v2 Spellbook first (once: "Back to the board" returns here).
     if (params.get("view") === "spellbook" && !this.registry.get("v2.spellbookShown")) {
       this.registry.set("v2.spellbookShown", true);
@@ -319,6 +339,8 @@ export class CollectScene extends Phaser.Scene {
     const reduced = isReducedMotion(this);
     const tones = level.palette.map(tonesFor);
 
+    // Two HUD buttons, or three when there is a 2× offer (or an unlocked switch) to show.
+    this.hudButtons = this.speedView().show ? 3 : 2;
     this.bakeStaticLayer();
     this.portal = new PortalView(this, this.layout, this.session.state.params.portal);
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
@@ -371,7 +393,7 @@ export class CollectScene extends Phaser.Scene {
     this.panels.sync(state);
     this.buildHud();
     this.tutorialLayer = this.tutorial
-      ? new TutorialLayer(this, this.layout, () => this.skipTutorial())
+      ? new TutorialLayer(this, this.layout, () => this.skipTutorial(), this.hudButtons)
       : null;
     this.refreshTutorial();
     this.buildInput();
@@ -403,8 +425,8 @@ export class CollectScene extends Phaser.Scene {
     paintPanelFrames(g, l, dpr);
     const cy = l.hud.y + l.hud.h / 2;
     const size = Math.round(HUD_BUTTON_CSS * dpr);
-    for (let i = 0; i < HUD_BUTTONS; i++) {
-      const x = hudButtonX(l, i, HUD_BUTTONS);
+    for (let i = 0; i < this.hudButtons; i++) {
+      const x = hudButtonX(l, i, this.hudButtons);
       g.fillStyle(theme.dusk, 1);
       g.fillCircle(x, cy, size / 2);
       g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
@@ -422,17 +444,61 @@ export class CollectScene extends Phaser.Scene {
   }
 
   private buildHud(): void {
-    this.hud = new CollectHud(this, this.layout, this.session.level.name, this.speed, {
+    this.hud = new CollectHud(this, this.layout, this.session.level.name, this.speedView(), {
       onUndo: () => this.session.undo(),
       onRestart: () => this.session.restart(),
-      onSpeed: () => this.toggleSpeed(),
+      onSpeed: () => this.onSpeedTap(),
     });
     this.hud.setProgress(progressOf(this.session.state).fraction);
   }
 
-  private toggleSpeed(): void {
-    this.speed = this.speed === 1 ? 2 : 1;
-    this.hud.setSpeed(this.speed);
+  private speedView(): SpeedView {
+    return speedView({
+      levelId: this.session.level.id,
+      state: this.speedState,
+      providerAvailable: getRewards(this).isAvailable("speed2x"),
+      speed: this.speed,
+    });
+  }
+
+  private saveSpeed(): void {
+    this.registry.set("v2.speedState", this.speedState);
+    this.registry.set("v2.speed", this.speed);
+  }
+
+  /** The speed button: switch 1×/2× once unlocked, or watch the optional ad that unlocks it. */
+  private onSpeedTap(): void {
+    const view = this.speedView();
+    if (view.action === "toggle") {
+      this.speed = this.speed === 1 ? 2 : 1;
+      this.saveSpeed();
+      this.hud.setSpeedLabel(`${this.speed}×`);
+    } else if (view.action === "watch") {
+      void this.watchForSpeed();
+    }
+  }
+
+  /**
+   * Shows the rewarded ad for 2×. The game is paused while it is on screen; whatever happens (a
+   * completed ad, an early close, no ad, an error) play carries on, at 1× unless the ad was completed.
+   */
+  private async watchForSpeed(): Promise<void> {
+    const levelId = this.session.level.id;
+    this.speedState = { ...this.speedState, adPending: true };
+    this.hud.setSpeedLabel("…");
+    const result = await safeShow(getRewards(this), "speed2x");
+    // The scene may have moved on (another level, shut down) while the ad was up.
+    if (!this.scene.isActive() || this.session.level.id !== levelId) {
+      this.speedState = { ...this.speedState, adPending: false };
+      return;
+    }
+    const outcome = applyAdResult(this.speedState, levelId, result);
+    this.speedState = outcome.state;
+    if (outcome.speed === 2) this.speed = 2;
+    this.saveSpeed();
+    // The HUD changes shape (the button appears as a switch, or goes away): rebuild from the state.
+    this.rebuild();
+    if (outcome.message) this.toaster.show(outcome.message, 2200);
   }
 
   private buildInput(): void {
@@ -558,7 +624,8 @@ export class CollectScene extends Phaser.Scene {
     if (!this.session) return;
     this.frameTime = time;
     const profileStart = this.profile ? performance.now() : 0;
-    const due = this.clock.advance(delta, this.speed);
+    // The game waits while an ad is on screen.
+    const due = this.speedState.adPending ? 0 : this.clock.advance(delta, this.speed);
     if (this.profile) this.profile.ticks += due;
     for (let i = 0; i < due; i++) {
       if (this.session.tick() === null) {

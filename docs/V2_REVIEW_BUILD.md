@@ -55,5 +55,6 @@ changed. The build fails if that property is lost (`tools/perf/check.ts`).
 
 A mid-range-device frame-time measurement (M15.3; desktop numbers are in `docs/V2_PERF.md`). Sound,
 haptics, trails and completion effects arrived in M10.4 and have not been judged by a human yet (G1). With the maximum of 8 holding slots on a 320 px phone each slot is
-narrower than the 44 px tap guideline; real levels use 3–5. The 1×/2× button and `&speed=2` exist
-only in review builds and are removed or gated when the real 2× rule lands (M14.3).
+narrower than the 44 px tap guideline; real levels use 3–5. The 2× button now follows the real rule (M14.3, docs/V2_SPEED.md): 1× is free, 2× only through an
+optional rewarded ad (a labelled mock in development), and no button when there is no provider.
+`&speed=2` is a review-only override and is removed or gated at the switch (M15.5).

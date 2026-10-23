@@ -8,12 +8,13 @@ import type { Hint, Target } from "./tutorial";
 export function targetRect(
   l: CollectLayout,
   target: Target,
+  hudButtons = 3,
 ): { x: number; y: number; w: number; h: number } | null {
   if (!target) return null;
   if (target.kind === "column") return l.columns[target.index] ?? null;
   if (target.kind === "slot") return l.slots[target.index] ?? null;
   const size = Math.round(HUD_ZONE_CSS * l.dpr);
-  const x = hudButtonX(l, 0, 3);
+  const x = hudButtonX(l, 0, hudButtons);
   return { x: x - size / 2, y: l.hud.y + l.hud.h / 2 - size / 2, w: size, h: size };
 }
 
@@ -34,6 +35,8 @@ export class TutorialLayer {
     private readonly scene: Phaser.Scene,
     private readonly layout: CollectLayout,
     onSkip: () => void,
+    /** How many HUD buttons there are (the Undo ring follows the first). */
+    private readonly hudButtons = 3,
   ) {
     const l = layout;
     const dpr = l.dpr;
@@ -96,7 +99,7 @@ export class TutorialLayer {
       return;
     }
     this.caption.setText(hint.text).setVisible(true);
-    const r = targetRect(this.layout, hint.target);
+    const r = targetRect(this.layout, hint.target, this.hudButtons);
     if (!r) return;
     const dpr = this.layout.dpr;
     const pad = 3 * dpr;
