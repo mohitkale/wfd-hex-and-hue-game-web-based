@@ -57,7 +57,7 @@ export const WORLD_IDENTITIES: Readonly<Record<WorldId, WorldIdentity>> = {
     atmosphere: {
       motion: "rise",
       count: 14,
-      tints: [0xf6d97a, 0xb48cff, 0xf6d97a],
+      tints: [0xf6d97a, 0xb48cff, 0xb48cff],
       size: { min: 0.5, spread: 0.7 },
       brightness: 0.16,
       twinkle: 1,

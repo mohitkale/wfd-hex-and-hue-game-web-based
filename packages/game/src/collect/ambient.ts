@@ -1,5 +1,6 @@
 import type Phaser from "phaser";
 import { unit } from "./swarm";
+import type { Atmosphere } from "./worldIdentity";
 
 export interface Mote {
   /** Fractions of the frame, 0..1. */
@@ -8,8 +9,6 @@ export interface Mote {
   /** 0..1 twinkle. */
   glow: number;
 }
-
-import type { Atmosphere } from "./worldIdentity";
 
 /** How many motes drift behind the board by default (Moonlit). */
 export const MOTES = 14;
@@ -50,8 +49,9 @@ export function moteAt(
       out.y = baseY;
       break;
     case "orbit": {
-      const angle = t * 0.12 * rate + unit(i, 13) * 6.28;
-      const radius = 0.015 + unit(i, 12) * 0.03;
+      // Several pixels a second on a phone: slow, but visibly wheeling (not a twinkle in place).
+      const angle = t * 0.5 * rate + unit(i, 13) * 6.28;
+      const radius = 0.04 + unit(i, 12) * 0.05;
       out.x = clamp01(baseX + Math.cos(angle) * radius);
       out.y = clamp01(baseY + Math.sin(angle) * radius);
       break;
@@ -67,6 +67,25 @@ export function moteAt(
 }
 
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+
+/**
+ * The size (px) and tint of mote `i`: an atmosphere's, or the original look (gold every third, else
+ * purple, 0.5 to 1.2 cells) when none is given. Pure, so the Moonlit equivalence is testable.
+ */
+export function moteLook(
+  i: number,
+  cellPx: number,
+  atmosphere?: Pick<Atmosphere, "size" | "tints">,
+): { size: number; tint: number } {
+  const size =
+    cellPx * ((atmosphere?.size.min ?? 0.5) + unit(i, 15) * (atmosphere?.size.spread ?? 0.7));
+  const tint = atmosphere
+    ? atmosphere.tints[i % atmosphere.tints.length]!
+    : i % 3 === 0
+      ? 0xf6d97a
+      : 0xb48cff;
+  return { size, tint };
+}
 
 export const newMote = (): Mote => ({ x: 0, y: 0, glow: 0 });
 

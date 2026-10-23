@@ -38,8 +38,9 @@ by a tint:
 | Lore voice               | quiet and domestic: a hearth, a candle, a first spell | folklore of stones and green things, never a health claim            | old sky-lore: what each sign was said to watch over   |
 
 In the game a level with a known picture takes its world from the picture's theme
-(`atmosphereForTheme`): the lights behind the board and the backdrop change. Moonlit is exactly the
-previous ambient look, so existing levels are unchanged; reduced motion holds every light still.
+(`atmosphereForTheme`): the lights behind the board and the backdrop change. Moonlit reproduces the
+previous ambient look (count, size, tints, brightness and motion are tested against it), so existing
+levels are unchanged; reduced motion holds every light still.
 Checked in the browser pane: the amethyst cluster (Crystal) opens with 22 lights and the green-blue
 backdrop, Libra (Zodiac) with 30 lights and the indigo one; the look is not yet tuned by eye on a
 phone. Tests check that no art theme belongs to two worlds, that every theme except `other` is claimed, and
@@ -55,6 +56,18 @@ to worlds by theme but cannot be placed on the curve.
 Every other slot has a plan (its world's subjects plus the skill its stage teaches), listed by
 `slots()`. For example level 21 is "a crystal or familiar picture · partial groups and dependencies: a
 group may be too big for what is open", and level 55 is "an astrology picture · advanced combinations".
+
+## Known gaps in this structure
+
+- **No gate of its own for the plan.** `worldsV2.ts` is checked by tests only; the four placed levels are
+  gated through the pool (`levels:check`), and nothing is shipped, so "all shipped levels pass the
+  gate" is true only vacuously.
+- **Dependency direction.** `content/worldsV2.ts` imports the identity data from `packages/game` (pure,
+  no imports). A tidier home for the non-rendering identity (themes, families, voice) is `content/`,
+  with the game keeping only the atmosphere; deferred.
+- **Look not tuned.** The three atmospheres differ in motion, count, size and speed, but have not been
+  tuned by eye on a phone; the orbit speed (a few pixels a second) is a first guess.
+- **M13.2 and M13.3 stay blocked** until the worlds are filled (they need M13.1).
 
 ## What is missing
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moteAt, newMote } from "./ambient";
+import { moteAt, moteLook, newMote } from "./ambient";
 import { WORLD_IDENTITIES, WORLD_IDS } from "./worldIdentity";
 
 describe("the lights behind the board, per world", () => {
@@ -54,7 +54,8 @@ describe("the lights behind the board, per world", () => {
       farthest = Math.max(farthest, Math.hypot(m.x - homes.x, m.y - homes.y));
     }
     expect(farthest).toBeGreaterThan(0);
-    expect(farthest).toBeLessThan(0.12);
+    expect(farthest).toBeLessThan(0.18);
+    expect(farthest).toBeGreaterThan(0.02); // a perceptible wheel, not a jitter
   });
 
   it("the Moonlit atmosphere is the original ambient look (no change for existing levels)", () => {
@@ -65,5 +66,31 @@ describe("the lights behind the board, per world", () => {
       }
     }
     expect(moonlit.count).toBe(14);
+    // Size and tint too: gold every third light, purple otherwise, as before.
+    for (let i = 0; i < moonlit.count; i++) {
+      expect(moteLook(i, 24, moonlit), `light ${i}`).toEqual(moteLook(i, 24));
+      expect(moteLook(i, 24).tint).toBe(i % 3 === 0 ? 0xf6d97a : 0xb48cff);
+    }
+    expect(moonlit.brightness).toBe(0.16); // the old peak alpha
+    expect(moonlit.size).toEqual({ min: 0.5, spread: 0.7 });
+  });
+
+  it("zodiac lights visibly wheel (several pixels a second), unlike crystal's, which stay put", () => {
+    const orbit = WORLD_IDENTITIES.zodiac.atmosphere;
+    const twinkle = WORLD_IDENTITIES.crystal.atmosphere;
+    const frameW = 330;
+    let moving = 0;
+    for (let i = 0; i < orbit.count; i++) {
+      const a = moteAt(i, 0, false, newMote(), orbit);
+      const b = moteAt(i, 4_000, false, newMote(), orbit);
+      const speed = (Math.hypot(b.x - a.x, b.y - a.y) * frameW) / 4;
+      if (speed >= 1.5) moving++;
+    }
+    expect(moving).toBeGreaterThan(orbit.count / 2);
+    for (let i = 0; i < twinkle.count; i++) {
+      const a = moteAt(i, 0, false, newMote(), twinkle);
+      const b = moteAt(i, 4_000, false, newMote(), twinkle);
+      expect([a.x, a.y]).toEqual([b.x, b.y]);
+    }
   });
 });
