@@ -5,6 +5,15 @@ import type * as collect from "@hexhue/core/collect";
  * shades are strings, one base-36 character per cell (`.` = empty). `tools/art/levels.ts` writes the
  * JSON; `decodeArtLevel` turns an entry back into a `CollectLevel`.
  */
+/** How a level's groups were made (kept for review; the game never reads it). */
+export interface ArtGenerated {
+  profile: string;
+  seed: number;
+  attempt: number;
+  score: number;
+  metrics: collect.GenMetrics;
+}
+
 export interface ArtLevelData {
   id: string;
   name: string;
@@ -21,13 +30,18 @@ export interface ArtLevelData {
   spawnGap: number;
   fieldCap: number;
   subject: collect.LevelSubject;
+  /** How the groups were made (`tools/art/levels.ts`): the generator profile, seed and its metrics. */
+  generated?: ArtGenerated;
 }
 
 const pack = (cells: readonly number[]): string =>
   cells.map((c) => (c < 0 ? "." : c.toString(36))).join("");
 const unpack = (s: string): number[] => [...s].map((c) => (c === "." ? -1 : parseInt(c, 36)));
 
-export function encodeArtLevel(level: collect.CollectLevel): ArtLevelData {
+export function encodeArtLevel(
+  level: collect.CollectLevel,
+  generated?: ArtGenerated,
+): ArtLevelData {
   if (!level.shades || !level.subject) throw new Error(`${level.id}: needs shades and a subject`);
   if (level.shades.colors.length > 36) throw new Error(`${level.id}: more than 36 shades`);
   return {
@@ -46,6 +60,7 @@ export function encodeArtLevel(level: collect.CollectLevel): ArtLevelData {
     spawnGap: level.spawnGap,
     fieldCap: level.fieldCap,
     subject: level.subject,
+    ...(generated ? { generated } : {}),
   };
 }
 

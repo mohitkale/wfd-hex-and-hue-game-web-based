@@ -43,77 +43,86 @@
    [
     {
      "color": 2,
-     "capacity": 29
-    },
-    {
-     "color": 2,
-     "capacity": 25
-    },
-    {
-     "color": 2,
-     "capacity": 29
-    },
-    {
-     "color": 0,
-     "capacity": 15
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 22
-    },
-    {
-     "color": 2,
      "capacity": 24
     },
     {
-     "color": 2,
-     "capacity": 21
-    },
-    {
-     "color": 2,
-     "capacity": 29
-    }
-   ],
-   [
-    {
      "color": 0,
-     "capacity": 20
+     "capacity": 34
     },
     {
      "color": 2,
-     "capacity": 21
-    },
-    {
-     "color": 0,
-     "capacity": 22
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 19
-    },
-    {
-     "color": 0,
-     "capacity": 24
+     "capacity": 26
     },
     {
      "color": 1,
      "capacity": 12
     }
+   ],
+   [
+    {
+     "color": 0,
+     "capacity": 30
+    },
+    {
+     "color": 2,
+     "capacity": 32
+    },
+    {
+     "color": 2,
+     "capacity": 31
+    },
+    {
+     "color": 2,
+     "capacity": 33
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 20
+    },
+    {
+     "color": 0,
+     "capacity": 17
+    },
+    {
+     "color": 2,
+     "capacity": 26
+    },
+    {
+     "color": 2,
+     "capacity": 27
+    }
    ]
   ],
-  "slots": 4,
+  "slots": 3,
   "squad": 4,
   "spawnGap": 1,
-  "fieldCap": 4,
+  "fieldCap": 3,
   "subject": {
    "id": "crescent-moon",
    "name": "Crescent Moon",
    "theme": "moon",
    "lore": "The waxing crescent: a golden sliver that grows by night."
+  },
+  "generated": {
+   "profile": "gentle",
+   "seed": 1,
+   "attempt": 0,
+   "score": 1.25,
+   "metrics": {
+    "cubes": 312,
+    "groups": 12,
+    "openColors": 3,
+    "buriedColors": 0,
+    "depth": 6,
+    "parkers": 1,
+    "minSlots": 1,
+    "slack": 2,
+    "firstMoves": 3,
+    "winnableOpenings": 3,
+    "doomedOpenings": 0
+   }
   }
  },
  {
@@ -154,57 +163,7 @@
    [
     {
      "color": 2,
-     "capacity": 30
-    },
-    {
-     "color": 2,
-     "capacity": 26
-    },
-    {
-     "color": 2,
-     "capacity": 30
-    },
-    {
-     "color": 1,
      "capacity": 25
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 25
-    },
-    {
-     "color": 2,
-     "capacity": 25
-    },
-    {
-     "color": 2,
-     "capacity": 22
-    },
-    {
-     "color": 2,
-     "capacity": 30
-    }
-   ],
-   [
-    {
-     "color": 1,
-     "capacity": 19
-    },
-    {
-     "color": 2,
-     "capacity": 22
-    },
-    {
-     "color": 1,
-     "capacity": 16
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 20
     },
     {
      "color": 0,
@@ -212,19 +171,78 @@
     },
     {
      "color": 2,
-     "capacity": 23
+     "capacity": 27
+    },
+    {
+     "color": 2,
+     "capacity": 32
+    }
+   ],
+   [
+    {
+     "color": 1,
+     "capacity": 36
+    },
+    {
+     "color": 2,
+     "capacity": 34
+    },
+    {
+     "color": 2,
+     "capacity": 32
+    },
+    {
+     "color": 2,
+     "capacity": 35
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 22
+    },
+    {
+     "color": 1,
+     "capacity": 24
+    },
+    {
+     "color": 2,
+     "capacity": 27
+    },
+    {
+     "color": 2,
+     "capacity": 19
     }
    ]
   ],
-  "slots": 4,
+  "slots": 3,
   "squad": 4,
   "spawnGap": 1,
-  "fieldCap": 4,
+  "fieldCap": 3,
   "subject": {
    "id": "triple-moon",
    "name": "Triple Moon",
    "theme": "moon",
    "lore": "Waxing, full and waning: the three faces of the moon, side by side."
+  },
+  "generated": {
+   "profile": "gentle",
+   "seed": 1,
+   "attempt": 0,
+   "score": 1.5,
+   "metrics": {
+    "cubes": 328,
+    "groups": 12,
+    "openColors": 3,
+    "buriedColors": 0,
+    "depth": 8,
+    "parkers": 2,
+    "minSlots": 1,
+    "slack": 2,
+    "firstMoves": 3,
+    "winnableOpenings": 3,
+    "doomedOpenings": 0
+   }
   }
  },
  {
@@ -283,77 +301,112 @@
    [
     {
      "color": 2,
-     "capacity": 40
-    },
-    {
-     "color": 2,
-     "capacity": 31
-    },
-    {
-     "color": 1,
-     "capacity": 34
-    },
-    {
-     "color": 2,
-     "capacity": 46
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 38
+     "capacity": 22
     },
     {
      "color": 0,
      "capacity": 16
     },
     {
-     "color": 2,
-     "capacity": 36
-    },
-    {
-     "color": 4,
-     "capacity": 21
-    }
-   ],
-   [
-    {
-     "color": 3,
-     "capacity": 34
-    },
-    {
-     "color": 2,
-     "capacity": 25
-    },
-    {
      "color": 1,
-     "capacity": 38
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 46
+     "capacity": 22
     },
     {
      "color": 2,
      "capacity": 41
     },
     {
+     "color": 2,
+     "capacity": 31
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 13
+    },
+    {
+     "color": 4,
+     "capacity": 21
+    },
+    {
+     "color": 3,
+     "capacity": 34
+    },
+    {
+     "color": 2,
+     "capacity": 38
+    },
+    {
+     "color": 2,
+     "capacity": 29
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 21
+    },
+    {
+     "color": 2,
+     "capacity": 24
+    },
+    {
+     "color": 1,
+     "capacity": 26
+    },
+    {
      "color": 3,
      "capacity": 40
     }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 27
+    },
+    {
+     "color": 1,
+     "capacity": 24
+    },
+    {
+     "color": 2,
+     "capacity": 22
+    },
+    {
+     "color": 2,
+     "capacity": 35
+    }
    ]
   ],
-  "slots": 4,
+  "slots": 2,
   "squad": 4,
   "spawnGap": 1,
-  "fieldCap": 4,
+  "fieldCap": 3,
   "subject": {
    "id": "witchs-cauldron",
    "name": "Witch's Cauldron",
    "theme": "ritual",
    "lore": "An iron cauldron over a low fire, its green brew just beginning to bubble."
+  },
+  "generated": {
+   "profile": "standard",
+   "seed": 1,
+   "attempt": 7,
+   "score": 2.75,
+   "metrics": {
+    "cubes": 486,
+    "groups": 18,
+    "openColors": 5,
+    "buriedColors": 0,
+    "depth": 10,
+    "parkers": 7,
+    "minSlots": 1,
+    "slack": 1,
+    "firstMoves": 4,
+    "winnableOpenings": 4,
+    "doomedOpenings": 0
+   }
   }
  },
  {
@@ -396,81 +449,100 @@
    [
     {
      "color": 0,
-     "capacity": 52
+     "capacity": 28
     },
     {
      "color": 0,
-     "capacity": 52
+     "capacity": 45
+    },
+    {
+     "color": 0,
+     "capacity": 43
     },
     {
      "color": 2,
-     "capacity": 39
-    },
-    {
-     "color": 0,
-     "capacity": 52
+     "capacity": 30
     }
    ],
    [
     {
      "color": 0,
-     "capacity": 46
+     "capacity": 33
     },
+    {
+     "color": 0,
+     "capacity": 47
+    },
+    {
+     "color": 0,
+     "capacity": 42
+    },
+    {
+     "color": 0,
+     "capacity": 48
+    }
+   ],
+   [
+    {
+     "color": 0,
+     "capacity": 42
+    },
+    {
+     "color": 0,
+     "capacity": 41
+    },
+    {
+     "color": 2,
+     "capacity": 38
+    },
+    {
+     "color": 2,
+     "capacity": 47
+    }
+   ],
+   [
     {
      "color": 1,
      "capacity": 10
     },
     {
      "color": 0,
-     "capacity": 43
+     "capacity": 35
     },
     {
      "color": 0,
      "capacity": 35
     }
-   ],
-   [
-    {
-     "color": 0,
-     "capacity": 38
-    },
-    {
-     "color": 2,
-     "capacity": 36
-    },
-    {
-     "color": 2,
-     "capacity": 40
-    },
-    {
-     "color": 0,
-     "capacity": 41
-    }
-   ],
-   [
-    {
-     "color": 0,
-     "capacity": 9
-    },
-    {
-     "color": 0,
-     "capacity": 43
-    },
-    {
-     "color": 0,
-     "capacity": 28
-    }
    ]
   ],
-  "slots": 4,
+  "slots": 2,
   "squad": 4,
   "spawnGap": 1,
-  "fieldCap": 4,
+  "fieldCap": 3,
   "subject": {
    "id": "amethyst-cluster",
    "name": "Amethyst Cluster",
    "theme": "crystal",
    "lore": "A cluster of amethyst points growing from dark stone, purple as the sky after sunset."
+  },
+  "generated": {
+   "profile": "standard",
+   "seed": 1,
+   "attempt": 0,
+   "score": 1.75,
+   "metrics": {
+    "cubes": 564,
+    "groups": 15,
+    "openColors": 3,
+    "buriedColors": 0,
+    "depth": 6,
+    "parkers": 3,
+    "minSlots": 1,
+    "slack": 1,
+    "firstMoves": 4,
+    "winnableOpenings": 4,
+    "doomedOpenings": 0
+   }
   }
  },
  {
@@ -517,48 +589,12 @@
   "columns": [
    [
     {
-     "color": 3,
-     "capacity": 4
-    },
-    {
      "color": 2,
-     "capacity": 34
-    },
-    {
-     "color": 0,
-     "capacity": 35
-    },
-    {
-     "color": 2,
-     "capacity": 42
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 42
-    },
-    {
-     "color": 2,
-     "capacity": 30
+     "capacity": 41
     },
     {
      "color": 2,
      "capacity": 33
-    },
-    {
-     "color": 0,
-     "capacity": 26
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 42
-    },
-    {
-     "color": 2,
-     "capacity": 31
     },
     {
      "color": 2,
@@ -566,17 +602,65 @@
     },
     {
      "color": 2,
-     "capacity": 27
+     "capacity": 30
+    },
+    {
+     "color": 2,
+     "capacity": 20
+    }
+   ],
+   [
+    {
+     "color": 3,
+     "capacity": 4
+    },
+    {
+     "color": 2,
+     "capacity": 29
+    },
+    {
+     "color": 0,
+     "capacity": 40
+    },
+    {
+     "color": 2,
+     "capacity": 26
+    },
+    {
+     "color": 2,
+     "capacity": 28
     }
    ],
    [
     {
      "color": 2,
-     "capacity": 37
+     "capacity": 18
     },
     {
      "color": 2,
-     "capacity": 22
+     "capacity": 29
+    },
+    {
+     "color": 2,
+     "capacity": 18
+    },
+    {
+     "color": 2,
+     "capacity": 21
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 26
+    },
+    {
+     "color": 2,
+     "capacity": 21
+    },
+    {
+     "color": 0,
+     "capacity": 21
     },
     {
      "color": 1,
@@ -584,15 +668,34 @@
     }
    ]
   ],
-  "slots": 4,
+  "slots": 2,
   "squad": 4,
   "spawnGap": 1,
-  "fieldCap": 4,
+  "fieldCap": 3,
   "subject": {
    "id": "libra-scales",
    "name": "Libra, the Scales",
    "theme": "astrology",
    "lore": "The Scales of Libra, the sign of balance, weighing the light against the dark."
+  },
+  "generated": {
+   "profile": "standard",
+   "seed": 1,
+   "attempt": 6,
+   "score": 2.25,
+   "metrics": {
+    "cubes": 443,
+    "groups": 18,
+    "openColors": 3,
+    "buriedColors": 1,
+    "depth": 4,
+    "parkers": 3,
+    "minSlots": 1,
+    "slack": 1,
+    "firstMoves": 3,
+    "winnableOpenings": 3,
+    "doomedOpenings": 0
+   }
   }
  },
  {
@@ -651,7 +754,43 @@
    [
     {
      "color": 0,
-     "capacity": 53
+     "capacity": 28
+    },
+    {
+     "color": 4,
+     "capacity": 12
+    },
+    {
+     "color": 0,
+     "capacity": 44
+    },
+    {
+     "color": 2,
+     "capacity": 41
+    }
+   ],
+   [
+    {
+     "color": 0,
+     "capacity": 33
+    },
+    {
+     "color": 0,
+     "capacity": 48
+    },
+    {
+     "color": 0,
+     "capacity": 42
+    },
+    {
+     "color": 0,
+     "capacity": 49
+    }
+   ],
+   [
+    {
+     "color": 0,
+     "capacity": 43
     },
     {
      "color": 0,
@@ -659,77 +798,60 @@
     },
     {
      "color": 2,
-     "capacity": 40
+     "capacity": 38
     },
     {
-     "color": 0,
-     "capacity": 53
+     "color": 3,
+     "capacity": 18
     }
    ],
    [
-    {
-     "color": 4,
-     "capacity": 12
-    },
     {
      "color": 1,
      "capacity": 10
     },
     {
      "color": 0,
-     "capacity": 44
+     "capacity": 35
     },
     {
      "color": 0,
-     "capacity": 36
-    }
-   ],
-   [
-    {
-     "color": 0,
-     "capacity": 39
-    },
-    {
-     "color": 3,
-     "capacity": 18
-    },
-    {
-     "color": 2,
-     "capacity": 39
+     "capacity": 35
     },
     {
      "color": 0,
-     "capacity": 42
-    }
-   ],
-   [
-    {
-     "color": 0,
-     "capacity": 16
-    },
-    {
-     "color": 0,
-     "capacity": 44
-    },
-    {
-     "color": 0,
-     "capacity": 29
-    },
-    {
-     "color": 0,
-     "capacity": 47
+     "capacity": 46
     }
    ]
   ],
-  "slots": 4,
+  "slots": 2,
   "squad": 4,
   "spawnGap": 1,
-  "fieldCap": 4,
+  "fieldCap": 3,
   "subject": {
    "id": "black-cat",
    "name": "Black Cat",
    "theme": "familiar",
    "lore": "A black cat with lantern-green eyes, the classic companion of the night."
+  },
+  "generated": {
+   "profile": "standard",
+   "seed": 1,
+   "attempt": 0,
+   "score": 3.75,
+   "metrics": {
+    "cubes": 575,
+    "groups": 16,
+    "openColors": 2,
+    "buriedColors": 3,
+    "depth": 12,
+    "parkers": 5,
+    "minSlots": 1,
+    "slack": 1,
+    "firstMoves": 3,
+    "winnableOpenings": 3,
+    "doomedOpenings": 0
+   }
   }
  }
 ]
