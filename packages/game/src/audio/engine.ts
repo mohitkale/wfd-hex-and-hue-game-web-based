@@ -30,7 +30,11 @@ export interface AudioSettings {
  * Minimum spacing for rapid repeats (a wisp sweeping a lane would otherwise stack dozens). Short
  * enough that 2× speed (a step every 30 ms) keeps nearly every note of a rising collect run.
  */
-const THROTTLE: Partial<Record<SoundName, number>> = { collect: 0.025, invalid: 0.15 };
+const THROTTLE: Partial<Record<SoundName, number>> = {
+  collect: 0.025,
+  pickup: 0.06,
+  invalid: 0.15,
+};
 
 /** Seconds of slow attack / release on music pad notes. */
 const PAD_ATTACK = 1.2;

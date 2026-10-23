@@ -105,3 +105,17 @@ Issue #77 asked for an early mid-range Android measurement. The author has no de
    Chrome performance trace for GPU time.
 
 Keep the page visible while measuring: a hidden page does not run animation frames at all.
+
+## M10.4 effects (trails, sparks, blooms, motes)
+
+All decorative particles live in one fixed ring buffer (160 entries, `particles.ts`) drawn by a fixed
+pool of 160 additive glow images (`ParticleLayer.ts`): a busy board recycles the oldest particle and
+never allocates per frame or grows. The 14 background motes are placed from a pure function of time.
+Trails are only left by carrying familiars (at most one puff per carrier every 1.5 ticks); sparks and
+blooms come from deliveries and completions. Lifetimes are counted in ticks, so 2× plays the same
+show in half the milliseconds. Reduced motion emits no trails, sparks or fountains and keeps the
+motes still; a completion is a short stationary fade of light.
+
+Measured on the desktop dev server (`?profile=1&level=big`, 18 familiars out, up to 70 live
+particles): scene `update` median 0.3 ms / p95 2.4 ms, frame-submit median 0.7 ms / p95 1.4 ms. As
+before, this is desktop CPU only and says nothing about a phone's frame rate (see M15.3).

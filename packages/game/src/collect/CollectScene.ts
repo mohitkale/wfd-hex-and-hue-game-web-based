@@ -1,6 +1,8 @@
 import * as collect from "@hexhue/core/collect";
 import Phaser from "phaser";
 import { isReducedMotion } from "../a11y";
+import { getAudio } from "../audio";
+import { Haptics } from "../haptics";
 import type { Insets } from "../layout";
 import { theme } from "../theme";
 import { Button } from "../view/Button";
@@ -9,8 +11,12 @@ import { ensureTextures, TEX } from "../view/textures";
 import { fadeIn } from "../view/transition";
 import { CubeLayer } from "./CubeLayer";
 import { FamiliarLayer } from "./FamiliarLayer";
+import { ParticleLayer } from "./ParticleLayer";
 import { PanelsView, paintPanelFrames } from "./PanelsView";
+import { AmbientLayer } from "./ambient";
 import { bake } from "./bake";
+import { planCues, playCues, rejectionCue, type CueSinks } from "./cues";
+import { Emitter, Particles } from "./particles";
 import { cellCenter, computeCollectLayout, hudButtonX, type CollectLayout } from "./collectLayout";
 import { RingStats } from "./profile";
 import { tonesFor } from "./cubePaint";
@@ -43,6 +49,16 @@ export class CollectScene extends Phaser.Scene {
   private cubes!: CubeLayer;
   private familiars!: FamiliarLayer;
   private panels!: PanelsView;
+  private emitter!: Emitter;
+  private particleLayer!: ParticleLayer;
+  private ambient!: AmbientLayer;
+  private readonly haptics = new Haptics();
+  private readonly sinks: CueSinks = {
+    sound: (name, options) => getAudio(this).play(name, options),
+    haptic: (kind) => this.haptics.play(kind),
+  };
+  /** The time of the latest frame, for effects started by events between frames. */
+  private frameTime = 0;
   private atlas = "";
   /** 24 ticks a second at 1× (one cell per tick): crossing a 20-cell board takes under a second. */
   private readonly clock = new TickClock(24);
@@ -100,6 +116,7 @@ export class CollectScene extends Phaser.Scene {
     // Saved settings arrive after the scene starts: pick up the colour-blind setting (and a changed
     // reduced-motion setting) when they do, rebuilding once if they differ from what was drawn.
     whenSaveReady(this, (save) => {
+      this.haptics.enabled = save?.data.settings.haptics ?? true;
       const wanted = params.get("cb") === "1" || (save?.data.settings.colorblind ?? false);
       if (wanted !== this.colorblind) {
         this.colorblind = wanted;
@@ -188,6 +205,8 @@ export class CollectScene extends Phaser.Scene {
     this.drawPortal();
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
     this.model.resync(state);
+    this.emitter = new Emitter(new Particles(160), this.layout.cell, reduced);
+    this.ambient = new AmbientLayer(this, this.layout.frame, TEX.glow, reduced, this.layout.cell);
     this.cubes = new CubeLayer(this, this.layout, level.palette, state.grid.slice());
     this.familiars = new FamiliarLayer(
       this,
@@ -197,7 +216,9 @@ export class CollectScene extends Phaser.Scene {
       tones,
       reduced,
       this.colorblind ? level.palette : null,
+      this.emitter,
     );
+    this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
     this.familiars.onDelivered = (_color, group) => {
       this.pulsePortal();
       this.panels.badge(group)?.pulse();
@@ -209,6 +230,7 @@ export class CollectScene extends Phaser.Scene {
       this.atlas,
       dpr,
       this.colorblind,
+      reduced,
     );
     this.rebuildMarks(state);
     this.panels.sync(state);
@@ -372,6 +394,8 @@ export class CollectScene extends Phaser.Scene {
     if (!result.ok) {
       const reason = result.reason;
       if (reason !== "ok" && reason !== "unavailable") this.toast(REASON_TEXT[reason]);
+      const cue = rejectionCue(reason);
+      if (cue) playCues([cue], this.sinks);
       return;
     }
     this.panels.sync(this.session.state);
@@ -435,7 +459,10 @@ export class CollectScene extends Phaser.Scene {
         marksChanged = this.marks.delete(e.cube) || marksChanged;
       }
       this.familiars.handle(e);
+      if (e.type === "groupCompleted") this.celebrateGroup(e.group);
+      else if (e.type === "won") this.celebrateWin();
     }
+    playCues(planCues(batch.events), this.sinks);
     if (marksChanged) this.cubes.setMarks(this.marks);
     this.panels.sync(this.session.state);
     const status = this.session.state.status;
@@ -444,8 +471,26 @@ export class CollectScene extends Phaser.Scene {
     }
   }
 
+  /** A finished group: its badge blooms and throws sparks in its own colour. */
+  private celebrateGroup(group: number): void {
+    const colorIndex = this.session.state.groups[group]!.color;
+    const color = tonesFor(this.session.level.palette[colorIndex]!).light;
+    const badge = this.panels.badge(group);
+    const at = badge ?? cellCenter(this.layout, this.session.state.params.portal);
+    this.emitter.bloom(at.x, at.y, color, this.frameTime);
+    this.emitter.sparks(at.x, at.y, color, 10, this.frameTime, 1.8);
+  }
+
+  /** Every cube is in: a fountain of the level's colours from the portal. */
+  private celebrateWin(): void {
+    const p = cellCenter(this.layout, this.session.state.params.portal);
+    const colors = this.session.level.palette.map((hex) => tonesFor(hex).light);
+    this.emitter.fountain(p.x, p.y, colors, this.frameTime);
+  }
+
   override update(time: number, delta: number): void {
     if (!this.session) return;
+    this.frameTime = time;
     const profileStart = this.profile ? performance.now() : 0;
     const due = this.clock.advance(delta, this.speed);
     if (this.profile) this.profile.ticks += due;
@@ -464,6 +509,8 @@ export class CollectScene extends Phaser.Scene {
       time,
       this.clock.tickMs / this.speed,
     );
+    this.ambient.update(time);
+    this.particleLayer.update(time);
     this.cubes.flush();
     this.profile?.update.push(performance.now() - profileStart);
   }

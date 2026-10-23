@@ -45,6 +45,7 @@ export class PanelsView {
     private readonly atlas: string,
     private readonly dpr: number,
     private readonly colorblind = false,
+    private readonly reduced = false,
   ) {
     this.drawFrames();
   }
@@ -183,7 +184,7 @@ export class PanelsView {
     this.scene.tweens.killTweensOf(t.badge);
     this.scene.tweens.add({
       targets: t.badge,
-      scale: completed ? 1.25 : 0.6,
+      scale: this.reduced ? 1 : completed ? 1.25 : 0.6,
       alpha: 0,
       duration: completed ? 260 : 140,
       ease: "Sine.easeOut",

@@ -6,6 +6,7 @@ const ALL: SoundName[] = [
   "tap",
   "invalid",
   "collect",
+  "pickup",
   "portal",
   "park",
   "launch",

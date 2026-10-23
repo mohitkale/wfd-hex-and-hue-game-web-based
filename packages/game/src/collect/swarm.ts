@@ -111,3 +111,11 @@ export class CellSpreader {
     return this.offsets.get(id) ?? 0;
   }
 }
+
+/**
+ * A 0..1..0 swell over `k` (progress 0..1 through a short moment): 0 outside it, 1 in the middle.
+ * Drives the pickup squash: the familiar flattens a little and springs back.
+ */
+export function bump(k: number): number {
+  return k <= 0 || k >= 1 ? 0 : Math.sin(Math.PI * k);
+}

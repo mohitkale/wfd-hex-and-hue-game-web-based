@@ -17,6 +17,7 @@ describe("v2 renderer boundaries", () => {
       "tickClock.ts",
       "profile.ts",
       "swarm.ts",
+      "particles.ts",
       "engineFlag.ts",
     ]) {
       const imports = importsOf(read(file));
