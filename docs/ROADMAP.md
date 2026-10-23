@@ -135,7 +135,7 @@ _Replace simplistic patterns with rich, meaningful magical illustrations. Contai
 
 _Make completion require thinking rather than repetitive tapping, with automated evidence of strategic depth._
 
-- [ ] **M12.1** Rebuild the solver — Solve v2 levels under the collection rules. _Needs M9.5, M8.4, M10.5._
+- [x] **M12.1** Rebuild the solver — Solve v2 levels under the collection rules. _Needs M9.5, M8.4, M10.5._
 - [ ] **M12.2** Redesign the level generator — Generate levels from curated art with meaningful structure, deterministically. _Needs M12.1, M11.4._
 - [ ] **M12.3** Anti-triviality testing — Automate simulated players and reject levels that simple strategies beat. _Needs M12.1, M8.4._
 - [ ] **M12.4** Improve difficulty scoring — Score decisions, not just random losses. _Needs M12.3._
