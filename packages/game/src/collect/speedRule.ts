@@ -30,8 +30,8 @@ export interface SpeedView {
   /** Whether the HUD shows a speed button at all. */
   show: boolean;
   label: string;
-  /** What a tap does: switch 1×/2×, or watch the ad (nothing when not shown or busy). */
-  action: "toggle" | "watch" | "none";
+  /** What a tap does: switch 1×/2×, watch the ad, or stop waiting for one that is on screen. */
+  action: "toggle" | "watch" | "cancel" | "none";
 }
 
 export interface SpeedInput {
@@ -47,7 +47,8 @@ export interface SpeedInput {
 export function speedView(i: SpeedInput): SpeedView {
   if (i.state.unlockedFor === i.levelId)
     return { show: true, label: `${i.speed}×`, action: "toggle" };
-  if (i.state.adPending) return { show: true, label: "…", action: "none" };
+  // While an ad is up the button can end the wait, so a provider that hangs never traps the game.
+  if (i.state.adPending) return { show: true, label: "…", action: "cancel" };
   if (!i.providerAvailable || i.state.declinedFor === i.levelId)
     return { show: false, label: "", action: "none" };
   return { show: true, label: "2×▶", action: "watch" };
@@ -85,4 +86,24 @@ export function enterLevel(state: SpeedState, levelId: string): SpeedState {
     declinedFor: state.declinedFor === levelId ? levelId : null,
     adPending: false,
   };
+}
+
+/**
+ * The speed state when a level starts (M14.3): what was kept in the session, narrowed to this level,
+ * and the speed that goes with it. 2× is only ever restored for the level it was unlocked for. The
+ * review override (`?speed=2`, development builds only; it is not an ad reward) unlocks the level.
+ */
+export function restoreSpeed(
+  kept: SpeedState | undefined,
+  keptSpeed: unknown,
+  levelId: string,
+  reviewOverride: boolean,
+): { state: SpeedState; speed: 1 | 2 } {
+  let state = enterLevel(kept ?? initialSpeedState(), levelId);
+  let speed: 1 | 2 = state.unlockedFor === levelId && keptSpeed === 2 ? 2 : 1;
+  if (reviewOverride) {
+    state = { ...state, unlockedFor: levelId };
+    speed = 2;
+  }
+  return { state, speed };
 }

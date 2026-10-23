@@ -18,12 +18,13 @@ import { AmbientLayer } from "./ambient";
 import { atmosphereForTheme } from "./worldIdentity";
 import { planCues, playCues, rejectionCue, type CueSinks } from "./cues";
 import { Emitter, Particles } from "./particles";
-import { getRewards, safeShow } from "../rewards";
+import { getRewards, safeShow, type AdResult } from "../rewards";
+import { stepFrame } from "./frameStep";
 import { CollectHud } from "./CollectHud";
 import {
   applyAdResult,
-  enterLevel,
   initialSpeedState,
+  restoreSpeed,
   speedView,
   type SpeedState,
   type SpeedView,
@@ -117,6 +118,9 @@ export class CollectScene extends Phaser.Scene {
   private speed: 1 | 2 = 1;
   /** The 2× rule (M14.3): per level, through an optional rewarded ad; kept across scene restarts. */
   private speedState: SpeedState = initialSpeedState();
+  /** Which wait for an ad is the current one, and how to end it early (the button, Retry, Undo). */
+  private adToken = 0;
+  private adCancel: (() => void) | null = null;
   /** How many HUD buttons there are: undo and retry, plus speed when something is offered. */
   private hudButtons = 2;
   private marks = new Map<number, number>();
@@ -191,16 +195,19 @@ export class CollectScene extends Phaser.Scene {
     this.tutorialSaved = false;
     const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     const params = new URLSearchParams(search);
-    // 2× is unlocked for this level only (a retry keeps it, another level starts at 1×).
-    const kept = this.registry.get("v2.speedState") as SpeedState | undefined;
-    this.speedState = enterLevel(kept ?? initialSpeedState(), level.id);
-    this.speed =
-      this.speedState.unlockedFor === level.id && this.registry.get("v2.speed") === 2 ? 2 : 1;
-    // `?speed=2` is a review override (it is not an ad reward): it unlocks 2× for the level it opens.
-    if (params.get("speed") === "2") {
-      this.speedState = { ...this.speedState, unlockedFor: level.id };
-      this.speed = 2;
-    }
+    // 2× is unlocked for this level only (a retry keeps it, another level starts at 1×). `?speed=2` is
+    // a review override and exists in development builds only: it is not an ad reward.
+    const restored = restoreSpeed(
+      this.registry.get("v2.speedState") as SpeedState | undefined,
+      this.registry.get("v2.speed"),
+      level.id,
+      params.get("speed") === "2" && import.meta.env?.DEV === true,
+    );
+    this.speedState = restored.state;
+    this.speed = restored.speed;
+    // Any ad wait left from before this level started no longer counts.
+    this.adToken++;
+    this.adCancel = null;
     this.saveSpeed();
     // `?view=spellbook` opens the v2 Spellbook first (once: "Back to the board" returns here).
     if (params.get("view") === "spellbook" && !this.registry.get("v2.spellbookShown")) {
@@ -219,6 +226,8 @@ export class CollectScene extends Phaser.Scene {
     this.unsubscribe.push(
       this.session.subscribe((batch) => this.onBatch(batch)),
       this.session.onReplace((reason) => {
+        // Retry and Undo are always free: they also end any wait for an ad.
+        this.adCancel?.();
         // Undo is something the tutorial teaches; a restart starts its lesson over.
         if (reason === "undo") this.tutorial?.note("undone");
         else if (this.tutorialId) {
@@ -393,7 +402,7 @@ export class CollectScene extends Phaser.Scene {
     this.panels.sync(state);
     this.buildHud();
     this.tutorialLayer = this.tutorial
-      ? new TutorialLayer(this, this.layout, () => this.skipTutorial(), this.hudButtons)
+      ? new TutorialLayer(this, this.layout, () => this.skipTutorial())
       : null;
     this.refreshTutorial();
     this.buildInput();
@@ -426,7 +435,7 @@ export class CollectScene extends Phaser.Scene {
     const cy = l.hud.y + l.hud.h / 2;
     const size = Math.round(HUD_BUTTON_CSS * dpr);
     for (let i = 0; i < this.hudButtons; i++) {
-      const x = hudButtonX(l, i, this.hudButtons);
+      const x = hudButtonX(l, i, 3);
       g.fillStyle(theme.dusk, 1);
       g.fillCircle(x, cy, size / 2);
       g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
@@ -456,7 +465,8 @@ export class CollectScene extends Phaser.Scene {
     return speedView({
       levelId: this.session.level.id,
       state: this.speedState,
-      providerAvailable: getRewards(this).isAvailable("speed2x"),
+      // No ad offer while learning (the tutorial's own levels): it would only be noise.
+      providerAvailable: !this.tutorialId && getRewards(this).isAvailable("speed2x"),
       speed: this.speed,
     });
   }
@@ -475,29 +485,41 @@ export class CollectScene extends Phaser.Scene {
       this.hud.setSpeedLabel(`${this.speed}×`);
     } else if (view.action === "watch") {
       void this.watchForSpeed();
+    } else if (view.action === "cancel") {
+      this.adCancel?.();
     }
   }
 
   /**
-   * Shows the rewarded ad for 2×. The game is paused while it is on screen; whatever happens (a
-   * completed ad, an early close, no ad, an error) play carries on, at 1× unless the ad was completed.
+   * Shows the rewarded ad for 2×. The game waits while it is on screen, but never for long and never
+   * for good: the button, Retry or Undo end the wait at any moment (a provider that hangs just becomes
+   * "no ad"), and whatever happens play carries on, at 1× unless the ad was completed.
    */
   private async watchForSpeed(): Promise<void> {
     const levelId = this.session.level.id;
+    const token = ++this.adToken;
     this.speedState = { ...this.speedState, adPending: true };
     this.hud.setSpeedLabel("…");
-    const result = await safeShow(getRewards(this), "speed2x");
-    // The scene may have moved on (another level, shut down) while the ad was up.
-    if (!this.scene.isActive() || this.session.level.id !== levelId) {
-      this.speedState = { ...this.speedState, adPending: false };
-      return;
-    }
+    const cancelled = new Promise<AdResult>((resolve) => {
+      this.adCancel = () => resolve("unavailable");
+    });
+    const result = await Promise.race([safeShow(getRewards(this), "speed2x"), cancelled]);
+    if (token === this.adToken) this.adCancel = null;
+    // The scene may have moved on (shut down, another level, a newer wait) while the ad was up.
+    if (!this.scene.isActive() || this.session.level.id !== levelId) return;
+    const current = token === this.adToken;
+    // A late result of an older wait never touches a newer one's state; only a completed ad still counts.
+    if (!current && result !== "rewarded") return;
     const outcome = applyAdResult(this.speedState, levelId, result);
-    this.speedState = outcome.state;
+    this.speedState = current
+      ? outcome.state
+      : { ...outcome.state, adPending: this.speedState.adPending };
     if (outcome.speed === 2) this.speed = 2;
     this.saveSpeed();
-    // The HUD changes shape (the button appears as a switch, or goes away): rebuild from the state.
-    this.rebuild();
+    const view = this.speedView();
+    // Rebuild only when the HUD changed shape (a button appeared or went away); else just the label.
+    if (view.show !== (this.hudButtons === 3)) this.rebuild();
+    else this.hud.setSpeedLabel(view.label);
     if (outcome.message) this.toaster.show(outcome.message, 2200);
   }
 
@@ -625,17 +647,8 @@ export class CollectScene extends Phaser.Scene {
     this.frameTime = time;
     const profileStart = this.profile ? performance.now() : 0;
     // The game waits while an ad is on screen.
-    const due = this.speedState.adPending ? 0 : this.clock.advance(delta, this.speed);
+    const due = stepFrame(this.session, this.clock, delta, this.speed, this.speedState.adPending);
     if (this.profile) this.profile.ticks += due;
-    for (let i = 0; i < due; i++) {
-      if (this.session.tick() === null) {
-        // Nothing is ticking (settled or over): drop the backlog but keep the position inside the
-        // current tick, so familiars never snap back.
-        this.clock.drain();
-        break;
-      }
-    }
-    if (due === 0 && this.session.state.status !== "playing") this.clock.drain();
     this.familiars.update(
       this.session.state.tick,
       this.clock.alpha,

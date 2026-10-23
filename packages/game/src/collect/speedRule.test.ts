@@ -5,10 +5,14 @@ import {
   applyAdResult,
   enterLevel,
   initialSpeedState,
+  restoreSpeed,
   speedView,
   type SpeedState,
 } from "./speedRule";
 import { TickClock } from "./tickClock";
+import { stepFrame } from "./frameStep";
+import { targetRect } from "./TutorialLayer";
+import { computeCollectLayout, hudButtonX } from "./collectLayout";
 import { ART_LEVELS } from "./artLevels";
 import { TUTORIAL } from "./tutorialLevels";
 import { moonlitHat } from "./slice";
@@ -31,11 +35,11 @@ describe("what the HUD offers", () => {
     expect(view(initialSpeedState())).toEqual({ show: true, label: "2×▶", action: "watch" });
   });
 
-  it("while an ad is on screen the button is busy and takes no taps", () => {
+  it("while an ad is on screen the button says so, and a tap on it ends the wait (a provider that hangs never traps the game)", () => {
     expect(view({ ...initialSpeedState(), adPending: true })).toEqual({
       show: true,
       label: "…",
-      action: "none",
+      action: "cancel",
     });
   });
 
@@ -49,7 +53,7 @@ describe("what the HUD offers", () => {
     expect(view(s, { speed: 1 }).label).toBe("1×");
   });
 
-  it("2× unlocked for another level offers nothing extra here: the offer is the ad again", () => {
+  it("2× unlocked for another level does not carry over: here the ad is offered again", () => {
     const s: SpeedState = { unlockedFor: "other", declinedFor: null, adPending: false };
     expect(view(s).action).toBe("watch");
   });
@@ -133,9 +137,7 @@ describe("speed never changes the outcome", () => {
         expect(session.tap(line[next]!).ok).toBe(true);
         next++;
       }
-      const due = clock.advance(1000 / 60, speed);
-      for (let i = 0; i < due; i++) session.tick();
-      if (due === 0 && collect.isSettled(session.state)) clock.drain();
+      stepFrame(session, clock, 1000 / 60, speed);
     }
     return { session, frames };
   }
@@ -164,4 +166,65 @@ describe("speed never changes the outcome", () => {
     },
     120_000,
   );
+});
+
+describe("the level's speed when it starts", () => {
+  const unlocked: SpeedState = { unlockedFor: "L", declinedFor: null, adPending: true };
+
+  it("restores 2× only for the very level it was unlocked for, and never an ad in flight", () => {
+    expect(restoreSpeed(unlocked, 2, "L", false)).toEqual({
+      state: { unlockedFor: "L", declinedFor: null, adPending: false },
+      speed: 2,
+    });
+    // Unlocked but switched back to 1×, or kept speed from another level: 1×.
+    expect(restoreSpeed(unlocked, 1, "L", false).speed).toBe(1);
+    expect(restoreSpeed(unlocked, 2, "M", false)).toEqual({ state: initialSpeedState(), speed: 1 });
+    expect(restoreSpeed(undefined, undefined, "L", false)).toEqual({
+      state: initialSpeedState(),
+      speed: 1,
+    });
+    expect(restoreSpeed(initialSpeedState(), 2, "L", false).speed).toBe(1); // a stale 2 never unlocks
+  });
+
+  it("the review override unlocks the level it opens (and only when the caller says it is allowed)", () => {
+    expect(restoreSpeed(undefined, undefined, "L", true)).toEqual({
+      state: { unlockedFor: "L", declinedFor: null, adPending: false },
+      speed: 2,
+    });
+    expect(restoreSpeed(undefined, undefined, "L", false).speed).toBe(1);
+  });
+});
+
+describe("the frame step the scene really runs", () => {
+  it("does nothing, and lets no time build up, while an ad is on screen", () => {
+    const level = TUTORIAL[0]!.make();
+    const session = new collect.CollectSession(level);
+    session.tap({ kind: "select", column: 0 });
+    const clock = new TickClock();
+    for (let i = 0; i < 600; i++) expect(stepFrame(session, clock, 16.7, 2, true)).toBe(0);
+    expect(session.state.tick).toBe(0);
+    // Afterwards play resumes normally, with no burst of ticks for the time that passed.
+    const first = stepFrame(session, clock, 16.7, 1, false);
+    expect(first).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("the Undo ring on the HUD", () => {
+  it("is on the first of the three fixed HUD slots, so undo and retry never move", () => {
+    const l = computeCollectLayout({
+      width: 750,
+      height: 1500,
+      dpr: 2,
+      insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      boardWidth: 10,
+      boardHeight: 10,
+      slots: 3,
+      columns: 3,
+      fieldCap: 3,
+      portalX: 4,
+    });
+    const r = targetRect(l, { kind: "undo" })!;
+    const slot0 = hudButtonX(l, 0, 3);
+    expect(r.x + r.w / 2).toBeCloseTo(slot0);
+  });
 });

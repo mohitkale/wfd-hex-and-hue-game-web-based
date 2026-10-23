@@ -48,7 +48,8 @@ export class CollectHud {
     if (speed.show) buttons.push([speed.label, handlers.onSpeed]);
     let speedLabel: Phaser.GameObjects.Text | null = null;
     buttons.forEach(([label, onPress], i) => {
-      const x = hudButtonX(l, i, buttons.length);
+      // Three slots whatever is shown, so undo and retry never move when the speed button comes or goes.
+      const x = hudButtonX(l, i, 3);
       const text = scene.add
         .text(x, cy, label, {
           fontFamily: theme.font,
