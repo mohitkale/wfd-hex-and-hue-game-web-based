@@ -33,6 +33,14 @@ export interface RunResult {
   actions: number;
   /** The actions taken, in order (for tests and reports). */
   taken: Action[];
+  /** Cubes delivered when the run ended, of `cubes` in the level. */
+  delivered: number;
+  cubes: number;
+  /**
+   * With `options.states`: the settled state before the first action and after each one (so
+   * `states[k]` is the position after `k` actions), for measures that look back along a run.
+   */
+  states?: CollectState[];
   /** Why the run was lost (`slotsFull`, `deadlock`, or `tooLong`), or null if won. */
   lost: "slotsFull" | "deadlock" | "tooLong" | null;
 }
@@ -109,15 +117,30 @@ const PICKS: Record<PlayerId, Pick> = {
 };
 
 /** Runs one player on a level. `seed` is only used by `random`. */
-export function runPlayer(level: CollectLevel, player: PlayerId | "random", seed = 0): RunResult {
+export function runPlayer(
+  level: CollectLevel,
+  player: PlayerId | "random",
+  seed = 0,
+  options: { states?: boolean } = {},
+): RunResult {
   const s = createCollectState(level);
   const memory = { lastColumn: -1 };
   const rng = player === "random" ? createRng(seed) : null;
   const limit = Math.max(1, 3 * s.groups.length);
   const taken: Action[] = [];
+  const states: CollectState[] | undefined = options.states ? [cloneState(s)] : undefined;
   let actions = 0;
+  const finish = (won: boolean, lost: RunResult["lost"]): RunResult => ({
+    won,
+    actions,
+    taken,
+    delivered: s.deliveredTotal,
+    cubes: s.cubesTotal,
+    lost,
+    ...(states ? { states } : {}),
+  });
   while (s.status === "playing") {
-    if (actions >= limit) return { won: false, actions, taken, lost: "tooLong" };
+    if (actions >= limit) return finish(false, "tooLong");
     const legal = legalActions(s);
     if (legal.length === 0) break; // the engine ends such a state as a deadlock when ticked
     const action = rng
@@ -126,10 +149,11 @@ export function runPlayer(level: CollectLevel, player: PlayerId | "random", seed
     apply(s, action);
     runUntilSettled(s);
     taken.push(action);
+    states?.push(cloneState(s));
     actions++;
   }
-  if (s.status === "won") return { won: true, actions, taken, lost: null };
-  return { won: false, actions, taken, lost: s.status === "lost" ? s.lossReason : "deadlock" };
+  if (s.status === "won") return finish(true, null);
+  return finish(false, s.status === "lost" ? s.lossReason : "deadlock");
 }
 
 /** What every player did on a level (docs/DIFFICULTY_V2.md §2). */

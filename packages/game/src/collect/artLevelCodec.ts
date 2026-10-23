@@ -15,6 +15,12 @@ export interface ArtGenerated {
   /** The difficulty tier the level was generated for, and what the simulated players did on it. */
   tier: string;
   strategies: { wins: Record<string, boolean>; randomRate: number };
+  /** The decision measures (M12.4): the score and its components, and the measures worth reading at a glance. */
+  difficulty: {
+    score: number;
+    components: Record<string, number>;
+    measures: Record<string, number | boolean | null>;
+  };
 }
 
 export interface ArtLevelData {
