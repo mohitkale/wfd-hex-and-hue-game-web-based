@@ -1,5 +1,6 @@
 import * as collect from "@hexhue/core/collect";
 import { createRng } from "@hexhue/core";
+import { ART_LEVELS } from "./artLevels";
 import { layeredOrb } from "./denseBoard";
 import { LOSE_LINES, SLICE_ID, WIN_LINE, moonlitHat } from "./slice";
 
@@ -172,6 +173,9 @@ export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
   /** 40×40 = 1,600 cubes and up to 36 familiars: the renderer's worst case (the board size limit). */
   big: () => stripes("dev-big", "Big 40×40 (dev)", 40, 5, 130),
 };
+
+/** Every art piece as a playable preview level (`?level=art-<piece id>`, M11.5). */
+Object.assign(DEV_LEVELS, ART_LEVELS);
 
 export const DEFAULT_DEV_LEVEL = "slice";
 

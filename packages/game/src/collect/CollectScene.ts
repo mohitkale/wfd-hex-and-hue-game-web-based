@@ -11,6 +11,8 @@ import { ensureTextures, TEX } from "../view/textures";
 import { fadeIn } from "../view/transition";
 import { CubeLayer } from "./CubeLayer";
 import { FamiliarLayer } from "./FamiliarLayer";
+import { CollectSpellbookScene } from "./CollectSpellbookScene";
+import { CompletionOverlay } from "./CompletionOverlay";
 import { ParticleLayer } from "./ParticleLayer";
 import { PanelsView, paintPanelFrames } from "./PanelsView";
 import { AmbientLayer } from "./ambient";
@@ -23,6 +25,7 @@ import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, levelFromSearch } from "./levels";
 import { TickClock } from "./tickClock";
+import { browserStore, loadSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
 import { VisualModel } from "./visuals";
 
 type CollectState = collect.CollectState;
@@ -73,6 +76,10 @@ export class CollectScene extends Phaser.Scene {
   private toastText: Phaser.GameObjects.Text | null = null;
   private overlay: Phaser.GameObjects.GameObject[] = [];
   private overlayTimer: Phaser.Time.TimerEvent | null = null;
+  /** The picture reveal shown after a win on a level with a known picture (M11.5). */
+  private reveal: CompletionOverlay | null = null;
+  /** What recording this win in the Spellbook did, so a relayout does not count it twice. */
+  private winRecord: { isNew: boolean; saved: boolean } | null = null;
   private portalGlow: Phaser.GameObjects.Image | null = null;
   private speedLabel: Phaser.GameObjects.Text | null = null;
   private unsubscribe: (() => void)[] = [];
@@ -97,6 +104,11 @@ export class CollectScene extends Phaser.Scene {
     const level = levelFromSearch(search);
     const params = new URLSearchParams(search);
     if (params.get("speed") === "2") this.speed = 2;
+    // `?view=spellbook` opens the v2 Spellbook first (once: "Back to the board" returns here).
+    if (params.get("view") === "spellbook" && !this.registry.get("v2.spellbookShown")) {
+      this.registry.set("v2.spellbookShown", true);
+      this.time.delayedCall(0, () => this.openSpellbook());
+    }
     this.colorblind = params.get("cb") === "1";
     this.session = new collect.CollectSession(level);
     const line = demoLineFromSearch(search, level);
@@ -105,6 +117,7 @@ export class CollectScene extends Phaser.Scene {
       this.session.subscribe((batch) => this.onBatch(batch)),
       this.session.onReplace(() => {
         this.demo = null;
+        this.winRecord = null;
         this.rebuild();
       }),
     );
@@ -186,6 +199,7 @@ export class CollectScene extends Phaser.Scene {
     this.overlayTimer?.remove();
     this.overlayTimer = null;
     this.overlay = [];
+    this.reveal = null;
     this.children.removeAll(true);
     this.toastText = null;
     this.build();
@@ -544,6 +558,7 @@ export class CollectScene extends Phaser.Scene {
     this.stepDemo(time);
     this.ambient.update(time);
     this.particleLayer.update(time);
+    this.reveal?.update(time);
     this.cubes.flush();
     this.profile?.update.push(performance.now() - profileStart);
   }
@@ -595,12 +610,50 @@ export class CollectScene extends Phaser.Scene {
   // End of game
   // -------------------------------------------------------------------------------------------
 
+  /**
+   * A win on a level with a known picture: record it in the v2 Spellbook, then reveal the finished
+   * illustration with its subject's effect and show its lore. Returns false when the level has no
+   * shaded picture to show (the plain end card is used instead).
+   */
+  private showReveal(subject: collect.LevelSubject): boolean {
+    const level = this.session.level;
+    if (!level.shades) return false;
+    if (!this.winRecord) {
+      const store = browserStore();
+      const result = recordWin(loadSpellbook(store), subject.id, Date.now());
+      this.winRecord = { isNew: result.isNew, saved: saveSpellbook(store, result.book) };
+    }
+    const { isNew, saved } = this.winRecord;
+    const overlay = new CompletionOverlay(this, {
+      layout: this.layout,
+      level: { ...level, subject },
+      dpr: this.dpr,
+      reduced: isReducedMotion(this),
+      isNew,
+      saved,
+      delivered: this.session.state.deliveredTotal,
+      onSpellbook: () => this.openSpellbook(),
+      onAgain: () => this.session.restart(),
+    });
+    this.reveal = overlay;
+    this.overlay = overlay.objects;
+    return true;
+  }
+
+  private openSpellbook(): void {
+    if (!this.scene.get("collect-spellbook"))
+      this.scene.add("collect-spellbook", CollectSpellbookScene, false);
+    this.scene.start("collect-spellbook");
+  }
+
   private showEnd(delay: number): void {
     const state = this.session.state;
     if (state.status === "playing" || this.overlay.length > 0) return;
     const l = this.layout;
     const dpr = this.dpr;
     const won = state.status === "won";
+    const subject = this.session.level.subject;
+    if (won && subject && this.showReveal(subject)) return;
     const shade = this.add
       .rectangle(
         l.frame.x + l.frame.w / 2,

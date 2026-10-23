@@ -23,6 +23,20 @@ export interface CellShades {
   cells: number[];
 }
 
+/**
+ * What a finished picture is, for the reveal and the Spellbook (docs/ART_DIRECTION_V2.md). Display
+ * only, like `shades`: no rule reads it.
+ */
+export interface LevelSubject {
+  /** The art piece id (`content/v2art`). */
+  id: string;
+  name: string;
+  /** The art theme (moon, ritual, crystal, astrology, familiar, other): picks the completion effect. */
+  theme: string;
+  /** One line of lore for the card; no unsupported historical or religious claims. */
+  lore: string;
+}
+
 /** A v2 level as authored and shipped (docs/V2_PROTOTYPE_SPEC.md §2). */
 export interface CollectLevel {
   id: string;
@@ -48,6 +62,8 @@ export interface CollectLevel {
   portalX?: number;
   /** Optional per-cube look within each family; absent means every cube is its family colour. */
   shades?: CellShades;
+  /** Optional: which picture this is, so a win can reveal it and unlock it in the Spellbook. */
+  subject?: LevelSubject;
 }
 
 export const COLLECT_LIMITS = {
@@ -143,6 +159,13 @@ export function validateCollectLevel(level: CollectLevel): string[] {
   });
   if (!cells.some((c) => c !== EMPTY)) errors.push("mosaic has no cubes");
   if (level.shades) errors.push(...shadeErrors(level.shades, palette.length, cells));
+  if (level.subject) {
+    const s = level.subject;
+    for (const key of ["id", "name", "theme", "lore"] as const) {
+      if (typeof s[key] !== "string" || s[key].trim() === "")
+        errors.push(`subject.${key} must be a non-empty string`);
+    }
+  }
 
   if (columns.length < 1 || columns.length > L.maxColumns)
     errors.push(`columns must have 1..${L.maxColumns} entries`);
@@ -216,6 +239,18 @@ export function parseCollectLevel(json: unknown): CollectLevel {
     fieldCap: num("fieldCap"),
   };
   if (o.portalX !== undefined) level.portalX = num("portalX");
+  if (o.subject !== undefined) {
+    const sub = o.subject as Record<string, unknown> | null;
+    if (!sub || typeof sub !== "object") fail("subject must be an object");
+    const text = (k: string) =>
+      typeof sub![k] === "string" ? (sub![k] as string) : fail(`subject.${k} must be a string`);
+    level.subject = {
+      id: text("id"),
+      name: text("name"),
+      theme: text("theme"),
+      lore: text("lore"),
+    };
+  }
   if (o.shades !== undefined) {
     const sh = o.shades as Record<string, unknown> | null;
     const nums = (v: unknown, k: string) =>
