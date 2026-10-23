@@ -11,17 +11,17 @@ npm install     # once
 npm run dev     # then open the URL below (the port is printed, usually 4321)
 ```
 
-| URL                              | What you get                                                                               |
-| -------------------------------- | ------------------------------------------------------------------------------------------ |
-| `/play/?engine=v2`               | The slice level, to play yourself                                                          |
-| `/play/?engine=v2&demo=win`      | The recorded winning line, played for you (about 100 s at 1×, about 50 s with `&speed=2`)  |
-| `/play/?engine=v2&demo=slots`    | A losing line: two groups park, a third runs dry with both slots full ("Out of slots")     |
-| `/play/?engine=v2&demo=deadlock` | The quickest loss: two taps leave nothing that can reach the cubes that are left ("Stuck") |
-| add `&cb=1`                      | Colour-blind symbols                                                                       |
+| URL                              | What you get                                                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `/play/?engine=v2`               | The slice level, to play yourself (a first visit starts in the tutorial, docs/V2_ONBOARDING.md; skip it, or use `&level=slice`) |
+| `/play/?engine=v2&demo=win`      | The recorded winning line, played for you (about 100 s at 1×, about 50 s with `&speed=2`)                                       |
+| `/play/?engine=v2&demo=slots`    | A losing line: two groups park, a third runs dry with both slots full ("Out of slots")                                          |
+| `/play/?engine=v2&demo=deadlock` | The quickest loss: two taps leave nothing that can reach the cubes that are left ("Stuck")                                      |
+| add `&cb=1`                      | Colour-blind symbols                                                                                                            |
 
 Use a phone-sized window (or your phone on the same network) for the intended portrait layout. The
 1×/2× button is a review-build control; the real 2× rule (optional rewarded ad) arrives in M14.3.
-Tapping anything yourself, or undo or restart, ends a demo. The demo and the `slice` level are reachable only through `?engine=v2` (`?level=slice` is the default; `demo=lose` is an alias of `demo=slots`). Reduced motion and the sound and haptics settings are honoured.
+Tapping anything yourself, or undo or restart, ends a demo. The demo and the `slice` level are reachable only through `?engine=v2` (`?level=slice` is the default once the tutorial is done or skipped, and always opens it; `demo=lose` is an alias of `demo=slots`). Reduced motion and the sound and haptics settings are honoured.
 
 ## The level
 

@@ -22,6 +22,18 @@ import { CollectHud } from "./CollectHud";
 import { PortalView } from "./PortalView";
 import { buildEndCard } from "./EndCard";
 import { Toast } from "./Toast";
+import type { Tutorial } from "./tutorial";
+import { TutorialLayer } from "./TutorialLayer";
+import { createTutorial } from "./tutorialLevels";
+import {
+  emptyTutorialBook,
+  markDone,
+  markSkipped,
+  nextAfter,
+  readTutorialBook,
+  saveTutorialBook,
+  type TutorialBook,
+} from "./tutorialBook";
 import { progressOf } from "./progress";
 import {
   HUD_BUTTON_CSS,
@@ -33,7 +45,7 @@ import {
 import { RingStats } from "./profile";
 import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
-import { demoLineFromSearch, dailyFromSearch, levelFromSearch } from "./levels";
+import { demoLineFromSearch, dailyFromSearch, levelFromSearch, tutorialStart } from "./levels";
 import { TickClock } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
 import {
@@ -46,6 +58,7 @@ import {
 } from "./dailyBook";
 import { utcDate } from "./daily";
 import { browserStore, readSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
+import { eventNote } from "./notes";
 import { sealMap } from "./sealView";
 import { VisualModel } from "./visuals";
 
@@ -116,6 +129,12 @@ export class CollectScene extends Phaser.Scene {
   private revealSeen = false;
   private portal!: PortalView;
   private hud!: CollectHud;
+  /** The tutorial being played (M14.2), its level id and layer, and whether its win was recorded. */
+  private tutorial: Tutorial | null = null;
+  private tutorialId: string | null = null;
+  private tutorialLayer: TutorialLayer | null = null;
+  private tutorialBook: TutorialBook = emptyTutorialBook();
+  private tutorialSaved = false;
   private unsubscribe: (() => void)[] = [];
   /** Colour-blind mode (M6.5): each colour also shows its symbol. `?cb=1` forces it for review. */
   private colorblind = false;
@@ -152,7 +171,15 @@ export class CollectScene extends Phaser.Scene {
     const daily = dailyFromSearch(search, Date.now(), chosen);
     this.dailyDate = daily?.date ?? null;
     this.sharing = false;
-    const level = levelFromSearch(search, daily ? daily.levelId : chosen);
+    // First visits start in the tutorial (M14.2); a daily never does.
+    this.tutorialBook = readTutorialBook(browserStore()).book;
+    const tutorialId = daily ? null : tutorialStart(search, chosen, this.tutorialBook);
+    this.tutorialId = tutorialId;
+    this.tutorial = tutorialId
+      ? createTutorial(tutorialId, this.registry.get("v2.tutorialSkipped") === true)
+      : null;
+    this.tutorialSaved = false;
+    const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     const params = new URLSearchParams(search);
     if (params.get("speed") === "2") this.speed = 2;
     // `?view=spellbook` opens the v2 Spellbook first (once: "Back to the board" returns here).
@@ -171,7 +198,16 @@ export class CollectScene extends Phaser.Scene {
     }
     this.unsubscribe.push(
       this.session.subscribe((batch) => this.onBatch(batch)),
-      this.session.onReplace(() => {
+      this.session.onReplace((reason) => {
+        // Undo is something the tutorial teaches; a restart starts its lesson over.
+        if (reason === "undo") this.tutorial?.note("undone");
+        else if (this.tutorialId) {
+          this.tutorial = createTutorial(
+            this.tutorialId,
+            this.registry.get("v2.tutorialSkipped") === true,
+          );
+          this.tutorialSaved = false;
+        }
         this.demo = null;
         this.winRecord = null;
         this.revealSeen = false;
@@ -334,6 +370,10 @@ export class CollectScene extends Phaser.Scene {
     this.rebuildMarks(state);
     this.panels.sync(state);
     this.buildHud();
+    this.tutorialLayer = this.tutorial
+      ? new TutorialLayer(this, this.layout, () => this.skipTutorial())
+      : null;
+    this.refreshTutorial();
     this.buildInput();
     this.clock.reset();
     if (state.status !== "playing") this.showEnd(0);
@@ -419,7 +459,11 @@ export class CollectScene extends Phaser.Scene {
     const result = this.session.tap(action);
     if (!result.ok) {
       const reason = result.reason;
-      if (reason !== "ok" && reason !== "unavailable") this.toaster.show(REASON_TEXT[reason]);
+      if (reason !== "ok" && reason !== "unavailable") {
+        this.toaster.show(REASON_TEXT[reason]);
+        this.tutorial?.note("rejected");
+        this.refreshTutorial();
+      }
       const cue = rejectionCue(reason);
       if (cue) playCues([cue], this.sinks);
       return;
@@ -458,6 +502,12 @@ export class CollectScene extends Phaser.Scene {
         marksChanged = this.marks.delete(e.cube) || marksChanged;
       }
       this.familiars.handle(e);
+      // The first time a group goes to wait, say why (the tutorial's own hints do this in its levels).
+      const note = eventNote(e);
+      if (note && !this.tutorial && !this.registry.get("v2.parkNote")) {
+        this.registry.set("v2.parkNote", true);
+        this.toaster.show(note, 2400);
+      }
       if (e.type === "groupCompleted") {
         this.cubes.setSeals(sealMap(this.session.state));
         this.celebrateGroup(e.group);
@@ -467,6 +517,7 @@ export class CollectScene extends Phaser.Scene {
     if (marksChanged) this.cubes.setMarks(this.marks);
     this.panels.sync(this.session.state);
     this.hud.setProgress(progressOf(this.session.state).fraction);
+    this.refreshTutorial();
     const status = this.session.state.status;
     if (status !== "playing" && this.overlay.length === 0 && !this.overlayTimer) {
       this.overlayTimer = this.time.delayedCall(700, () => this.showEnd(0));
@@ -659,6 +710,44 @@ export class CollectScene extends Phaser.Scene {
     this.scene.start("collect-spellbook");
   }
 
+  /** Shows the tutorial's current hint (or nothing). */
+  private refreshTutorial(): void {
+    this.tutorialLayer?.show(
+      this.tutorial?.update(this.session.state) ?? null,
+      this.tutorial !== null && !this.tutorial.finished,
+    );
+  }
+
+  /** "Skip": no more hints, and the tutorial is not offered again on later visits. */
+  private skipTutorial(): void {
+    this.tutorial?.skip();
+    // For the rest of the visit (a retry or Next must not bring the hints back) and for later visits.
+    this.registry.set("v2.tutorialSkipped", true);
+    this.tutorialBook = markSkipped(this.tutorialBook);
+    saveTutorialBook(browserStore(), this.tutorialBook);
+    this.refreshTutorial();
+  }
+
+  /** A won tutorial level is remembered, and the end card leads on to the next one (or to the game). */
+  private tutorialWin(): { label: string; onPress: () => void } | undefined {
+    const id = this.tutorialId;
+    if (!id) return undefined;
+    if (!this.tutorialSaved) {
+      this.tutorialSaved = true;
+      this.tutorialBook = markDone(this.tutorialBook, id);
+      saveTutorialBook(browserStore(), this.tutorialBook);
+    }
+    const following = nextAfter(this.tutorialBook, id);
+    return {
+      label: following ? "Next" : "Play",
+      onPress: () => {
+        // On to the next level not finished; after the last, on to the slice.
+        this.registry.set("v2.level", following ?? "slice");
+        this.scene.restart();
+      },
+    };
+  }
+
   private showEnd(delay: number): void {
     const state = this.session.state;
     if (state.status === "playing" || this.overlay.length > 0) return;
@@ -674,6 +763,9 @@ export class CollectScene extends Phaser.Scene {
       reduced: isReducedMotion(this),
       onRetry: () => this.session.restart(),
       onUndo: () => this.session.undo(),
+      ...(won && this.tutorialId ? { next: this.tutorialWin()! } : {}),
+      // Pointed at by the tutorial's last hint: Undo becomes the main button.
+      emphasizeUndo: !won && this.tutorial?.update(state)?.target?.kind === "undo",
     });
   }
 }

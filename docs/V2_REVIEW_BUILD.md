@@ -10,14 +10,15 @@ npm run dev     # Astro dev server, usually http://localhost:4321
 
 Open one of:
 
-| URL                               | What you get                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| `/play/?engine=v2`                | The M10.5 vertical slice, "Moonlit Hat" (see `docs/V2_SLICE.md`)               |
-| `/play/?engine=v2&level=moon`     | The crescent-moon dev level (20×18, five colours, 3 columns, 4 slots)          |
-| `/play/?engine=v2&level=parking`  | The teaching board from the design doc: park, resume, or lose with one slot    |
-| `/play/?engine=v2&level=purple12` | Purple 12 can reach only 7 cubes: it waits showing 5 until the blue is cleared |
-| add `&cb=1`                       | Colour-blind symbols on familiars, carried cubes and groups                    |
-| add `&speed=2`                    | Start at 2× (the 1×/2× button also toggles it; review builds only)             |
+| URL                               | What you get                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `/play/?engine=v2`                | A first visit: the tutorial (`docs/V2_ONBOARDING.md`); after it or a skip: the slice, "Moonlit Hat" (`docs/V2_SLICE.md`) |
+| `/play/?engine=v2&level=slice`    | The M10.5 vertical slice, "Moonlit Hat", always                                                                          |
+| `/play/?engine=v2&level=moon`     | The crescent-moon dev level (20×18, five colours, 3 columns, 4 slots)                                                    |
+| `/play/?engine=v2&level=parking`  | The teaching board from the design doc: park, resume, or lose with one slot                                              |
+| `/play/?engine=v2&level=purple12` | Purple 12 can reach only 7 cubes: it waits showing 5 until the blue is cleared                                           |
+| add `&cb=1`                       | Colour-blind symbols on familiars, carried cubes and groups                                                              |
+| add `&speed=2`                    | Start at 2× (the 1×/2× button also toggles it; review builds only)                                                       |
 
 A production build can include it permanently with `PUBLIC_ENGINE=v2 npm run build`.
 
