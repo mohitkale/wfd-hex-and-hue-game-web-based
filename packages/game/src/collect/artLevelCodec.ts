@@ -12,6 +12,9 @@ export interface ArtGenerated {
   attempt: number;
   score: number;
   metrics: collect.GenMetrics;
+  /** The difficulty tier the level was generated for, and what the simulated players did on it. */
+  tier: string;
+  strategies: { wins: Record<string, boolean>; randomRate: number };
 }
 
 export interface ArtLevelData {

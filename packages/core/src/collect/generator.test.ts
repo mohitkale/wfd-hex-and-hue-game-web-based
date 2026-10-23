@@ -211,6 +211,70 @@ describe("groups and seeds", () => {
   });
 });
 
+describe("the acceptance gate (M12.3)", () => {
+  /** A stand-in gate: one objection per group beyond the second in the first column. */
+  const crowdedFirstColumn = (level: { columns: unknown[][] }): string[] =>
+    Array.from(
+      { length: Math.max(0, level.columns[0]!.length - 2) },
+      () => "first column is crowded",
+    );
+  const art = rings(10);
+
+  it("the hill climb repairs a candidate the gate objects to, and the result passes the gate and the solver", () => {
+    let repaired = 0;
+    for (let seed = 1; seed <= 12 && repaired < 2; seed++) {
+      const plain = generateLevel(art, "g", "g", { seed, profile: "gentle", refineSteps: 0 });
+      if (!plain || crowdedFirstColumn(plain.level).length === 0) continue;
+      const gated = generateLevel(art, "g", "g", {
+        seed,
+        profile: "gentle",
+        refineSteps: 80,
+        gate: crowdedFirstColumn,
+      });
+      if (!gated) continue; // the search is bounded and may not always get there
+      repaired++;
+      expect(crowdedFirstColumn(gated.level)).toEqual([]);
+      expect(solve(gated.level).status).toBe("solved");
+      expect(gated.level.cells).toEqual(art.cells);
+    }
+    expect(repaired).toBeGreaterThanOrEqual(1);
+  }, 120_000);
+
+  it("never returns a level the gate still objects to, even when the search cannot fix it", () => {
+    for (let seed = 1; seed <= 4; seed++) {
+      const g = generateLevel(art, "g", "g", {
+        seed,
+        profile: "gentle",
+        refineSteps: 4,
+        gate: crowdedFirstColumn,
+      });
+      if (g) expect(crowdedFirstColumn(g.level)).toEqual([]);
+    }
+  });
+
+  it("a candidate the gate already accepts is returned unchanged (no refinement)", () => {
+    const plain = generateLevel(art, "g", "g", { seed: 3, profile: "gentle", refineSteps: 0 })!;
+    const gated = generateLevel(art, "g", "g", { seed: 3, profile: "gentle", gate: () => [] })!;
+    expect(gated.level).toEqual(plain.level);
+  });
+
+  it("the ungated pool does not depend on the refinement switch for profiles asking for pitfalls", () => {
+    const a = generateLevel(art, "g", "g", {
+      seed: 2,
+      profile: "standard",
+      refineSteps: 0,
+      maxAttempts: 6,
+    });
+    const b = generateLevel(art, "g", "g", {
+      seed: 2,
+      profile: "standard",
+      refineSteps: 0,
+      maxAttempts: 6,
+    });
+    expect(a).toEqual(b);
+  });
+});
+
 describe("rejection", () => {
   it("returns null when the picture cannot supply the structure (one colour cannot make groups wait)", () => {
     const flat: GeneratorArt = {

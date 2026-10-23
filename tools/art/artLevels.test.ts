@@ -1,6 +1,7 @@
 import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { checkStrategies, type Tier } from "../../content/difficulty";
 import { pieces } from "../../content/v2art";
 import {
   decodeArtLevel,
@@ -22,7 +23,7 @@ import {
   unlockedList,
 } from "../../packages/game/src/collect/v2Spellbook";
 import { botPlay } from "../collect/density";
-import { OUTPUT, artLevels, levelForPiece, serialize } from "./levels";
+import { DEFAULT_TIER, OUTPUT, TARGET_TIER, artLevels, levelForPiece, serialize } from "./levels";
 
 const withoutShades = (level: collect.CollectLevel): collect.CollectLevel => {
   const { shades: _shades, ...rest } = level;
@@ -74,6 +75,18 @@ describe("the art library's preview levels", () => {
       expect(level.slots, level.id).toBe(Math.min(8, m.minSlots + spec.slack));
       expect(collect.minSlots(level, 200_000).slots, level.id).toBe(m.minSlots);
       expect(m.cubes).toBe(level.cells.filter((c) => c >= 0).length);
+    }
+  });
+
+  it("the pipeline enforces the tier: every level's recorded player results are true and meet its band", () => {
+    for (const { level, generated: record } of generated) {
+      const report = collect.strategyReport(level);
+      expect(record.strategies.wins, level.id).toEqual(report.wins);
+      expect(record.strategies.randomRate, level.id).toBe(report.randomRate);
+      // The label is the piece's target tier, not whatever was written, and its band is met.
+      const id = level.subject!.id;
+      expect(record.tier, level.id).toBe(TARGET_TIER[id] ?? DEFAULT_TIER);
+      expect(checkStrategies(report, record.tier as Tier), level.id).toEqual([]);
     }
   });
 

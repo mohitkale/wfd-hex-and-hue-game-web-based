@@ -59,3 +59,12 @@ export {
   type GeneratorArt,
   type Profile,
 } from "./generator";
+export {
+  DETERMINISTIC_PLAYERS,
+  RANDOM_RUNS,
+  runPlayer,
+  strategyReport,
+  type PlayerId,
+  type RunResult,
+  type StrategyReport,
+} from "./players";

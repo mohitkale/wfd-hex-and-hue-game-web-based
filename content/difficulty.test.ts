@@ -7,9 +7,11 @@ import {
   TIERS,
   WORLD_WIN_SHARE_CAP,
   checkLevel,
+  checkStrategies,
   checkWorld,
   simpleWins,
   tierForLevel,
+  tiersSatisfied,
   type DeterministicId,
   type LevelMetrics,
   type Range,
@@ -230,6 +232,60 @@ describe("checkLevel", () => {
     expect(random[2]).toBeGreaterThan(random[3]!);
     expect(BANDS.hard.mustLose.length).toBeGreaterThan(BANDS.medium.mustLose.length);
     for (const id of BANDS.medium.mustLose) expect(BANDS.hard.mustLose).toContain(id);
+  });
+});
+
+describe("checkStrategies (the simple-player rules of a band)", () => {
+  const wins = (...winners: DeterministicId[]) =>
+    Object.fromEntries(
+      DETERMINISTIC_IDS.map((id) => [id, winners.includes(id)]),
+    ) as LevelMetrics["wins"];
+
+  it("agrees with checkLevel on the player rules for every tier and the good levels", () => {
+    for (const tier of TIERS) {
+      const m = good(tier);
+      expect(checkStrategies(m, tier)).toEqual([]);
+      const level = tier === "tutorial" ? 1 : undefined;
+      const viaLevel = checkLevel(m, tier, level).filter((p) =>
+        /^(simpleWins|randomRate|.* must (win|lose)|.* and .* must not both win)/.test(p),
+      );
+      expect(viaLevel).toEqual([]);
+    }
+  });
+
+  it("rejects medium and hard levels that column-spam wins", () => {
+    for (const tier of ["medium", "hard"] as const) {
+      for (const spam of ["first-front", "last-front", "round-robin"] as const) {
+        const problems = checkStrategies({ wins: wins(spam), randomRate: 0.2 }, tier);
+        expect(problems, `${tier} ${spam}`).toContain(`${spam} must lose ${tier} levels`);
+      }
+    }
+  });
+
+  it("does not penalise a clever human line: nothing here looks at the solver", () => {
+    // A hard level that no cheap player wins is accepted however winnable it is.
+    expect(checkStrategies({ wins: wins(), randomRate: 0.1 }, "hard")).toEqual([]);
+  });
+
+  it("lets tutorial and easy levels be easy, and shuts them out of medium", () => {
+    const easyPlay = { wins: allWin, randomRate: 0.95 };
+    expect(checkStrategies(easyPlay, "tutorial")).toEqual([]);
+    expect(checkStrategies(easyPlay, "easy").join()).toContain("simpleWins 9");
+    expect(checkStrategies(easyPlay, "medium").length).toBeGreaterThan(0);
+    expect(tiersSatisfied(easyPlay)).toEqual(["tutorial"]);
+    expect(tiersSatisfied({ wins: allLose, randomRate: 0.1 })).toEqual(["medium", "hard"]);
+    expect(
+      tiersSatisfied({
+        wins: wins("largest", "smallest", "tidy-left", "tidy-right"),
+        randomRate: 0.6,
+      }),
+    ).toEqual(["easy"]);
+    // Random win rate in the gap between tiers fits none.
+    expect(tiersSatisfied({ wins: allWin, randomRate: 0.5 })).toEqual([]);
+  });
+
+  it("treats a NaN random rate as a failure", () => {
+    expect(checkStrategies({ wins: allWin, randomRate: Number.NaN }, "tutorial")).not.toEqual([]);
   });
 });
 

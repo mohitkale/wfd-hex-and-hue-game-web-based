@@ -123,6 +123,21 @@
     "winnableOpenings": 3,
     "doomedOpenings": 0,
     "randomLoss": 0
+   },
+   "tier": "tutorial",
+   "strategies": {
+    "wins": {
+     "first-front": true,
+     "last-front": true,
+     "round-robin": true,
+     "tidy-left": true,
+     "tidy-right": true,
+     "largest": true,
+     "smallest": true,
+     "most-delivered": true,
+     "clears-capacity": true
+    },
+    "randomRate": 1
    }
   }
  },
@@ -240,6 +255,21 @@
     "winnableOpenings": 3,
     "doomedOpenings": 0,
     "randomLoss": 0
+   },
+   "tier": "tutorial",
+   "strategies": {
+    "wins": {
+     "first-front": true,
+     "last-front": true,
+     "round-robin": true,
+     "tidy-left": true,
+     "tidy-right": true,
+     "largest": true,
+     "smallest": true,
+     "most-delivered": true,
+     "clears-capacity": true
+    },
+    "randomRate": 1
    }
   }
  },
@@ -379,6 +409,21 @@
     "winnableOpenings": 3,
     "doomedOpenings": 0,
     "randomLoss": 0
+   },
+   "tier": "tutorial",
+   "strategies": {
+    "wins": {
+     "first-front": true,
+     "last-front": true,
+     "round-robin": true,
+     "tidy-left": true,
+     "tidy-right": true,
+     "largest": true,
+     "smallest": true,
+     "most-delivered": true,
+     "clears-capacity": true
+    },
+    "randomRate": 1
    }
   }
  },
@@ -502,6 +547,21 @@
     "winnableOpenings": 3,
     "doomedOpenings": 0,
     "randomLoss": 0
+   },
+   "tier": "tutorial",
+   "strategies": {
+    "wins": {
+     "first-front": true,
+     "last-front": true,
+     "round-robin": true,
+     "tidy-left": true,
+     "tidy-right": true,
+     "largest": true,
+     "smallest": true,
+     "most-delivered": true,
+     "clears-capacity": true
+    },
+    "randomRate": 1
    }
   }
  },
@@ -636,6 +696,21 @@
     "winnableOpenings": 4,
     "doomedOpenings": 0,
     "randomLoss": 0
+   },
+   "tier": "tutorial",
+   "strategies": {
+    "wins": {
+     "first-front": true,
+     "last-front": true,
+     "round-robin": true,
+     "tidy-left": true,
+     "tidy-right": true,
+     "largest": true,
+     "smallest": true,
+     "most-delivered": true,
+     "clears-capacity": true
+    },
+    "randomRate": 1
    }
   }
  },
@@ -695,29 +770,29 @@
    [
     {
      "color": 0,
-     "capacity": 29
+     "capacity": 36
     },
     {
      "color": 0,
-     "capacity": 21
-    },
-    {
-     "color": 3,
-     "capacity": 18
+     "capacity": 24
     },
     {
      "color": 0,
-     "capacity": 46
+     "capacity": 42
+    },
+    {
+     "color": 2,
+     "capacity": 49
     },
     {
      "color": 0,
-     "capacity": 76
+     "capacity": 43
     }
    ],
    [
     {
      "color": 2,
-     "capacity": 22
+     "capacity": 30
     },
     {
      "color": 4,
@@ -725,47 +800,51 @@
     },
     {
      "color": 0,
-     "capacity": 50
+     "capacity": 20
     },
     {
-     "color": 2,
-     "capacity": 34
+     "color": 1,
+     "capacity": 10
     },
     {
      "color": 0,
-     "capacity": 24
+     "capacity": 23
     }
    ],
    [
-    {
-     "color": 0,
-     "capacity": 38
-    },
-    {
-     "color": 0,
-     "capacity": 34
-    },
     {
      "color": 0,
      "capacity": 25
     },
     {
      "color": 0,
-     "capacity": 41
+     "capacity": 36
+    },
+    {
+     "color": 0,
+     "capacity": 43
+    },
+    {
+     "color": 0,
+     "capacity": 47
     }
    ],
    [
     {
      "color": 0,
-     "capacity": 72
+     "capacity": 43
     },
     {
-     "color": 2,
-     "capacity": 23
+     "color": 0,
+     "capacity": 39
     },
     {
-     "color": 1,
-     "capacity": 10
+     "color": 3,
+     "capacity": 18
+    },
+    {
+     "color": 0,
+     "capacity": 35
     }
    ]
   ],
@@ -782,21 +861,36 @@
   "generated": {
    "profile": "standard",
    "seed": 1,
-   "attempt": 4,
-   "score": 6.5,
+   "attempt": 7,
+   "score": 5.75,
    "metrics": {
     "cubes": 575,
-    "groups": 17,
+    "groups": 18,
     "openColors": 2,
     "buriedColors": 3,
     "depth": 12,
-    "parkers": 6,
+    "parkers": 5,
     "minSlots": 1,
     "slack": 1,
     "firstMoves": 4,
     "winnableOpenings": 4,
     "doomedOpenings": 0,
-    "randomLoss": 0.4166666666666667
+    "randomLoss": 0.3333333333333333
+   },
+   "tier": "easy",
+   "strategies": {
+    "wins": {
+     "first-front": true,
+     "last-front": false,
+     "round-robin": false,
+     "tidy-left": true,
+     "tidy-right": false,
+     "largest": true,
+     "smallest": true,
+     "most-delivered": true,
+     "clears-capacity": true
+    },
+    "randomRate": 0.85
    }
   }
  }
