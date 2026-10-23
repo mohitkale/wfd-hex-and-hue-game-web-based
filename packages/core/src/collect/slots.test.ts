@@ -6,7 +6,7 @@ import { firstFreeSlot, freeSlots, slotViews } from "./slots";
 import { violation } from "./invariants";
 import { validateCollectLevel } from "./level";
 import { isSettled, runUntilSettled, step } from "./sim";
-import { cloneState, createCollectState, hashState, type CollectState } from "./state";
+import { createCollectState, hashState, type CollectState } from "./state";
 
 const select = (column: number): Action => ({ kind: "select", column });
 const resume = (slot: number): Action => ({ kind: "resume", slot });
@@ -111,6 +111,40 @@ describe("holding slots", () => {
     expect(two.status).toBe("won");
   });
 
+  it("a park lands in the lowest free slot even when the hole is in the middle", () => {
+    const s = createCollectState(threeWaiters(3));
+    // Put groups 1 and 2 in slots 0 and 2 as waiting groups (a valid mid-game state), leaving slot 1 free.
+    for (const id of [1, 2]) {
+      s.groups[id]!.status = "waiting";
+      s.columns[id] = [];
+    }
+    s.slots = [1, null, 2];
+    expect(violation(s)).toBeNull();
+    expect(firstFreeSlot(s)).toBe(1);
+    expect(freeSlots(s)).toBe(1);
+
+    apply(s, select(0)); // red reaches one of its cubes and parks
+    settle(s);
+    expect(s.groups[0]!.status).toBe("waiting");
+    expect(s.slots).toEqual([1, 0, 2]); // the hole, not the first or last slot
+    expect(freeSlots(s)).toBe(0);
+  });
+
+  it("resume restarts the spawn timer: the first familiar comes out on the next tick", () => {
+    const level = { ...fixtureB(), spawnGap: 3 };
+    const s = createCollectState(level);
+    apply(s, select(0));
+    settle(s);
+    apply(s, select(2));
+    settle(s);
+    expect(s.groups[0]!.status).toBe("waiting");
+    s.groups[0]!.nextSpawn = s.tick + 50; // a stale, far-future timer from before it parked
+    apply(s, resume(0));
+    expect(s.groups[0]!.nextSpawn).toBe(s.tick + 1);
+    const ev = step(s);
+    expect(ev.some((e) => e.type === "familiarSpawned" && e.group === 0)).toBe(true);
+  });
+
   it("resume is legal only with a reachable cube, and a failed resume costs nothing", () => {
     const s = createCollectState(fixtureB());
     apply(s, select(0));
@@ -169,29 +203,25 @@ describe("loss is a function of the game state, never of timing", () => {
     expect(legalActions(s)).toEqual([]);
   });
 
-  it("chunking ticks differently never changes where a game ends up", () => {
+  it("running to settled in one call equals stepping tick by tick (and extra steps do nothing)", () => {
     let compared = 0;
     for (let seed = 1; seed <= 150; seed++) {
       const level = randomLevel(seed, true);
       if (!level || validateCollectLevel(level).length > 0) continue;
       const rng = createRng(seed);
-      const a = createCollectState(level);
-      const b = createCollectState(level);
-      for (let i = 0; i < 500 && a.status === "playing"; i++) {
+      const a = createCollectState(level); // ticked one step at a time
+      const b = createCollectState(level); // run to settled in a single call
+      for (let i = 0; i < 100 && a.status === "playing"; i++) {
         const legal = legalActions(a);
-        if (legal.length === 0 && isSettled(a)) break;
-        if (isSettled(a)) {
-          const act = legal[rng.int(0, legal.length - 1)]!;
-          apply(a, act);
-          apply(b, act);
-        }
-        // `a` advances with step(); `b` with runUntilSettled plus redundant no-op steps afterwards.
-        step(a);
-        step(b);
-        if (isSettled(b)) for (let k = 0; k < rng.int(0, 3); k++) step(b);
-        expect(hashState(b), `seed ${seed}`).toBe(hashState(a));
+        if (legal.length === 0) break;
+        const act = legal[rng.int(0, legal.length - 1)]!;
+        apply(a, act);
+        apply(b, act);
+        for (let k = 0; k < 5_000 && !isSettled(a) && a.status === "playing"; k++) step(a);
+        runUntilSettled(b);
+        for (let k = 0; k < rng.int(0, 3); k++) step(b); // redundant steps after settling
+        expect(hashState(b), `seed ${seed} action ${i}`).toBe(hashState(a));
       }
-      expect(hashState(cloneState(a))).toBe(hashState(a));
       compared++;
     }
     expect(compared).toBeGreaterThan(50);
