@@ -16,6 +16,7 @@ import { CompletionOverlay } from "./CompletionOverlay";
 import { ParticleLayer } from "./ParticleLayer";
 import { PanelsView, paintPanelFrames } from "./PanelsView";
 import { AmbientLayer } from "./ambient";
+import { atmosphereForTheme } from "./worldIdentity";
 import { bake } from "./bake";
 import { planCues, playCues, rejectionCue, type CueSinks } from "./cues";
 import { Emitter, Particles } from "./particles";
@@ -246,7 +247,17 @@ export class CollectScene extends Phaser.Scene {
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
     this.model.resync(state);
     this.emitter = new Emitter(new Particles(160), this.layout.cell, reduced);
-    this.ambient = new AmbientLayer(this, this.layout.frame, TEX.glow, reduced, this.layout.cell);
+    // Each world has its own atmosphere (docs/V2_WORLDS.md); a level without a known picture keeps the default.
+    const look = level.subject ? atmosphereForTheme(level.subject.theme) : undefined;
+    this.ambient = new AmbientLayer(
+      this,
+      this.layout.frame,
+      TEX.glow,
+      reduced,
+      this.layout.cell,
+      look,
+    );
+    this.cameras.main.setBackgroundColor(look?.backdrop ?? theme.night);
     this.cubes = new CubeLayer(
       this,
       this.layout,
