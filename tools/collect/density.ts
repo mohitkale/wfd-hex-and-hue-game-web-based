@@ -21,7 +21,11 @@ export const SIZES = [16, 24, 32, 36, 40];
 export const TICKS_PER_SECOND = 24;
 
 /** CSS pixels per cube (cell pitch, gap included) for a `size`×`size` board on a phone. */
-export function cubeCss(size: number, [, w, h, dpr]: [string, number, number, number]): number {
+export function cubeCss(
+  size: number,
+  [, w, h, dpr]: [string, number, number, number],
+  panels = { columns: 4, slots: 4, fieldCap: 4 },
+): number {
   const l = computeCollectLayout({
     width: Math.round(w * dpr),
     height: Math.round(h * dpr),
@@ -29,9 +33,7 @@ export function cubeCss(size: number, [, w, h, dpr]: [string, number, number, nu
     insets: { top: 0, right: 0, bottom: 0, left: 0 },
     boardWidth: size,
     boardHeight: size,
-    columns: 4,
-    slots: 4,
-    fieldCap: 4,
+    ...panels,
     portalX: Math.floor((size - 1) / 2),
   });
   return l.cell / dpr;

@@ -41,9 +41,9 @@ small, deliberate illustrations of witchy things, and must stay readable when ev
 - **A-03 [check]** At least 3 of the 4 corner cells are empty (the silhouette rule), and at least
   10 % of all cells are empty.
 - **Cube size (measured in M11.2, [V2_ART_DENSITY.md](V2_ART_DENSITY.md)):** width is the binding
-  side. Standard pieces (up to 32 per side) get at least 8.5 CSS px per cube on every phone from
-  320 px wide; hero pieces (up to 40) get 7 px on a 320 px phone and at least 8 px from 360 px
-  wide. So **32 is the working default and 40 is hero-only**, and a feature that must read
+  side. Standard pieces (up to 32 per side) get a cube pitch (cell including gap) of at least 8.5 CSS px on every
+  phone from 320 px wide; hero pieces (up to 40) get 7 px on a 320 px phone and at least 8 px from
+  360 px wide. So **32 is the working default and 40 is hero-only**, and a feature that must read
   (an eye, a rune) is at least 2×2 cells.
 - Play time is set by the level's squad, spawn gap and field cap as much as by the picture:
   a 32×32 test board (772 cubes) took 90 s for a bot that taps as soon as anything is legal and

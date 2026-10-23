@@ -71,6 +71,8 @@ function shadeErrors(shades: CellShades, families: number, cells: number[]): str
   const errors: string[] = [];
   const { colors, family, cells: look } = shades;
   const max = COLLECT_LIMITS.maxShades;
+  // Shades per family (1-5) is an art rule (ART_DIRECTION_V2 A-11) checked by the art pipeline,
+  // not here: the level model only bounds the total.
   if (colors.length < 1 || colors.length > max) errors.push(`shades must have 1..${max} colors`);
   colors.forEach((c, i) => {
     if (!HEX_COLOR.test(c)) errors.push(`shades.colors[${i}] "${c}" is not #rrggbb`);

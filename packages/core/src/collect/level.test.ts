@@ -6,6 +6,8 @@ import {
   validateCollectLevel,
   type CollectLevel,
 } from "./level";
+import { legalActions } from "./actions";
+import { CollectSession } from "./session";
 import { createCollectState, hashState } from "./state";
 import { paddedIndex } from "./grid";
 
@@ -141,8 +143,21 @@ describe("shades (display-only looks within a colour family)", () => {
     expect(validateCollectLevel(level).join()).toContain("shades must have");
   });
 
-  it("never changes the game: the state is identical with and without shades", () => {
-    const plain = fixtureB();
-    expect(hashState(createCollectState(shaded(plain)))).toBe(hashState(createCollectState(plain)));
+  it("never changes the game: the same taps give the same state, tick by tick, with and without", () => {
+    const run = (level: CollectLevel) => {
+      const session = new CollectSession(level);
+      const hashes: string[] = [];
+      for (let guard = 0; session.state.status === "playing" && guard < 5000; guard++) {
+        const legal = legalActions(session.state);
+        if (legal.length > 0) session.tap(legal[0]!);
+        else if (session.tick() === null) break;
+        hashes.push(hashState(session.state));
+      }
+      return { hashes, status: session.state.status };
+    };
+    const plain = run(fixtureB());
+    const withShades = run(shaded(fixtureB()));
+    expect(plain.hashes.length).toBeGreaterThan(5);
+    expect(withShades).toEqual(plain);
   });
 });

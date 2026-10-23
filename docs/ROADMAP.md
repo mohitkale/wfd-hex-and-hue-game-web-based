@@ -168,7 +168,7 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 
 - [ ] **M15.1** Comprehensive gameplay tests — Test every rule and the save/resume path. _Needs M14.5._
 - [ ] **M15.2** Gameplay regression and strategy testing — Validate every production level. _Needs M15.1._
-- [ ] **M15.3** Performance and compatibility — Measure frame time and compatibility. _Needs M15.1._
+- [ ] **M15.3** Performance and compatibility — Measure frame time and compatibility. Includes the on-device 60 fps measurement of the 32×32 shaded board (`?engine=v2&level=dense`) deferred from M11.2, which had no reference phone. _Needs M15.1._
 - [ ] **M15.4** Human playability validation **(human gate)** — Run and record a small session with first-time players. _Needs M15.2, M15.3._ Box ticked only when real findings are recorded (G3); stays unticked while awaiting humans.
 - [ ] **M15.5** Production readiness and release candidate **(human gate)** — Prepare v2.0.0 and stop for explicit approval before tagging or publishing. _Needs M15.4._ PR is not merged, and the box not ticked, until the user approves (G4).
 

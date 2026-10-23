@@ -20,6 +20,19 @@ describe("cube size on phones", () => {
   );
 });
 
+describe("cube size does not depend on the panels below the board", () => {
+  it("is the same with the most columns, slots and field tiles the engine allows", () => {
+    const most = {
+      columns: collect.COLLECT_LIMITS.maxColumns,
+      slots: collect.COLLECT_LIMITS.maxSlots,
+      fieldCap: collect.COLLECT_LIMITS.maxFieldCap,
+    };
+    for (const p of PHONES) {
+      for (const size of SIZES) expect(cubeCss(size, p, most)).toBe(cubeCss(size, p));
+    }
+  });
+});
+
 describe("the shaded density test orb", () => {
   it.each([24, 32, 40])("%i×%i is a valid level with valid shades", (size) => {
     const level = layeredOrb(size);

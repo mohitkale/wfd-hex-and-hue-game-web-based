@@ -31,8 +31,9 @@ columns, four slots, four field tiles:
 
 Width is the binding side everywhere (the board's height is never the limit for a square board).
 
-**Decision (initial, revisable after a real-phone test):** cubes are at least 7 CSS px on any
-supported phone and at least 8 px from 360 px wide; standard pieces stay at or below 32 per side
+**Decision (initial, revisable after a real-phone test):** the cube _pitch_ (cell including its gap)
+is at least 7 CSS px on any supported phone and at least 8 px from 360 px wide; the drawn cube is a
+device pixel smaller than the pitch (6.5 CSS px at the 320 px, 40-per-side worst case); standard pieces stay at or below 32 per side
 (at least 8.5 px everywhere); 40 is for hero pieces. The test suite fails if the layout ever drops
 below these numbers.
 
@@ -40,7 +41,7 @@ below these numbers.
 
 The test orb on the real engine at 24 ticks a second (1×), 6 colours, squad 5, spawn gap 1, four
 working groups, four slots. "Eager" taps the next group as soon as anything is legal; "settled"
-waits for the board to settle after every tap (the slowest a player could be):
+waits for the board to settle after every tap (a deliberately slow bot, not a bound: a person who thinks is slower):
 
 | Size  | Cubes | Eager bot | Settled bot |
 | ----- | ----- | --------- | ----------- |
@@ -52,8 +53,8 @@ waits for the board to settle after every tap (the slowest a player could be):
 
 The figures are bot times on a board whose groups are dealt outside-in so it is always finishable;
 they are not human times and exclude thinking. Two things to carry into M12: (1) time depends on
-squad, spawn gap and field cap as much as on cube count (the slice's 196 cubes took about 100 s with
-squad 3 and spawn gap 2), so pacing a large picture is a level-design parameter, not a reason to
+squad, spawn gap and field cap as much as on cube count (the slice's 196 cubes took about 100 s in
+its recorded demo line, with squad 3 and spawn gap 2; a recording, not a bot measurement), so pacing a large picture is a level-design parameter, not a reason to
 shrink art; (2) a piece of 700+ cubes needs a deliberate pacing answer (bigger squads, or more
 groups working at once), not the slice's settings.
 
