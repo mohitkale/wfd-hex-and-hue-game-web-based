@@ -15,7 +15,10 @@
 function isShell(file: string): boolean {
   return (
     file === "play/index.html" ||
-    file.startsWith("_astro/") ||
+    // The v2 review board (`?engine=v2`) is a separate chunk that players of the shipped game never
+    // load: precaching it would download it for everyone and change the worker version on every
+    // v2 deploy. It loads over the network when asked for. Removed from this rule at the v2 switch.
+    (file.startsWith("_astro/") && !file.startsWith("_astro/CollectScene.")) ||
     file.startsWith("icons/") ||
     file === "manifest.webmanifest" ||
     file === "favicon.svg"

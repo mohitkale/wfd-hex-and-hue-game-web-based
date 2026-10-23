@@ -27,10 +27,22 @@ export const BUDGETS: Budget[] = [
   {
     // Phaser is most of it (~390 KB gzip); the engine and scenes must stay lean around it.
     label: "play page JS",
-    match: (f) => f.path.startsWith("_astro/") && /\.js$/.test(f.path) && !/worker/.test(f.path),
+    match: (f) =>
+      f.path.startsWith("_astro/") &&
+      /\.js$/.test(f.path) &&
+      !/worker/.test(f.path) &&
+      !f.path.startsWith("_astro/CollectScene."),
     measure: "gzip",
     per: "total",
     max: 450 * KB,
+  },
+  {
+    // The v2 review board and engine (`?engine=v2`): its own allowance until v2 replaces v1.
+    label: "v2 collect chunk",
+    match: (f) => f.path.startsWith("_astro/CollectScene.") && /\.js$/.test(f.path),
+    measure: "gzip",
+    per: "total",
+    max: 40 * KB,
   },
   {
     label: "each HTML page",

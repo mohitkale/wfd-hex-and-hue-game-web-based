@@ -33,8 +33,23 @@ describe("performance budget", () => {
   });
 
   it("names the worst file for per-file budgets", () => {
-    const html = checkBudgets([file("a.html", 1_000), file("blog/big/index.html", 30_000)])[1]!;
+    const html = checkBudgets([file("a.html", 1_000), file("blog/big/index.html", 30_000)]).find(
+      (r) => r.label === "each HTML page",
+    )!;
     expect(html).toMatchObject({ ok: false, file: "blog/big/index.html" });
+  });
+
+  it("counts the v2 review chunk against its own limit, not the play JS total", () => {
+    const results = checkBudgets([
+      file("_astro/play.abc.js", 100_000),
+      file("_astro/CollectScene.xyz.js", 120_000),
+    ]);
+    const play = results.find((r) => r.label === "play page JS")!;
+    const v2 = results.find((r) => r.label === "v2 collect chunk")!;
+    expect(play.value).toBe(100_000);
+    expect(v2.value).toBe(120_000);
+    expect(v2.ok).toBe(false); // 120,000 bytes gzip-equivalent is over its 40 KB allowance
+    expect(play.ok).toBe(true);
   });
 
   it("keeps the hint worker out of the play JS total", () => {

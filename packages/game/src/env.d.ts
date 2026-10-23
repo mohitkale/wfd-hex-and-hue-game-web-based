@@ -5,4 +5,6 @@ interface ImportMetaEnv {
   readonly PUBLIC_POSTHOG_KEY?: string;
   /** PostHog host, e.g. https://eu.i.posthog.com (the default). */
   readonly PUBLIC_POSTHOG_HOST?: string;
+  /** "v2" selects the v2 board in a review build (see collect/engineFlag.ts). */
+  readonly PUBLIC_ENGINE?: string;
 }
