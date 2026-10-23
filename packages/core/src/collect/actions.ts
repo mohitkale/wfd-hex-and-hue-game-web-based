@@ -1,3 +1,4 @@
+import { hasSealedAccessible } from "./seals";
 import { hasAssignable } from "./targeting";
 import type { CollectEvent } from "./events";
 import type { CollectState } from "./state";
@@ -14,7 +15,9 @@ export type ActionCheck =
   /** `fieldCap` groups are already working. */
   | "fieldFull"
   /** The group has no assignable cube right now. */
-  | "noReachableCube";
+  | "noReachableCube"
+  /** Its reachable cubes are all wax-sealed until a key colour is gathered (M13.4). */
+  | "sealed";
 
 export class IllegalActionError extends Error {
   constructor(
@@ -39,7 +42,9 @@ export function explain(s: CollectState, a: Action): ActionCheck {
   let working = 0;
   for (const g of s.groups) if (g.status === "working") working++;
   if (working >= s.params.fieldCap) return "fieldFull";
-  return hasAssignable(s, s.groups[id]!.color) ? "ok" : "noReachableCube";
+  const color = s.groups[id]!.color;
+  if (hasAssignable(s, color)) return "ok";
+  return hasSealedAccessible(s, color) ? "sealed" : "noReachableCube";
 }
 
 /** Legal actions in the canonical order: column fronts by column, then waiting groups by slot. */

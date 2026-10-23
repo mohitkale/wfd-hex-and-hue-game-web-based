@@ -1,6 +1,6 @@
 import { EMPTY } from "../level";
 import { computeDist, padCells, paddedIndex, topologyFor, type Topology } from "./grid";
-import { defaultPortalX, type CollectLevel } from "./level";
+import { defaultPortalX, type CollectLevel, type SealSpec } from "./level";
 
 /** Level constants copied into the state so every function needs only the state. Never mutated. */
 export interface CollectParams {
@@ -14,6 +14,8 @@ export interface CollectParams {
   squad: number;
   spawnGap: number;
   fieldCap: number;
+  /** Sealed cubes (M13.4) as padded cell indices; absent on levels without any, so older states are unchanged. */
+  seals?: SealSpec[];
 }
 
 export type GroupStatus = "queued" | "working" | "waiting" | "completed";
@@ -105,6 +107,14 @@ export function createCollectState(level: CollectLevel): CollectState {
       squad: level.squad,
       spawnGap: level.spawnGap,
       fieldCap: level.fieldCap,
+      ...(level.seals && level.seals.length > 0
+        ? {
+            seals: level.seals.map((s) => ({
+              key: s.key,
+              cells: s.cells.map((c) => paddedIndex(stride, c % width, Math.floor(c / width))),
+            })),
+          }
+        : {}),
     },
     tick: 0,
     status: "playing",
@@ -130,6 +140,8 @@ export function createCollectState(level: CollectLevel): CollectState {
 export interface Caches {
   /** `accessible[color]` = cube cells (padded) with at least one reachable neighbour. */
   accessible: Set<number>[];
+  /** Padded cell → key colour of its seal, or null on a level without seals. Never changes. */
+  sealKey: Map<number, number> | null;
 }
 
 const caches = new WeakMap<CollectState, Caches>();
@@ -151,7 +163,12 @@ function buildCaches(s: CollectState): Caches {
       }
     }
   }
-  return { accessible };
+  let sealKey: Map<number, number> | null = null;
+  if (s.params.seals) {
+    sealKey = new Map();
+    for (const seal of s.params.seals) for (const cell of seal.cells) sealKey.set(cell, seal.key);
+  }
+  return { accessible, sealKey };
 }
 
 /** The caches of `s`, built from `grid` and `dist` on first use. */
@@ -177,7 +194,8 @@ export function cloneState(s: CollectState): CollectState {
     familiars: s.familiars.map((f) => ({ ...f, route: f.route.slice() })),
   };
   const c = caches.get(s);
-  if (c) caches.set(copy, { accessible: c.accessible.map((set) => new Set(set)) });
+  if (c)
+    caches.set(copy, { accessible: c.accessible.map((set) => new Set(set)), sealKey: c.sealKey });
   return copy;
 }
 
@@ -199,6 +217,20 @@ function checkShape(s: CollectState): void {
     if (!isInt(p[k]) || p[k] < 1) fail(`params.${k} must be an integer ≥ 1`);
   }
   if (p.width > 40 || p.height > 40) fail("params.width/height exceed 40");
+  if (p.seals !== undefined) {
+    if (
+      !Array.isArray(p.seals) ||
+      !p.seals.every(
+        (v) =>
+          isRecord(v) &&
+          isInt(v.key) &&
+          v.key >= 0 &&
+          Array.isArray(v.cells) &&
+          v.cells.every((c) => isInt(c) && c >= 0 && c < (p.width + 2) * (p.height + 2)),
+      )
+    )
+      fail("params.seals must be a list of {key, cells}");
+  }
   if (p.stride !== p.width + 2) fail("params.stride must be width + 2");
   const cells = p.stride * (p.height + 2);
   if (!isInt(p.portal) || p.portal < 0 || p.portal >= cells) fail("params.portal out of range");

@@ -30,6 +30,7 @@
     "solver:report": "tsx tools/collect/solverReport.ts",
     "strategy:report": "tsx tools/collect/strategyReport.ts",
     "measures:report": "tsx tools/collect/measuresReport.ts",
+    "seals:report": "tsx tools/collect/sealReport.ts",
     "levels:report": "tsx tools/collect/levelsV2.ts --report",
     "levels:check": "tsx tools/collect/levelsV2.ts --check",
     "audit:v1": "tsx tools/audit/run.ts",

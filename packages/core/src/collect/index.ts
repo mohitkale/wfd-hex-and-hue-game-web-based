@@ -7,7 +7,16 @@ export {
   type CollectLevel,
   type LevelSubject,
   type GroupSpec,
+  type SealSpec,
 } from "./level";
+export {
+  hasSealedAccessible,
+  keyCleared,
+  openingSealed,
+  sealGate,
+  sealKeyAt,
+  sealedCells,
+} from "./seals";
 export {
   cloneState,
   createCollectState,

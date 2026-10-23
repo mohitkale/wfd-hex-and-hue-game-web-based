@@ -37,6 +37,15 @@ export interface LevelSubject {
   lore: string;
 }
 
+/**
+ * Wax seals (M13.4): the cubes at `cells` (unpadded indices into `CollectLevel.cells`) cannot be
+ * collected until every group of colour `key` has completed. See `seals.ts` and docs/V2_VARIETY.md.
+ */
+export interface SealSpec {
+  key: number;
+  cells: number[];
+}
+
 /** A v2 level as authored and shipped (docs/V2_PROTOTYPE_SPEC.md §2). */
 export interface CollectLevel {
   id: string;
@@ -60,6 +69,8 @@ export interface CollectLevel {
   fieldCap: number;
   /** Portal column in `[0, width - 1]`; default `floor((width - 1) / 2)`. */
   portalX?: number;
+  /** Optional sealed cubes; absent means every cube can be collected as soon as it is reachable. */
+  seals?: SealSpec[];
   /** Optional per-cube look within each family; absent means every cube is its family colour. */
   shades?: CellShades;
   /** Optional: which picture this is, so a win can reveal it and unlock it in the Spellbook. */
@@ -113,6 +124,42 @@ function shadeErrors(shades: CellShades, families: number, cells: number[]): str
       errors.push(
         `shades.cells[${i}]: shade ${s} belongs to family ${family[s]}, the cube is ${c}`,
       );
+    }
+  });
+  return errors;
+}
+
+/** Problems with a level's seals (call only on a level whose colours and capacities are valid). */
+function sealErrors(level: CollectLevel): string[] {
+  const errors: string[] = [];
+  const seals = level.seals!;
+  if (!Array.isArray(seals)) return ["seals must be an array"];
+  const colors = level.palette.length;
+  const present = new Set<number>();
+  for (const c of level.cells) if (c !== EMPTY) present.add(c);
+  const sealed = new Set<number>();
+  seals.forEach((seal, i) => {
+    if (
+      !seal ||
+      !isInt(seal.key) ||
+      seal.key < 0 ||
+      seal.key >= colors ||
+      !Array.isArray(seal.cells)
+    ) {
+      errors.push(`seals[${i}] must be {key, cells}`);
+      return;
+    }
+    if (!present.has(seal.key)) errors.push(`seals[${i}]: key colour ${seal.key} has no cubes`);
+    if (seal.cells.length === 0) errors.push(`seals[${i}] seals no cubes`);
+    for (const cell of seal.cells) {
+      if (!isInt(cell) || cell < 0 || cell >= level.cells.length || level.cells[cell] === EMPTY) {
+        errors.push(`seals[${i}]: cell ${cell} is not a cube`);
+        continue;
+      }
+      if (level.cells[cell] === seal.key)
+        errors.push(`seals[${i}]: cell ${cell} is sealed by its own colour`);
+      if (sealed.has(cell)) errors.push(`seals[${i}]: cell ${cell} is sealed twice`);
+      sealed.add(cell);
     }
   });
   return errors;
@@ -192,6 +239,7 @@ export function validateCollectLevel(level: CollectLevel): string[] {
       }
     });
   }
+  if (errors.length === 0 && level.seals) errors.push(...sealErrors(level));
   if (errors.length === 0 && legalActions(createCollectState(level)).length === 0) {
     errors.push("no front group has an accessible cube: the level has no legal first action");
   }
@@ -250,6 +298,20 @@ export function parseCollectLevel(json: unknown): CollectLevel {
       theme: text("theme"),
       lore: text("lore"),
     };
+  }
+  if (o.seals !== undefined) {
+    if (!Array.isArray(o.seals)) fail("seals must be an array");
+    level.seals = (o.seals as unknown[]).map((v, i): SealSpec => {
+      const ss = v as Record<string, unknown> | null;
+      if (
+        !ss ||
+        typeof ss.key !== "number" ||
+        !Array.isArray(ss.cells) ||
+        !ss.cells.every((c) => typeof c === "number")
+      )
+        fail(`seals[${i}] must be {key, cells}`);
+      return { key: ss!.key as number, cells: (ss!.cells as number[]).slice() };
+    });
   }
   if (o.shades !== undefined) {
     const sh = o.shades as Record<string, unknown> | null;

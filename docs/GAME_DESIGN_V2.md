@@ -219,6 +219,30 @@ A familiar must be able to walk to a neighbouring cell, so a cube behind another
 is unreachable until the blockers go. Removing an outer cube always opens exactly the cell it
 occupied, which is how interior cubes get exposed.
 
+## 4b. Wax seals (M13.4)
+
+An optional level feature (`seals: {key, cells[]}[]`, docs/V2_VARIETY.md). Levels without it behave
+exactly as §4 to §10 say; its state carries no `seals` field.
+
+- A **sealed cube** is a cube like any other (it occupies its cell, blocks walking and is counted),
+  but it is **not assignable** while any group of its **key** colour has not completed: it is skipped
+  by target selection (§4) and does not count for "has an assignable cube" (§6, §7 Phase 3).
+- A seal lifts when **every group of the key colour is `completed`** and never returns. The lift is
+  visible to Phase 3 pass 2 (stall) of the **same tick** the key group completes in pass 1, and to the
+  next tick's Phase 2. So a sealed-colour group that ran dry on that tick is not parked (it keeps
+  working and spawns again next tick); one that was already parked is never resumed automatically,
+  only by a player `resume` (§5).
+- So a group of a partly sealed colour can start, deliver what is not sealed and run dry with capacity
+  left: it parks (§5), exactly as if the rest were hidden. If all its reachable cubes are sealed the
+  tap is refused with reason `sealed` (distinct from `noReachableCube`).
+- Validity: every sealed cell holds a cube, is sealed once, and its key is a different colour that has
+  cubes. A level whose every opening is sealed has no legal first action and is rejected (R-20).
+- Invariants are unchanged (R-18 counts sealed cubes as unreserved board cubes). The solver needs no
+  new state: at a settled state "every group of the key completed" is a function of the solver's
+  state key (no queued or waiting group of that colour is left).
+- A **colour-wide lock** (a whole colour unselectable until a key is gathered) was tried and
+  rejected: it only removes options, so every simple strategy still wins (docs/V2_VARIETY.md §2).
+
 ## 5. Groups, columns, field and slots
 
 | State       | Where   | Meaning                                                                                        |
