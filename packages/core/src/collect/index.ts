@@ -46,3 +46,16 @@ export {
   type SolveResult,
   type Verdict,
 } from "./solver";
+export {
+  PROFILES,
+  generateLevel,
+  peel,
+  randomLossRate,
+  reachableByColor,
+  score as generatorScore,
+  type GenMetrics,
+  type GenerateOptions,
+  type Generated,
+  type GeneratorArt,
+  type Profile,
+} from "./generator";

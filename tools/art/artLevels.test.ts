@@ -2,7 +2,11 @@ import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { pieces } from "../../content/v2art";
-import { decodeArtLevel, encodeArtLevel } from "../../packages/game/src/collect/artLevelCodec";
+import {
+  decodeArtLevel,
+  encodeArtLevel,
+  type ArtLevelData,
+} from "../../packages/game/src/collect/artLevelCodec";
 import {
   ART_LEVELS,
   ART_PIECE_IDS,
@@ -27,8 +31,15 @@ const withoutShades = (level: collect.CollectLevel): collect.CollectLevel => {
 
 /** M11.5: every art piece is a playable level whose win reveals it and unlocks it in the Spellbook. */
 
+/** The committed levels and generation records (regenerating all six takes about half a minute). */
+const committed = (JSON.parse(readFileSync(OUTPUT, "utf8")) as ArtLevelData[]).map((d) => ({
+  level: decodeArtLevel(d),
+  generated: d.generated!,
+}));
+
 describe("the art library's preview levels", () => {
-  const levels = artLevels();
+  const generated = committed;
+  const levels = generated.map((g) => g.level);
 
   it("has one valid, winnable level per piece, with its shades and subject", () => {
     expect(levels.map((l) => l.id)).toEqual(pieces.map((p) => `art-${p.id}`));
@@ -41,8 +52,8 @@ describe("the art library's preview levels", () => {
   });
 
   it("the committed JSON is current (run `npm run art:levels` after changing art)", () => {
-    expect(readFileSync(OUTPUT, "utf8")).toBe(serialize(levels));
-  });
+    expect(readFileSync(OUTPUT, "utf8")).toBe(serialize(artLevels()));
+  }, 300_000);
 
   it("the game's registry plays them: ?level=art-<id>, and the finished picture is reachable by id", () => {
     expect(ART_PIECE_IDS).toEqual(pieces.map((p) => p.id));
@@ -51,6 +62,19 @@ describe("the art library's preview levels", () => {
       expect(artLevelForPiece(p.id)?.subject?.name).toBe(p.name);
     }
     expect(artLevelForPiece("no-such-piece")).toBeNull();
+  });
+
+  it("records how each level was generated, and the record is true (profile limits, slots, openings)", () => {
+    for (const { level, generated: record } of generated) {
+      const spec = collect.PROFILES[record.profile as collect.Profile];
+      expect(spec, level.id).toBeDefined();
+      const m = record.metrics;
+      expect(m.parkers, level.id).toBeGreaterThanOrEqual(spec.minParkers);
+      expect(m.winnableOpenings, level.id).toBeGreaterThanOrEqual(spec.minOpenings);
+      expect(level.slots, level.id).toBe(Math.min(8, m.minSlots + spec.slack));
+      expect(collect.minSlots(level, 200_000).slots, level.id).toBe(m.minSlots);
+      expect(m.cubes).toBe(level.cells.filter((c) => c >= 0).length);
+    }
   });
 
   it("round-trips through the compact encoding exactly", () => {
@@ -69,12 +93,12 @@ describe("the art library's preview levels", () => {
 
 describe("effect selection by subject", () => {
   it("every piece of the set gets its theme's own effect, not the fallback", () => {
-    for (const level of artLevels()) {
+    for (const { level } of committed) {
       const effect = effectForTheme(level.subject!.theme);
       expect(effect.id, level.id).not.toBe("bloom");
     }
     const byTheme = new Map(
-      artLevels().map((l) => [l.subject!.theme, effectForTheme(l.subject!.theme).id]),
+      committed.map(({ level: l }) => [l.subject!.theme, effectForTheme(l.subject!.theme).id]),
     );
     expect(byTheme.get("moon")).toBe("illuminate");
     expect(byTheme.get("ritual")).toBe("bubbles");
@@ -86,7 +110,7 @@ describe("effect selection by subject", () => {
 
 describe("a win unlocks the picture in the Spellbook", () => {
   it("winning a level and recording it unlocks exactly that piece, with its lore on hand", () => {
-    for (const level of artLevels()) {
+    for (const { level } of committed) {
       expect(botPlay(level, true).status).toBe("won");
       const { book, isNew } = recordWin(emptySpellbook(), level.subject!.id, 123);
       expect(isNew).toBe(true);
@@ -98,7 +122,7 @@ describe("a win unlocks the picture in the Spellbook", () => {
   });
 
   it("losing never unlocks anything (a loss is not recorded)", () => {
-    const level = artLevels()[0]!;
+    const level = committed[0]!.level;
     const session = new collect.CollectSession(level);
     expect(session.state.status).toBe("playing");
     expect(isUnlocked(emptySpellbook(), level.subject!.id)).toBe(false);
@@ -107,7 +131,7 @@ describe("a win unlocks the picture in the Spellbook", () => {
 
 describe("the finished picture", () => {
   it("paints each cube in its shade, falling back to the family colour without shades", () => {
-    const level = artLevels()[0]!;
+    const level = committed[0]!.level;
     const i = level.cells.findIndex((c) => c >= 0);
     expect(cellColor(level, i)).toBe(
       parseInt(level.shades!.colors[level.shades!.cells[i]!]!.slice(1), 16),
@@ -124,6 +148,6 @@ describe("the finished picture", () => {
   });
 
   it("fits any piece on a phone-sized card", () => {
-    for (const level of artLevels()) expect(fitCell(level, 300, 200)).toBeGreaterThanOrEqual(5);
+    for (const { level } of committed) expect(fitCell(level, 300, 200)).toBeGreaterThanOrEqual(5);
   });
 });
