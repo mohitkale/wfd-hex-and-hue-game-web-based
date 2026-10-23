@@ -131,9 +131,10 @@ describe("loss is a function of the game state, never of timing", () => {
     settle(s);
     apply(s, select(1));
     let lostAt = -1;
-    while (s.status === "playing" && s.tick < 100) {
+    for (let i = 0; i < 100 && lostAt === -1; i++) {
       step(s);
-      if (s.status === "lost") lostAt = s.tick;
+      // `status` is re-read each tick (the loop condition would narrow it to "playing").
+      if ((s.status as string) === "lost") lostAt = s.tick;
     }
     expect(lostAt).toBe(10);
     expect(s.lossReason).toBe("slotsFull");
