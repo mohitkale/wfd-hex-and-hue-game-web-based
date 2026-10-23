@@ -34,3 +34,4 @@ export { computeDist, paddedIndex, topologyFor } from "./grid";
 export type { CollectEvent, LossReason, TickBatch } from "./events";
 export { groupViews, remaining, uncommitted, type GroupView } from "./groups";
 export { firstFreeSlot, freeSlots, slotViews, type SlotView } from "./slots";
+export { CollectSession, ReplayError, replay, type LogEntry, type ReplayResult } from "./session";
