@@ -57,8 +57,8 @@ try {
       maxFamilies: int("max-families", 8, 1, 8),
       maxMeanError: int("max-error", 45, 1, 400),
     });
-    const author = flags.get("author")?.trim();
-    if (!author) fail('--families needs --author "Name" (who drew it)');
+    const author =
+      flags.get("author")?.trim() || fail('--families needs --author "Name" (who drew it)');
     console.log(toPieceSource(name, result, author));
     console.error(
       `${result.width}×${result.height}, ${Object.keys(result.legend).length} shades; ` +

@@ -10,7 +10,7 @@ the tooling.
 | ----------------- | ----------------------------- | --------------------------------------------------------------------------- |
 | Piece model       | `tools/art/piece.ts`          | Rows + a legend of (family, shade role) + provenance                        |
 | House families    | `tools/art/families.ts`       | 10 ramps (deep, shade, base, light, glint); a test pins them to the doc     |
-| Rules             | `tools/art/rules.ts`          | A-01..A-34 (20 checks, one warning) and the provenance rules                |
+| Rules             | `tools/art/rules.ts`          | A-01..A-35 (21 checks, one warning) and the provenance rules                |
 | Library check     | `tools/art/artcheck.ts`       | `npm run art:check` (part of `npm run verify`)                              |
 | Review sheet      | `tools/art/sheet.ts`          | `npm run art:sheet` → `dist/art-sheet.html`; `renderPng` for committed PNGs |
 | Production import | `tools/art/importFamilies.ts` | `npm run art:import -- art.png id --families --author "Name"`               |
@@ -43,15 +43,32 @@ the board panel colour to them.
 - **Provenance:** no author; a source other than `hand-drawn`, `imported-png` or `generated-draft`;
   a licence outside the closed list; a lore line that is empty, over 140 characters or a `TODO`; a
   malformed id.
-- **Review:** `reviewed: true` needs a named reviewer and a date, and **CI, a solver, a simulated
-  player or the model itself is never a reviewer** (the check rejects those names). A
-  `generated-draft` can be neither reviewed nor shipped: generated shapes are sketches.
+- **Review:** `reviewed: true` needs a named reviewer, a real date and a `reviewedHash` equal to
+  `contentHash(piece)`, so **changing the picture after approval fails the check until a human
+  reviews it again** (the failure prints the new hash). CI, solvers, simulated players and the model
+  are never reviewers: the check rejects those names, but see the limits below. A `generated-draft`
+  can be neither reviewed nor shipped: generated shapes are sketches.
+- **Placeholders:** an author or lore that is `unknown`, `TODO`, `imported` and the like fails.
 - **Shipping:** every id in `SHIPPED` must exist, be reviewed, and not be a generated draft.
 
 **Warnings** (listed, not failing): A-17 (a pair of families that collapse under deuteranopia and
 cannot be told apart by value; the colour-blind symbols cover it), and a shipped piece whose licence
 is still `original-owner-pending`. The second is a reminder for the release gate (G4): the repository
 has no licence file yet and the choice is the owner's.
+
+## Limits, stated plainly
+
+- `reviewed`, `reviewedBy`, `reviewedOn` and `reviewedHash` are plain data in the repository. The name
+  filter is a **tripwire**, not proof of a human: anyone who commits can type a plausible name. The
+  real protection is the human gates (G2, G4) and a person reading the pull request that sets those
+  fields. Per the project rules, only the owner's approval in chat leads to `reviewed: true`.
+- `SHIPPED` is a hand-edited list in `content/v2art/index.ts`; nothing yet links a world to it (worlds
+  arrive in M13.1, which must derive or test that every piece a world uses is listed).
+- Until the owner chooses a licence, a shipped piece with `original-owner-pending` is only a
+  warning. `npm run art:check -- --release` makes it an error: run it at the release gate (G4).
+- `features` (deliberate one-cell details) is bounded by A-35, but choosing what is a feature is a
+  judgement the reviewer sees on the sheet.
+- `import --families` prints a rule report for a draft and never sets the exit code.
 
 ## Not checked
 
