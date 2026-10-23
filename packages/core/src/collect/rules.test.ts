@@ -8,12 +8,11 @@ import { violation } from "./invariants";
 import { validateCollectLevel, type CollectLevel } from "./level";
 import { replay } from "./session";
 import { isSettled, runUntilSettled, step } from "./sim";
-import { createCollectState, type CollectState } from "./state";
+import { cachesOf, createCollectState, type CollectState } from "./state";
 import { nearestTarget } from "./targeting";
 import { bruteSolve, playLine } from "./testing";
 
 const select = (column: number): Action => ({ kind: "select", column });
-const resume = (slot: number): Action => ({ kind: "resume", slot });
 
 function settle(s: CollectState): CollectEvent[] {
   const out: CollectEvent[] = [];
@@ -44,11 +43,6 @@ describe("edge cases R-01 … R-20 (GAME_DESIGN_V2 §4a), by id", () => {
     expect(s.dist[hiddenRed]).toBe(-1);
   });
 
-  it("R-03 and R-04 and R-05: see sim.test.ts (channel, pocket, diagonal)", () => {
-    // Labelled here so the traceability check below finds them; the boards are in sim.test.ts.
-    expect(true).toBe(true);
-  });
-
   it("R-06: several familiars of one group reserve different cubes and may share a cell", () => {
     const s = createCollectState(fixtureC(3));
     apply(s, select(0));
@@ -60,50 +54,31 @@ describe("edge cases R-01 … R-20 (GAME_DESIGN_V2 §4a), by id", () => {
     expect(reserved.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("R-07: see sim.test.ts (fixture E) — the lower group id reserves, the other parks", () => {
-    const s = createCollectState(fixtureE());
-    apply(s, select(0));
-    apply(s, select(1));
-    step(s);
-    expect(s.groups[1]!.status).toBe("waiting");
-  });
-
   it("R-10: a cube behind a chain of cubes is reached only after each link is removed", () => {
-    // Yellow sits behind blue A behind blue B (bottom row, touching the ring).
-    const level = board(
-      ["BBB", "BYB", "BBB", "BXB"],
-      [
-        [["B", 8]],
-        [
-          ["X", 1],
-          ["Y", 1],
-        ],
-      ],
-      {
-        colors: "BYX",
-        slots: 2,
-        squad: 1,
-        spawnGap: 1,
-      },
-    );
+    // Y sits in the middle of a solid 5×5 block: all four of its neighbours are interior cubes.
+    const rows = ["BBBBB", "BBBBB", "BBYBB", "BBBBB", "BBBBB"];
+    const level = board(rows, [[["B", 24]], [["Y", 1]]], { colors: "BY", squad: 1, spawnGap: 1 });
+    expect(validateCollectLevel(level)).toEqual([]);
     const s = createCollectState(level);
-    const yellow = paddedIndex(5, 1, 1);
-    expect(level.palette).toHaveLength(3);
+    const t = topologyFor(5, 5);
+    const yellow = paddedIndex(7, 2, 2);
+    const around = [0, 1, 2, 3].map((k) => t.neighbors[yellow * 4 + k]!);
+    const blueAccessible = (cell: number) => cachesOf(s).accessible[0]!.has(cell);
+    expect(around.every((c) => !blueAccessible(c))).toBe(true); // none of its neighbours is reachable yet
+
     apply(s, select(0));
-    let seenAccessible: number | null = null;
-    for (let i = 0; i < 400 && !isSettled(s); i++) {
-      step(s);
+    let pickups = 0;
+    let pickupsWhenAccessible = -1;
+    for (let i = 0; i < 2_000 && s.groups[0]!.status === "working"; i++) {
+      for (const e of step(s)) if (e.type === "cubePickedUp") pickups++;
+      expect(violation(s)).toBeNull();
       const accessible = nearestTarget(s, 1) !== null;
-      if (accessible && seenAccessible === null) {
-        seenAccessible = s.tick;
-        // At that moment one of yellow's four neighbours (all blue) has been removed.
-        const t = topologyFor(3, 4);
-        const open = [0, 1, 2, 3].filter((k) => s.grid[t.neighbors[yellow * 4 + k]!] === -1);
-        expect(open.length).toBeGreaterThanOrEqual(1);
-      }
-      if (seenAccessible === null) expect(nearestTarget(s, 1)).toBeNull();
+      if (pickupsWhenAccessible === -1 && accessible) pickupsWhenAccessible = pickups;
+      if (pickupsWhenAccessible === -1) expect(accessible).toBe(false);
     }
-    expect(seenAccessible).not.toBeNull();
+    // One removal (an edge cube) cannot expose it; a neighbour must itself become reachable first.
+    expect(pickupsWhenAccessible).toBeGreaterThanOrEqual(2);
+    expect(s.groups[0]!.status).toBe("completed");
   });
 
   it("R-11: a route is fixed when assigned and never changes while the familiar uses it", () => {
@@ -203,15 +178,20 @@ describe("edge cases R-01 … R-20 (GAME_DESIGN_V2 §4a), by id", () => {
   });
 
   it("R-18/R-19: the capacity identity and reservation integrity hold on every tick of every fixture", () => {
+    let played = 0;
     for (const level of [fixtureA(), fixtureB(), fixtureC(3), fixtureD(), fixtureE()]) {
       const s = createCollectState(level);
       for (let guard = 0; guard < 50 && s.status === "playing"; guard++) {
         const legal = legalActions(s);
         if (legal.length === 0) break;
         apply(s, legal[0]!);
+        // `settle` also checks `violation(s)` (identity R-18, one reserver per cube R-19) per tick.
         settle(s);
+        expect(violation(s), `${level.id} tick ${s.tick}`).toBeNull();
+        played++;
       }
     }
+    expect(played).toBeGreaterThan(10);
   });
 
   it("R-20: a level with no legal first action is rejected", () => {
@@ -226,6 +206,81 @@ describe("edge cases R-01 … R-20 (GAME_DESIGN_V2 §4a), by id", () => {
       { colors: "BR" },
     );
     expect(validateCollectLevel(level).join()).toContain("no legal first action");
+  });
+});
+
+describe("a loss freezes the tick (GAME_DESIGN_V2 §7 Phase 3)", () => {
+  it("when two groups run dry in the same tick with no free slot, only the first is reported lost", () => {
+    // Symmetric about the portal, so both groups deliver their one reachable cube at the same tick.
+    const level = board(
+      ["BBBBBBB", "BRBBBYB", "BBBBBBB", "BRBBBYB"],
+      [[["R", 2]], [["Y", 2]], [["B", 24]]],
+      { colors: "BRY", slots: 1, squad: 3, spawnGap: 1, portalX: 3 },
+    );
+    expect(validateCollectLevel(level)).toEqual([]);
+    const s = createCollectState(level);
+    s.slots[0] = 99; // another group already holds the only slot (hand-built state)
+    apply(s, select(0));
+    apply(s, select(1));
+    const lost: CollectEvent[] = [];
+    for (let i = 0; i < 200 && s.status === "playing"; i++) {
+      lost.push(...step(s).filter((e) => e.type === "lost"));
+    }
+    expect(lost).toEqual([{ type: "lost", reason: "slotsFull", group: 0 }]);
+    // The second group was never processed: it is still working, not parked, and the state is frozen.
+    expect(s.groups[1]!.status).toBe("working");
+    expect(s.slots).toEqual([99]);
+    const tick = s.tick;
+    expect(step(s)).toEqual([]);
+    expect(s.tick).toBe(tick);
+  });
+});
+
+describe("the test solver itself is sound", () => {
+  it("memoised search gives the same answer as an unmemoised reference on 150 small levels", () => {
+    let solved = 0;
+    let unsolvable = 0;
+    for (let seed = 1; seed <= 2000 && solved + unsolvable < 150; seed++) {
+      const level = randomLevel(seed, seed % 2 === 0);
+      if (!level || validateCollectLevel(level).length > 0) continue;
+      const groups = level.columns.reduce((n, c) => n + c.length, 0);
+      if (groups > 6) continue; // keep the unmemoised tree small
+      const memo = bruteSolve(level, 200_000, true);
+      const plain = bruteSolve(level, 200_000, false);
+      if (memo.status === "unknown" || plain.status === "unknown") continue;
+      expect(memo.status, `seed ${seed}`).toBe(plain.status);
+      if (memo.status === "solved") solved++;
+      else unsolvable++;
+    }
+    expect(solved).toBeGreaterThan(40);
+    expect(unsolvable).toBeGreaterThanOrEqual(5);
+  });
+
+  it("reports unknown, not unsolvable, when the node budget runs out", () => {
+    const result = bruteSolve(fixtureB(), 1);
+    expect(result.status).toBe("unknown");
+    expect(result.line).toBeNull();
+    expect(result.nodes).toBeLessThanOrEqual(1);
+  });
+
+  it("the unsolvable verdict comes from exhausting a real tree, not from one short branch", () => {
+    // Two different first moves, both dead ends, each reached through a different state.
+    const level = board(
+      ["BBBBBBB", "BBBBBBB", "BBBBBBB", "BBBRBBB", "BBBBBBB", "BBBBBBB", "BBBBBBB"],
+      [
+        [["B", 2]],
+        [["B", 2]],
+        [
+          ["R", 1],
+          ["B", 44],
+        ],
+      ],
+      { colors: "BR", slots: 2 },
+    );
+    const result = bruteSolve(level);
+    expect(result.status).toBe("unsolvable");
+    expect(result.nodes).toBeGreaterThanOrEqual(3);
+    expect(result.losses).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -318,7 +373,7 @@ describe("no invisible or teleported pickups, no duplicate collection", () => {
     const s = createCollectState(level);
     const events: CollectEvent[] = [];
     const cellOf = new Map<number, number>(); // familiar id -> current cell
-    const snapshots: { e: CollectEvent; at: Map<number, number>; grid: number[] }[] = [];
+    const snapshots: { e: CollectEvent; at: Map<number, number> }[] = [];
     for (let i = 0; i < 20_000 && s.status === "playing"; i++) {
       if (isSettled(s) || rng.next() < 0.15) {
         const legal = legalActions(s);
@@ -326,7 +381,7 @@ describe("no invisible or teleported pickups, no duplicate collection", () => {
       }
       const t = step(s);
       for (const e of t) {
-        snapshots.push({ e, at: new Map(cellOf), grid: s.grid.slice() });
+        snapshots.push({ e, at: new Map(cellOf) });
         if (e.type === "familiarSpawned") cellOf.set(e.familiar, s.params.portal);
         if (e.type === "familiarMoved") cellOf.set(e.familiar, e.to);
         if (e.type === "familiarRetired") cellOf.delete(e.familiar);
@@ -342,16 +397,39 @@ describe("no invisible or teleported pickups, no duplicate collection", () => {
     if (level && validateCollectLevel(level).length === 0) levels.push(level);
   }
 
-  it("every move is a single step between open neighbouring cells", () => {
+  it("every familiar starts at the portal and each move starts where the last ended, one step at a time", () => {
+    let moves = 0;
     levels.forEach((level, i) => {
-      const { s, events } = allEvents(level, 6000 + i);
+      const { s, snapshots } = allEvents(level, 6000 + i);
       const t = topologyFor(level.width, level.height);
-      for (const e of events) {
+      for (const { e, at } of snapshots) {
         if (e.type !== "familiarMoved") continue;
+        // Continuity: the familiar was exactly where this move says it starts (the portal at spawn).
+        expect(at.get(e.familiar), `${level.id}: familiar ${e.familiar} teleported`).toBe(e.from);
         const adjacent = [0, 1, 2, 3].some((k) => t.neighbors[e.from * 4 + k] === e.to);
         expect(adjacent, `${level.id}: ${e.from} -> ${e.to} is not one step`).toBe(true);
+        moves++;
       }
       expect(s.status).not.toBe("playing");
+    });
+    expect(moves).toBeGreaterThan(1000);
+  });
+
+  it("familiars only ever stand on cells that are open at that moment", () => {
+    levels.forEach((level, i) => {
+      const rng = createRng(6500 + i);
+      const s = createCollectState(level);
+      for (let k = 0; k < 20_000 && s.status === "playing"; k++) {
+        if (isSettled(s) || rng.next() < 0.15) {
+          const legal = legalActions(s);
+          if (legal.length > 0) apply(s, legal[rng.int(0, legal.length - 1)]!);
+        }
+        step(s);
+        for (const f of s.familiars) {
+          if (f.status === "idle") continue;
+          expect(s.grid[f.route[f.at]!], `${level.id} tick ${s.tick}`).toBe(-1);
+        }
+      }
     });
   });
 
@@ -445,8 +523,8 @@ describe("win is on delivery, and big boards finish", () => {
     apply(s, select(0));
     apply(s, select(1));
     settle(s);
-    expect(s.status === "won" || s.status === "playing").toBe(true);
-    expect(s.deliveredTotal + s.grid.filter((c) => c !== -1).length).toBe(36);
-    expect(resume(0)).toEqual({ kind: "resume", slot: 0 });
+    expect(s.status).toBe("won");
+    expect(s.deliveredTotal).toBe(36);
+    expect(s.groups.map((g) => g.delivered)).toEqual([18, 18]);
   });
 });

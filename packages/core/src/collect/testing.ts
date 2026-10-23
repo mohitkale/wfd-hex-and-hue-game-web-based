@@ -1,6 +1,6 @@
 import { apply, legalActions, type Action } from "./actions";
 import type { CollectLevel } from "./level";
-import { CollectSession, type LogEntry } from "./session";
+import { CollectSession } from "./session";
 import { isSettled, runUntilSettled } from "./sim";
 import { cloneState, createCollectState, stateKey } from "./state";
 
@@ -15,11 +15,15 @@ export interface BruteResult {
   line: Action[] | null;
   /** Nodes expanded. */
   nodes: number;
-  /** Distinct losing leaves met (a lower bound on how many ways there are to fail). */
+  /** Losing transitions met while searching (not distinct: the loss path is not memoised). */
   losses: number;
 }
 
-export function bruteSolve(level: CollectLevel, maxNodes = 50_000): BruteResult {
+/**
+ * `memo: false` disables the `stateKey` memoisation: an exponential reference search used to check
+ * that the memo never changes an answer (small levels only).
+ */
+export function bruteSolve(level: CollectLevel, maxNodes = 50_000, memo = true): BruteResult {
   const root = createCollectState(level);
   const seen = new Set<string>();
   const path: Action[] = [];
@@ -45,9 +49,11 @@ export function bruteSolve(level: CollectLevel, maxNodes = 50_000): BruteResult 
         losses++;
         continue;
       }
-      const key = stateKey(next);
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (memo) {
+        const key = stateKey(next);
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
       path.push(action);
       if (search(next)) return true;
       path.pop();
@@ -72,5 +78,3 @@ export function playLine(level: CollectLevel, line: readonly Action[]): CollectS
   }
   return session;
 }
-
-export type { LogEntry };
