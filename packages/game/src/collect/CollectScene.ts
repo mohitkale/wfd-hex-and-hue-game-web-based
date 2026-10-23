@@ -11,7 +11,8 @@ import { CubeLayer } from "./CubeLayer";
 import { FamiliarLayer } from "./FamiliarLayer";
 import { PanelsView, paintPanelFrames } from "./PanelsView";
 import { bake } from "./bake";
-import { cellCenter, computeCollectLayout, type CollectLayout } from "./collectLayout";
+import { cellCenter, computeCollectLayout, hudButtonX, type CollectLayout } from "./collectLayout";
+import { RingStats } from "./profile";
 import { tonesFor } from "./cubePaint";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { levelFromSearch } from "./levels";
@@ -19,6 +20,9 @@ import { TickClock } from "./tickClock";
 import { VisualModel } from "./visuals";
 
 type CollectState = collect.CollectState;
+
+/** HUD buttons: undo, retry, speed. The baked circles and the tap zones share `hudButtonX`. */
+const HUD_BUTTONS = 3;
 
 const REASON_TEXT: Record<Exclude<collect.ActionCheck, "ok">, string> = {
   gameOver: "The game is over",
@@ -53,14 +57,7 @@ export class CollectScene extends Phaser.Scene {
   /** Colour-blind mode (M6.5): each colour also shows its symbol. `?cb=1` forces it for review. */
   private colorblind = false;
   /** `?profile=1`: records the CPU time of every `update` so a build can be measured (see perf()). */
-  private profile: {
-    ms: Float32Array;
-    render: Float32Array;
-    n: number;
-    rn: number;
-    ticks: number;
-    started: number;
-  } | null = null;
+  private profile: { update: RingStats; render: RingStats; ticks: number } | null = null;
 
   constructor() {
     super("collect");
@@ -85,6 +82,15 @@ export class CollectScene extends Phaser.Scene {
       this.session.onReplace(() => this.rebuild()),
     );
     this.scale.on("resize", this.rebuild, this);
+    // A restored WebGL context loses the contents of render textures (the baked board and cubes):
+    // redraw everything from the session's state.
+    const renderer = this.game.renderer;
+    if (renderer.type === Phaser.WEBGL) {
+      renderer.on(Phaser.Renderer.Events.RESTORE_WEBGL, this.rebuild, this);
+      this.events.once("shutdown", () =>
+        renderer.off(Phaser.Renderer.Events.RESTORE_WEBGL, this.rebuild, this),
+      );
+    }
     this.events.once("shutdown", () => {
       this.scale.off("resize", this.rebuild, this);
       for (const u of this.unsubscribe) u();
@@ -107,22 +113,12 @@ export class CollectScene extends Phaser.Scene {
     );
     fadeIn(this);
     if (params.get("profile") === "1") {
-      const profile = {
-        ms: new Float32Array(2400),
-        render: new Float32Array(2400),
-        n: 0,
-        rn: 0,
-        ticks: 0,
-        started: performance.now(),
-      };
+      const profile = { update: new RingStats(), render: new RingStats(), ticks: 0 };
       this.profile = profile;
       // CPU time Phaser spends submitting a frame (independent of vsync and of the GPU).
       let renderStart = 0;
       const onPre = () => (renderStart = performance.now());
-      const onPost = () => {
-        profile.render[profile.rn % profile.render.length] = performance.now() - renderStart;
-        profile.rn++;
-      };
+      const onPost = () => profile.render.push(performance.now() - renderStart);
       this.game.events.on(Phaser.Core.Events.PRE_RENDER, onPre);
       this.game.events.on(Phaser.Core.Events.POST_RENDER, onPost);
       this.events.once("shutdown", () => {
@@ -246,15 +242,17 @@ export class CollectScene extends Phaser.Scene {
     paintPanelFrames(g, l, dpr);
     const cy = l.hud.y + l.hud.h / 2;
     const size = Math.round(36 * dpr);
-    for (let i = 0; i < 3; i++) {
-      const x = l.frame.x + l.frame.w - 14 * dpr - size / 2 - (2 - i) * (size + 8 * dpr);
+    for (let i = 0; i < HUD_BUTTONS; i++) {
+      const x = hudButtonX(l, i, HUD_BUTTONS);
       g.fillStyle(theme.dusk, 1);
       g.fillCircle(x, cy, size / 2);
       g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
       g.strokeCircle(x, cy, size / 2);
     }
+    // Only the area with static content (HUD, board, field and slot rows), not the columns below.
+    const bottom = Math.max(...l.slots.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
     const rt = this.add
-      .renderTexture(l.frame.x, l.frame.y, l.frame.w, l.frame.h)
+      .renderTexture(l.frame.x, l.frame.y, l.frame.w, bottom - l.frame.y)
       .setOrigin(0, 0)
       .setDepth(0);
     rt.draw(g, -l.frame.x, -l.frame.y);
@@ -327,8 +325,7 @@ export class CollectScene extends Phaser.Scene {
       [`${this.speed}×`, () => this.toggleSpeed()],
     ];
     buttons.forEach(([label, onPress], i) => {
-      const x =
-        l.frame.x + l.frame.w - 14 * dpr - size / 2 - (buttons.length - 1 - i) * (size + 8 * dpr);
+      const x = hudButtonX(l, i, buttons.length);
       const text = this.add
         .text(x, cy, label, {
           fontFamily: theme.font,
@@ -468,10 +465,7 @@ export class CollectScene extends Phaser.Scene {
       this.clock.tickMs / this.speed,
     );
     this.cubes.flush();
-    if (this.profile) {
-      this.profile.ms[this.profile.n % this.profile.ms.length] = performance.now() - profileStart;
-      this.profile.n++;
-    }
+    this.profile?.update.push(performance.now() - profileStart);
   }
 
   /**
@@ -481,30 +475,21 @@ export class CollectScene extends Phaser.Scene {
    */
   perf(): Record<string, unknown> {
     const p = this.profile;
-    const frames = p ? Math.min(p.n, p.ms.length) : 0;
-    const pct = (arr: number[], q: number) =>
-      arr.length ? +arr[Math.min(arr.length - 1, Math.floor(arr.length * q))]!.toFixed(3) : null;
-    const renders = p
-      ? Array.from(p.render.subarray(0, Math.min(p.rn, p.render.length))).sort((a, b) => a - b)
-      : [];
-    const sorted = p ? Array.from(p.ms.subarray(0, frames)).sort((a, b) => a - b) : [];
-    const at = (q: number) =>
-      sorted.length
-        ? +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]!.toFixed(3)
-        : null;
+    const upd = p?.update.summary();
+    const ren = p?.render.summary();
     const s = this.session.state;
-    const live = [...this.model.familiars.values()].filter((v) => v.mode !== "retiring").length;
     return {
-      frames,
-      updateMsMedian: at(0.5),
-      updateMsP95: at(0.95),
-      updateMsMax: at(1),
-      renderSubmitMsMedian: pct(renders, 0.5),
-      renderSubmitMsP95: pct(renders, 0.95),
-      renderSubmitMsMax: pct(renders, 1),
+      frames: p?.update.size ?? 0,
+      updateMsMedian: upd?.median ?? null,
+      updateMsP95: upd?.p95 ?? null,
+      updateMsMax: upd?.max ?? null,
+      renderSubmitMsMedian: ren?.median ?? null,
+      renderSubmitMsP95: ren?.p95 ?? null,
+      renderSubmitMsMax: ren?.max ?? null,
       ticksRun: p?.ticks ?? 0,
       familiarsLive: s.familiars.length,
-      familiarsDrawn: live,
+      // Sprites actually on screen (attached to a familiar, not retiring), counted by the layer.
+      familiarsDrawn: this.familiars.stats.live,
       spritesCreated: this.familiars.stats.created,
       peakFamiliars: this.familiars.stats.peakLive,
       maxPossible: s.params.squad * s.params.fieldCap,
@@ -516,8 +501,14 @@ export class CollectScene extends Phaser.Scene {
       tick: s.tick,
       delivered: s.deliveredTotal,
       cubesTotal: s.cubesTotal,
-      countsMatch: live === s.familiars.length,
+      countsMatch: this.familiars.stats.live === s.familiars.length,
     };
+  }
+
+  /** Clears the profiler's samples (call after selecting groups so idle frames do not skew them). */
+  resetProfile(): void {
+    this.profile?.update.clear();
+    this.profile?.render.clear();
   }
 
   // -------------------------------------------------------------------------------------------

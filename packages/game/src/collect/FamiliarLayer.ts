@@ -8,7 +8,16 @@ import { TEX } from "../view/textures";
 import { bake } from "./bake";
 import { paintCube, type CubeTones } from "./cubePaint";
 import { FAMILIAR_H, FAMILIAR_W, FRAME_NAMES, badgeRect, type FrameName } from "./familiarArt";
-import { CellSpreader, drift, hover as hoverOf, popDuration } from "./swarm";
+import {
+  CellSpreader,
+  drawnCoord,
+  drift,
+  ease,
+  hover as hoverOf,
+  interpolate,
+  popDuration,
+  type Offset,
+} from "./swarm";
 import { frameFor, type FamiliarVisual, type VisualModel } from "./visuals";
 
 type CollectEvent = collect.CollectEvent;
@@ -23,6 +32,13 @@ interface Entry {
   mark: Phaser.GameObjects.Image | null;
   retiring: boolean;
   popping: boolean;
+  /** Per-familiar constants (drift, hover, pop length), set once when the entry is attached to an id. */
+  drift: Offset;
+  hoverPhase: number;
+  hoverRate: number;
+  popMs: number;
+  /** The eased crowd offset (cells) currently applied, so it glides instead of snapping. */
+  spread: number;
   /** Pickup lift: the carried cube rises from the cube's cell to above the head (decorative, timed). */
   liftFromX: number;
   liftFromY: number;
@@ -55,7 +71,7 @@ export class FamiliarLayer {
   /** One baked texture per palette colour for the carried and delivered cube. */
   private readonly cubeKeys: string[];
   /** Counters for the profiler (`?profile=1`): sprites ever created, and the live/pooled counts. */
-  readonly stats = { created: 0, peakLive: 0 };
+  readonly stats = { created: 0, peakLive: 0, live: 0 };
   /** Called when a cube lands in the portal: (palette index, group id). */
   onDelivered: (colorIndex: number, group: number) => void = () => undefined;
 
@@ -131,6 +147,11 @@ export class FamiliarLayer {
       cubeColor: -1,
       retiring: false,
       popping: false,
+      drift: { x: 0, y: 0 },
+      hoverPhase: 0,
+      hoverRate: 1,
+      popMs: 140,
+      spread: 0,
       liftFromX: 0,
       liftFromY: 0,
       liftUntil: 0,
@@ -184,35 +205,47 @@ export class FamiliarLayer {
     spreader.finish();
     if (this.model.familiars.size > this.stats.peakLive)
       this.stats.peakLive = this.model.familiars.size;
+    let live = 0;
     for (const v of this.model.familiars.values()) {
       let e = this.entries.get(v.id);
       if (!e) {
         e = this.acquire();
         this.entries.set(v.id, e);
-        if (!this.reduced && !quiet && v.mode !== "retiring") this.popIn(e, s, popDuration(v.id));
+        e.drift = drift(v.id);
+        const h = hoverOf(v.id);
+        e.hoverPhase = h.phase;
+        e.hoverRate = h.rate;
+        e.popMs = popDuration(v.id);
+        e.spread = spreader.offset(v.id);
+        if (!this.reduced && !quiet && v.mode !== "retiring") this.popIn(e, s, e.popMs);
       }
       const frame = this.frameNames[v.colorIndex]![FRAME_INDEX[frameFor(v, tick)]]!;
       if (e.img.frame.name !== frame) e.img.setFrame(frame);
 
-      // Position: interpolate along this tick's move, otherwise stand on the cell.
-      let x = this.cx(v.to);
-      let y = this.cy(v.to);
-      if (v.mode === "walk" || v.mode === "carry") {
-        const t = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
-        x = this.cx(v.from) + (x - this.cx(v.from)) * t;
-        y = this.cy(v.from) + (y - this.cy(v.from)) * t;
-      }
-      // Each familiar keeps its own small drift off the cell centre and shares a crowded cell
-      // with others; none of it is game state, and reduced motion keeps it (it is not motion).
-      const d = drift(v.id);
-      x += (d.x + spreader.offset(v.id)) * cell;
-      y += d.y * cell;
+      // Position: interpolate along this tick's move, otherwise stand on the cell. Each familiar
+      // keeps its own drift off the centre and glides to its share of a crowded cell (cosmetic
+      // only; reduced motion keeps it, as it is placement, not motion).
+      const moving = v.mode === "walk" || v.mode === "carry";
+      const toX = this.cx(v.to);
+      const toY = this.cy(v.to);
+      e.spread = ease(e.spread, spreader.offset(v.id));
+      const x = drawnCoord(
+        moving ? interpolate(this.cx(v.from), toX, alpha) : toX,
+        e.drift.x,
+        e.spread,
+        cell,
+      );
+      const y = drawnCoord(
+        moving ? interpolate(this.cy(v.from), toY, alpha) : toY,
+        e.drift.y,
+        0,
+        cell,
+      );
       // A gentle hover while moving or waiting, out of step between familiars; none for reduced motion.
-      const h = hoverOf(v.id);
       const hover =
         this.reduced || v.mode === "pickup" || v.mode === "deliver"
           ? 0
-          : Math.sin((timeMs / 110) * h.rate + h.phase) * s * 0.7;
+          : Math.sin((timeMs / 110) * e.hoverRate + e.hoverPhase) * s * 0.7;
       e.img.setPosition(x, y + hover);
       if (!e.retiring && !e.popping) e.img.setScale(s);
       e.shadow.setPosition(x, y + s * 2.2);
@@ -244,6 +277,7 @@ export class FamiliarLayer {
       }
       if (e.chest) this.placeChest(e, v, frameFor(v, tick), x, y + hover);
       if (v.mode === "retiring" && !e.retiring) this.retire(v.id, e);
+      if (!e.retiring) live++;
     }
     // Sprites whose familiar vanished from the model (restart/undo) are released.
     for (const [id, e] of this.entries) {
@@ -252,6 +286,7 @@ export class FamiliarLayer {
         this.entries.delete(id);
       }
     }
+    this.stats.live = live;
     if (this.quietFrames > 0) this.quietFrames--;
   }
 
@@ -285,7 +320,7 @@ export class FamiliarLayer {
   private popIn(e: Entry, s: number, ms: number): void {
     e.popping = true;
     e.img.setScale(s * 0.2);
-    e.shadow.setAlpha(0);
+    e.shadow.setDisplaySize(s * 2, s).setAlpha(0);
     this.scene.tweens.add({
       targets: e.img,
       scale: s,

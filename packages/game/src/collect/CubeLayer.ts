@@ -45,7 +45,7 @@ export class CubeLayer {
   private paintAll(scene: Phaser.Scene): void {
     const started = performance.now();
     const { cell, stride } = this.layout;
-    const g = scene.add.graphics();
+    const g = scene.make.graphics({}, false);
     for (let i = 0; i < this.grid.length; i++) {
       const color = this.grid[i]!;
       if (color < 0) continue;

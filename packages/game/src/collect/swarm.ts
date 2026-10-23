@@ -39,10 +39,36 @@ export function popDuration(id: number): number {
   return Math.round(120 + unit(id, 5) * 50);
 }
 
+/** Linear interpolation with `t` clamped to 0..1 (progress through a tick). */
+export function interpolate(from: number, to: number, t: number): number {
+  const k = t < 0 ? 0 : t > 1 ? 1 : t;
+  return from + (to - from) * k;
+}
+
 /**
- * Spreads familiars that are drawn on the same cell so they do not hide each other: the k-th of n
- * (in the order they are added, which the layer keeps in ascending id) gets a horizontal offset in
- * [-spread, +spread] cells. Reuses its maps, so calling it every frame allocates nothing.
+ * Where a familiar is drawn along one axis, in pixels: the cell centre plus its own drift and its
+ * share of a crowded cell (both in cells). Pure and scalar, so the layer calls it for x and y every
+ * frame without allocating.
+ */
+export function drawnCoord(
+  center: number,
+  driftCells: number,
+  spreadCells: number,
+  cellPx: number,
+): number {
+  return center + (driftCells + spreadCells) * cellPx;
+}
+
+/** Moves `current` a fraction of the way to `target` (eases the crowd offset instead of snapping). */
+export function ease(current: number, target: number, rate = 0.25): number {
+  return current + (target - current) * rate;
+}
+
+/**
+ * Spreads familiars that are drawn on the same cell so they overlap less: the k-th of n (in the order
+ * they are added) gets a horizontal offset in [-spread, +spread] cells. It reduces exact stacking
+ * but does not remove overlap: sprites are wider than a cell. Reuses its maps, so calling it every
+ * frame allocates nothing new once warm.
  */
 export class CellSpreader {
   private readonly total = new Map<number, number>();

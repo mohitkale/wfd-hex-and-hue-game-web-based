@@ -128,3 +128,15 @@ export function cellCenter(layout: CollectLayout, idx: number): { x: number; y: 
 export function spriteScaleForCell(cell: number, spriteWidth = 16): number {
   return clamp(Math.round((cell * 1.6) / spriteWidth), 1, 6);
 }
+
+/** Centre x of HUD button `index` of `count` (right-aligned, 8 css px apart); shared by the baked circles and the tap zones. */
+export function hudButtonX(layout: CollectLayout, index: number, count: number): number {
+  const size = Math.round(36 * layout.dpr);
+  return (
+    layout.frame.x +
+    layout.frame.w -
+    14 * layout.dpr -
+    size / 2 -
+    (count - 1 - index) * (size + 8 * layout.dpr)
+  );
+}
