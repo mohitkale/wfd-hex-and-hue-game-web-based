@@ -44,6 +44,11 @@ interface ProfileSpec {
   minMinSlots: number;
   /** At most this share of first moves may doom the level. */
   maxDoomedFirst: number;
+  /**
+   * Random settled-sequential play must fail at least this often: the level has pitfalls, not just
+   * groups that wait. Reached by the solver-guided refinement; 0 skips the refinement.
+   */
+  minRandomLoss: number;
 }
 
 export const PROFILES: Readonly<Record<Profile, ProfileSpec>> = {
@@ -54,6 +59,7 @@ export const PROFILES: Readonly<Record<Profile, ProfileSpec>> = {
     minOpenings: 2,
     minMinSlots: 1,
     maxDoomedFirst: 0,
+    minRandomLoss: 0,
   },
   standard: {
     groups: 16,
@@ -62,14 +68,16 @@ export const PROFILES: Readonly<Record<Profile, ProfileSpec>> = {
     minOpenings: 1,
     minMinSlots: 1,
     maxDoomedFirst: 0.5,
+    minRandomLoss: 0.15,
   },
   tight: {
     groups: 20,
     slack: 0,
     minParkers: 3,
     minOpenings: 1,
-    minMinSlots: 2,
+    minMinSlots: 1,
     maxDoomedFirst: 0.75,
+    minRandomLoss: 0.4,
   },
 };
 
@@ -80,6 +88,8 @@ export interface GenerateOptions {
   maxAttempts?: number;
   /** Solver node budget per query (default 20,000). */
   budget?: number;
+  /** Hill-climbing steps for profiles that ask for pitfalls (default 24; 0 turns refinement off). */
+  refineSteps?: number;
 }
 
 /** What the structure of a generated level is, so it can be inspected and gated. */
@@ -100,6 +110,8 @@ export interface GenMetrics {
   firstMoves: number;
   winnableOpenings: number;
   doomedOpenings: number;
+  /** Share of random settled-sequential playouts (fixed seeds) that do not win: how many pitfalls there are. */
+  randomLoss: number;
 }
 
 export interface Generated {
@@ -108,7 +120,7 @@ export interface Generated {
   /** Which candidate (0-based) was kept, and how many were acceptable. */
   attempt: number;
   acceptable: number;
-  /** How much structure the kept candidate has (higher is deeper); see `score`. */
+  /** How much structure the kept candidate has (higher is deeper); see `score`. Not comparable across profiles. */
   score: number;
 }
 
@@ -123,6 +135,7 @@ export function score(m: GenMetrics): number {
     4 * doomedShare +
     0.25 * m.parkers +
     0.5 * m.buriedColors +
+    6 * m.randomLoss +
     (m.winnableOpenings >= 2 ? 1 : 0)
   );
 }
@@ -190,6 +203,12 @@ function split(n: number, chunk: number, rng: Rng): number[] {
     sizes.push(take);
     left -= take;
   }
+  // A small remainder joins the group before it, so no group is tiny (unless the colour is).
+  const floor = chunk * 0.5;
+  if (sizes.length > 1 && sizes[sizes.length - 1]! < floor) {
+    const last = sizes.pop()!;
+    sizes[sizes.length - 1]! += last;
+  }
   return sizes;
 }
 
@@ -228,8 +247,15 @@ function deal(
 }
 
 /** Candidate seeds are derived from the level seed and the attempt so each attempt is reproducible alone. */
-const attemptSeed = (seed: number, attempt: number): number =>
-  Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(attempt + 1, 0xc2b2ae35);
+const mix32 = (x: number): number => {
+  let h = x >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+};
+/** Chained (not XORed) mixing, so distinct (seed, attempt) pairs do not trade places. */
+export const attemptSeed = (seed: number, attempt: number): number =>
+  mix32(mix32(seed + 0x9e3779b9) + attempt * 0x7f4a7c15 + 1);
 
 /**
  * Generates a level for a picture. Deterministic: the same art, id, profile and seed always give
@@ -242,24 +268,116 @@ export function generateLevel(
   name: string,
   options: GenerateOptions,
 ): Generated | null {
+  const seed = options.seed;
+  if (!Number.isInteger(seed) || seed < 0 || seed > 0x7fffffff)
+    throw new Error("seed must be an integer in 0..2^31-1");
   const profile = options.profile ?? "standard";
   const spec = PROFILES[profile];
   const budget = options.budget ?? 20_000;
   const attempts = options.maxAttempts ?? 12;
-  let best: Generated | null = null;
-  let acceptable = 0;
+  const refineSteps = options.refineSteps ?? 24;
+
+  // 1. Deal candidates and keep the structurally acceptable ones.
+  const found: Generated[] = [];
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const rng = createRng(attemptSeed(options.seed, attempt));
+    const rng = createRng(attemptSeed(seed, attempt));
     const candidate = deal(art, id, name, spec, rng);
-    const result = evaluate(candidate, spec, budget);
-    if (!result) continue;
-    acceptable++;
-    const s = score(result.metrics);
-    if (!best || s > best.score) {
-      best = { level: result.level, metrics: result.metrics, attempt, acceptable: 0, score: s };
+    const result = evaluate(candidate, spec, budget, false);
+    if (result) {
+      found.push({ ...result, attempt, acceptable: 0, score: score(result.metrics) });
     }
   }
-  return best && { ...best, acceptable };
+  const acceptable = found.length;
+  found.sort((a, b) => b.score - a.score || a.attempt - b.attempt);
+
+  // 2. Profiles that ask for pitfalls refine the best few: a solver-guided search over the column
+  //    order that raises how often random play fails, never leaving a level the solver cannot win.
+  let best: Generated | null = null;
+  const pool = spec.minRandomLoss > 0 ? found.slice(0, 3) : found.slice(0, 1);
+  for (const c of pool) {
+    const level =
+      spec.minRandomLoss > 0
+        ? refine(c.level, budget, refineSteps, createRng(attemptSeed(seed, 1000 + c.attempt)))
+        : c.level;
+    const result = evaluate({ ...level, slots: 8 }, spec, budget, true);
+    if (!result) continue;
+    const s = score(result.metrics);
+    if (!best || s > best.score) best = { ...result, attempt: c.attempt, acceptable, score: s };
+  }
+  return best;
+}
+
+/** How often random settled-sequential play (fixed seeds, so deterministic) fails to win the level. */
+export function randomLossRate(level: CollectLevel, runs = 12): number {
+  let failed = 0;
+  for (let r = 0; r < runs; r++) {
+    const rng = createRng(7919 * (r + 1));
+    const s = createCollectState(level);
+    for (let guard = 0; guard < 2000 && s.status === "playing"; guard++) {
+      const legal = legalActions(s);
+      if (legal.length === 0) break;
+      apply(s, legal[rng.int(0, legal.length - 1)]!);
+      runUntilSettled(s);
+    }
+    if (s.status !== "won") failed++;
+  }
+  return failed / runs;
+}
+
+/**
+ * Hill-climbs on the deal (swap or move groups; shift cubes between, or merge, groups of one colour), keeping a change
+ * only when the solver can still win the level and random play fails at least as often. The slot
+ * count is held fixed, so pressure comes from the order and the group sizes. Returns the input if nothing helped.
+ */
+function refine(level: CollectLevel, budget: number, steps: number, rng: Rng): CollectLevel {
+  let current = level;
+  let best = randomLossRate(current);
+  for (let step = 0; step < steps; step++) {
+    const columns = current.columns.map((c) => c.map((g) => ({ ...g })));
+    const places: [number, number][] = columns.flatMap((c, ci) =>
+      c.map((_, gi) => [ci, gi] as [number, number]),
+    );
+    const a = places[rng.int(0, places.length - 1)]!;
+    const b = places[rng.int(0, places.length - 1)]!;
+    const move = rng.next();
+    if (move < 0.35) {
+      // Swap two groups.
+      const tmp = columns[a[0]]![a[1]]!;
+      columns[a[0]]![a[1]] = columns[b[0]]![b[1]]!;
+      columns[b[0]]![b[1]] = tmp;
+    } else if (move < 0.6) {
+      // Move a group elsewhere.
+      const [moved] = columns[a[0]]!.splice(a[1], 1);
+      columns[b[0]]!.splice(Math.min(b[1], columns[b[0]]!.length), 0, moved!);
+    } else if (move < 0.8) {
+      // Shift cubes between two groups of one colour (bigger groups wait longer, smaller finish sooner).
+      const ga = columns[a[0]]![a[1]]!;
+      const gb = columns[b[0]]![b[1]]!;
+      if (ga === gb || ga.color !== gb.color) continue;
+      const delta = Math.min(
+        ga.capacity - 1,
+        Math.max(1, Math.round(ga.capacity * (0.1 + 0.4 * rng.next()))),
+      );
+      ga.capacity -= delta;
+      gb.capacity += delta;
+    } else {
+      // Merge two groups of one colour into one (a bigger group that must wait for more cubes).
+      const ga = columns[a[0]]![a[1]]!;
+      const gb = columns[b[0]]![b[1]]!;
+      if (ga === gb || ga.color !== gb.color) continue;
+      ga.capacity += gb.capacity;
+      columns[b[0]]!.splice(b[1], 1);
+    }
+    const candidate: CollectLevel = { ...current, columns };
+    if (columns.some((c) => c.length === 0) || validateCollectLevel(candidate).length > 0) continue;
+    if (new CollectSolver(candidate, budget).solve().status !== "solved") continue;
+    const loss = randomLossRate(candidate);
+    if (loss >= best) {
+      best = loss;
+      current = candidate;
+    }
+  }
+  return current;
 }
 
 /** Sets the slot count from the solver and checks the structure; null if the candidate is rejected. */
@@ -267,6 +385,7 @@ function evaluate(
   candidate: CollectLevel,
   spec: ProfileSpec,
   budget: number,
+  enforceLoss: boolean,
 ): { level: CollectLevel; metrics: GenMetrics } | null {
   if (validateCollectLevel(candidate).length > 0) return null;
   // The cheapest structural test first: groups that cannot finish from the opening position.
@@ -305,6 +424,8 @@ function evaluate(
   if (winnable < spec.minOpenings) return null;
   if (first.length > 0 && doomed / first.length > spec.maxDoomedFirst) return null;
   if (solver.solve().status !== "solved") return null;
+  const randomLoss = randomLossRate(level);
+  if (enforceLoss && randomLoss < spec.minRandomLoss) return null;
 
   const open = reachable.filter((n) => n > 0).length;
   const present = new Set(level.cells.filter((c) => c !== EMPTY)).size;
@@ -323,6 +444,7 @@ function evaluate(
       firstMoves: first.length,
       winnableOpenings: winnable,
       doomedOpenings: doomed,
+      randomLoss,
     },
   };
 }

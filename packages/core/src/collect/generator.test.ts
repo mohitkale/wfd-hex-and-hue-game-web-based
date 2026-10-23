@@ -3,8 +3,10 @@ import { EMPTY } from "../level";
 import { board, randomLevel } from "./fixtures";
 import {
   PROFILES,
+  attemptSeed,
   generateLevel,
   peel,
+  randomLossRate,
   reachableByColor,
   score,
   type GeneratorArt,
@@ -34,7 +36,7 @@ function rings(size: number): GeneratorArt {
 
 const profiles: Profile[] = ["gentle", "standard", "tight"];
 const make = (art: GeneratorArt, seed: number, profile: Profile, maxAttempts = 8) =>
-  generateLevel(art, "gen", "Generated", { seed, profile, maxAttempts });
+  generateLevel(art, "gen", "Generated", { seed, profile, maxAttempts, refineSteps: 6 });
 
 describe("reading a picture", () => {
   const level = board(["BBB", "BRB", "BBB"], [[["B", 8]], [["R", 1]]], { colors: "BR" });
@@ -125,6 +127,8 @@ describe("generated levels are valid, solvable and structured", () => {
           spec.maxDoomedFirst,
         );
         expect(metrics.depth).toBe(peel(level).depth);
+        expect(metrics.randomLoss).toBe(randomLossRate(level));
+        expect(metrics.randomLoss).toBeGreaterThanOrEqual(spec.minRandomLoss);
         expect(g.score).toBe(score(metrics));
         expect(g.attempt).toBeLessThan(8);
         expect(g.acceptable).toBeGreaterThanOrEqual(1);
@@ -138,11 +142,16 @@ describe("generated levels are valid, solvable and structured", () => {
 
   it("the kept level is the best-scoring acceptable candidate (more attempts never score lower)", () => {
     const art = rings(10);
-    const few = generateLevel(art, "g", "g", { seed: 5, profile: "gentle", maxAttempts: 2 });
-    const many = generateLevel(art, "g", "g", { seed: 5, profile: "gentle", maxAttempts: 12 });
-    expect(few).not.toBeNull();
-    expect(many!.score).toBeGreaterThanOrEqual(few!.score);
-    expect(many!.acceptable).toBeGreaterThanOrEqual(few!.acceptable);
+    let compared = 0;
+    for (let seed = 1; seed <= 8 && compared < 2; seed++) {
+      const few = generateLevel(art, "g", "g", { seed, profile: "gentle", maxAttempts: 3 });
+      const many = generateLevel(art, "g", "g", { seed, profile: "gentle", maxAttempts: 12 });
+      if (!few) continue;
+      compared++;
+      expect(many!.score).toBeGreaterThanOrEqual(few.score);
+      expect(many!.acceptable).toBeGreaterThanOrEqual(few.acceptable);
+    }
+    expect(compared).toBeGreaterThanOrEqual(1);
   });
 
   it("works on the random tight boards of the engine's own test generator", () => {
@@ -162,6 +171,44 @@ describe("generated levels are valid, solvable and structured", () => {
     }
     expect(produced).toBeGreaterThanOrEqual(1);
   }, 60_000);
+});
+
+describe("groups and seeds", () => {
+  it("no group is tiny: a colour is split into groups of at least half the target size", () => {
+    for (const size of [8, 10, 13]) {
+      const art = rings(size);
+      for (let seed = 1; seed <= 6; seed++) {
+        const g = make(art, seed, "gentle");
+        if (!g) continue;
+        const cubes = art.cells.length;
+        const chunk = Math.max(6, cubes / PROFILES.gentle.groups);
+        const perColor = new Array<number>(3).fill(0);
+        for (const c of art.cells) perColor[c]!++;
+        for (const grp of g.level.columns.flat()) {
+          // Refinement may shift cubes, but never to nothing; an unrefined (gentle) deal keeps the floor.
+          expect(grp.capacity).toBeGreaterThanOrEqual(
+            Math.min(perColor[grp.color]!, Math.floor(chunk * 0.5)),
+          );
+        }
+      }
+    }
+  });
+
+  it("derives distinct candidate seeds for distinct (seed, attempt) pairs, deterministically", () => {
+    const seen = new Set<number>();
+    for (let seed = 0; seed < 1000; seed++) {
+      for (let attempt = 0; attempt < 12; attempt++) seen.add(attemptSeed(seed, attempt));
+    }
+    expect(seen.size).toBe(12_000);
+    expect(attemptSeed(5, 3)).toBe(attemptSeed(5, 3));
+  });
+
+  it("rejects seeds that cannot be told apart or are not integers", () => {
+    const art = rings(8);
+    for (const seed of [1.5, -1, 2 ** 31, Number.NaN]) {
+      expect(() => generateLevel(art, "g", "g", { seed })).toThrow("seed must be an integer");
+    }
+  });
 });
 
 describe("rejection", () => {

@@ -50,6 +50,7 @@ export {
   PROFILES,
   generateLevel,
   peel,
+  randomLossRate,
   reachableByColor,
   score as generatorScore,
   type GenMetrics,

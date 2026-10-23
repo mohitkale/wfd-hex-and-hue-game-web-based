@@ -2,8 +2,7 @@
 
 `packages/core/src/collect/generator.ts`. Given a finished picture it makes a level, deterministically
 from a seed, and keeps only levels the solver can win and that have the structure its profile asks
-for. The art library's preview levels (`npm run art:levels`) now come from it, replacing the
-bot-dealing of M11.5.
+for. The art library's preview levels (`npm run art:levels`) come from it.
 
 ## What it decides
 
@@ -11,69 +10,86 @@ The picture decides which colours are open at the start and which are buried (an
 must be peeled). The generator decides everything else:
 
 - **Groups:** how many cubes each group may carry. Each colour's cubes are split into groups of
-  varied size around a target (the profile's group count against the picture's cube count), none
-  tiny, summing exactly to the colour's cubes.
-- **Columns and order:** the groups are shuffled into 3 to 5 columns (varied ordering).
+  varied size around a target (the profile's group count against the picture's cube count); a small
+  remainder joins the previous group so no group is tiny; sizes sum exactly to the colour's cubes.
+- **Columns and order:** the groups are shuffled into 3 to 5 columns.
 - **Slots:** the fewest holding slots that still allow a win (found by the solver) plus the
-  profile's slack, so slot pressure is set from the level, never guessed.
+  profile's slack. `winnable(K)` is monotone in the slot count (a stall parks into the first free
+  slot and slots matter only for the `slotsFull` loss), and the final level is solved again at its
+  own slot count, so soundness does not rest on that.
 - Squad 4, spawn gap 1 and field cap 3, fixed: the pace is a later design decision (M14).
 
 ## Profiles
 
-| Profile    | Groups | Slack | Groups that must wait | Winnable openings | Fewest slots | Doomed first moves |
-| ---------- | ------ | ----- | --------------------- | ----------------- | ------------ | ------------------ |
-| `gentle`   | 12     | +2    | at least 1            | at least 2        | at least 1   | none               |
-| `standard` | 16     | +1    | at least 2            | at least 1        | at least 1   | at most 50 %       |
-| `tight`    | 20     | +0    | at least 3            | at least 1        | at least 2   | at most 75 %       |
+| Profile    | Groups | Slack | Groups that must wait | Winnable openings | Doomed first moves | Random play must fail |
+| ---------- | ------ | ----- | --------------------- | ----------------- | ------------------ | --------------------- |
+| `gentle`   | 12     | +2    | at least 1            | at least 2        | none               | not asked             |
+| `standard` | 16     | +1    | at least 2            | at least 1        | at most 50 %       | at least 15 %         |
+| `tight`    | 20     | +0    | at least 3            | at least 1        | at most 75 %       | at least 40 %         |
 
 "Groups that must wait" are groups whose capacity exceeds the cubes of their colour reachable when
-the game opens, so they cannot finish straight away and have to park or be resumed. A first move
-"dooms" the level when no win remains after it (the solver says so, or it loses at once).
+the game opens. A first move "dooms" the level when no win remains after it. **Random play must fail**
+is the share of 12 fixed-seed random settled-sequential playouts that do not win (`randomLoss`): a
+cheap measure of how many pitfalls there are, as opposed to groups that merely wait.
 
 ## How a level is chosen
 
-`generateLevel(art, id, name, { seed, profile, maxAttempts, budget })` tries up to `maxAttempts`
-(default 12) candidates. Candidate `k` is dealt from a seed derived from the level seed and `k`, so
-each is reproducible on its own. A candidate is **rejected** unless: it is a valid level; enough
-groups must wait; the solver finds a win within its node budget with at least the profile's fewest
-slots; and its first moves meet the profile (an unclassifiable first move rejects the candidate: it
-never guesses). Of the acceptable candidates the highest `score` wins (more slots needed, more
-dooming first moves, more waiting groups, more buried colours, a choice of openings), the earliest on
-ties. If none is acceptable it returns `null`: a picture can simply be too shallow for a profile.
+`generateLevel(art, id, name, { seed, profile, maxAttempts, budget, refineSteps })`:
+
+1. **Deal** up to `maxAttempts` (default 12) candidates, each from a seed derived from the level
+   seed and its attempt number (so each is reproducible alone). A candidate is **rejected** unless it
+   is valid, enough groups must wait, the solver wins it within its node budget with at least the
+   profile's fewest slots, and its first moves meet the profile (an unclassifiable first move rejects
+   it: it never guesses).
+2. **Refine** (profiles that ask for pitfalls): the best three acceptable candidates are improved by
+   a **solver-guided hill climb** (`refineSteps`, default 24): swap or move groups, shift cubes
+   between two groups of one colour, or merge them; a change is kept only if the solver can still win
+   the level and random play fails at least as often. The slot count is held, so the pressure comes
+   from the order and the sizes.
+3. **Choose** the best-scoring result that meets every limit including `randomLoss`
+   (`score`: fewest slots, dooming first moves, groups that wait, buried colours, a choice of
+   openings and, most heavily, how often random play fails). Scores are not comparable across
+   profiles. If nothing qualifies it returns `null`: a picture can be too shallow for a profile.
 
 **Deterministic:** the same art, id, profile and seed give the identical level (tested, including
-independence from earlier generations). The solver is deterministic too.
+independence from earlier generations). Candidate seeds come from a chained 32-bit mixer; because the
+engine's generator takes 32-bit seeds, two different (seed, attempt) pairs can in principle collide
+(about 8 in 240,000 pairs), which only wastes an attempt. A seed must be an integer in 0 to 2^31 - 1.
 
 ## What it made for the six pieces (seed 1)
 
-| Level            | Profile  | Cubes | Groups | Open / buried colours | Rings | Groups that must wait | Fewest slots | Slots | First moves (winnable / dooming) | Score |
-| ---------------- | -------- | ----- | ------ | --------------------- | ----- | --------------------- | ------------ | ----- | -------------------------------- | ----- |
-| crescent-moon    | gentle   | 312   | 12     | 3 / 0                 | 6     | 1                     | 1            | 3     | 3 (3 / 0)                        | 1.25  |
-| triple-moon      | gentle   | 328   | 12     | 3 / 0                 | 8     | 2                     | 1            | 3     | 3 (3 / 0)                        | 1.5   |
-| witchs-cauldron  | standard | 486   | 18     | 5 / 0                 | 10    | 7                     | 1            | 2     | 4 (4 / 0)                        | 2.75  |
-| amethyst-cluster | standard | 564   | 15     | 3 / 0                 | 6     | 3                     | 1            | 2     | 4 (4 / 0)                        | 1.75  |
-| libra-scales     | standard | 443   | 18     | 3 / 1                 | 4     | 3                     | 1            | 2     | 3 (3 / 0)                        | 2.25  |
-| black-cat        | standard | 575   | 16     | 2 / 3                 | 12    | 5                     | 1            | 2     | 3 (3 / 0)                        | 3.75  |
+| Level            | Profile  | Cubes | Groups | Open / buried colours | Rings | Groups that must wait | Fewest slots | Slots | Doomed first moves | Random play fails |
+| ---------------- | -------- | ----- | ------ | --------------------- | ----- | --------------------- | ------------ | ----- | ------------------ | ----------------- |
+| crescent-moon    | gentle   | 312   | 12     | 3 / 0                 | 6     | 1                     | 1            | 3     | 0 of 3             | 0 %               |
+| triple-moon      | gentle   | 328   | 11     | 3 / 0                 | 8     | 2                     | 1            | 3     | 0 of 3             | 0 %               |
+| witchs-cauldron  | gentle   | 486   | 12     | 5 / 0                 | 10    | 7                     | 1            | 3     | 0 of 3             | 0 %               |
+| amethyst-cluster | gentle   | 564   | 12     | 3 / 0                 | 6     | 4                     | 1            | 3     | 0 of 3             | 0 %               |
+| libra-scales     | gentle   | 443   | 13     | 3 / 1                 | 4     | 3                     | 1            | 3     | 0 of 4             | 0 %               |
+| black-cat        | standard | 575   | 17     | 2 / 3                 | 12    | 6                     | 1            | 2     | 0 of 4             | 42 %              |
 
-All six are solver-verified (their lines replay to a win) and meet their profile. The `standard`
-profile was tried first and `gentle` is the fallback; the crescent and triple moon could only
-support `gentle`.
+(`npm run art:levels` tries `standard` first and falls back to `gentle`.)
 
-## An honest finding: structure is thin
+## What this shows: structure comes from layered pictures
 
-Look at the table: **the fewest slots is 1 for every piece and no first move dooms a level.** The
-generator does what it was asked (valid, solvable, groups that wait, slot counts from the solver),
-but random dealing of a finished picture rarely creates a position where the player can go wrong:
-the open colours let you clear almost anything, and one holding slot is always enough. Asking for
-more (`tight`: two slots needed, many waiting groups) succeeds on only some pictures (the black cat
-in a couple of seeds) and not on the others within 12 candidates. So these levels are checked
-for solvability and for having groups that wait, **not** for being hard, and not yet for resisting
-simple strategies. That is the next task: M12.3's simulated players will say how often cheap play
-wins them, and M12.2's generator is where a smarter, solver-guided deal (building dependencies on
-purpose instead of shuffling) would go if they turn out to be easy.
+- **The black cat** (three buried colours: the cat is drawn over a moon) is the one picture that
+  supports pitfalls. It reaches `standard` (random play fails 42 %), and `tight` too (random play
+  fails every time at one slot). The tests check all three profiles on it.
+- **The other five pieces** are essentially single-layer: every colour is open from the first move
+  (the moons, the cauldron, the crystals) or nearly so (Libra has one buried colour). The generator
+  tries hard on them (the profile climb at `standard` runs for several seconds each) and fails to
+  make random play lose even once, so they fall back to `gentle`: solvable, with groups that wait, but
+  with **no pitfalls**: the fewest slots is 1, no first move dooms the level, and random play never
+  fails. A level cannot be harder than its picture allows.
+
+So the generator does build structure on purpose when the picture has depth, but it cannot invent
+depth. That is a finding for the art, not only for the generator: **a catalogue of single-layer
+pictures will make easy levels however they are dealt**; layered pictures (a subject over a backdrop,
+an object inside a frame) are what make the puzzle. M13.1 (authoring the world levels) and the art
+catalogue should be planned with that in mind. Whether even the black cat's levels resist simple
+strategies is what M12.3's simulated players will measure; `randomLoss` is only one cheap proxy.
 
 ## Cost
 
-About 0.3 s per candidate for a 300 to 575 cube picture (solving is the cost), so generating one
-level takes a few seconds; the six pieces take about 5 s together. It runs offline
-(`npm run art:levels`); the game never generates at runtime.
+Candidates cost about 0.1 to 0.3 s each (solving is the cost). A `gentle` level takes about a second;
+a profile with refinement takes about 5 s per picture whether it succeeds or not. All six pieces take
+about 30 s in `npm run art:levels`, which runs offline; the game never generates at runtime.

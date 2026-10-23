@@ -42,24 +42,6 @@
   "columns": [
    [
     {
-     "color": 2,
-     "capacity": 24
-    },
-    {
-     "color": 0,
-     "capacity": 34
-    },
-    {
-     "color": 2,
-     "capacity": 26
-    },
-    {
-     "color": 1,
-     "capacity": 12
-    }
-   ],
-   [
-    {
      "color": 0,
      "capacity": 30
     },
@@ -69,21 +51,39 @@
     },
     {
      "color": 2,
-     "capacity": 31
+     "capacity": 20
     },
     {
-     "color": 2,
-     "capacity": 33
+     "color": 1,
+     "capacity": 12
     }
    ],
    [
+    {
+     "color": 2,
+     "capacity": 34
+    },
+    {
+     "color": 0,
+     "capacity": 29
+    },
     {
      "color": 2,
      "capacity": 20
     },
     {
      "color": 0,
-     "capacity": 17
+     "capacity": 22
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 30
+    },
+    {
+     "color": 2,
+     "capacity": 33
     },
     {
      "color": 2,
@@ -91,7 +91,7 @@
     },
     {
      "color": 2,
-     "capacity": 27
+     "capacity": 24
     }
    ]
   ],
@@ -121,7 +121,8 @@
     "slack": 2,
     "firstMoves": 3,
     "winnableOpenings": 3,
-    "doomedOpenings": 0
+    "doomedOpenings": 0,
+    "randomLoss": 0
    }
   }
  },
@@ -163,25 +164,25 @@
    [
     {
      "color": 2,
-     "capacity": 25
-    },
-    {
-     "color": 0,
-     "capacity": 15
-    },
-    {
-     "color": 2,
-     "capacity": 27
-    },
-    {
-     "color": 2,
      "capacity": 32
+    },
+    {
+     "color": 2,
+     "capacity": 31
+    },
+    {
+     "color": 2,
+     "capacity": 21
+    },
+    {
+     "color": 2,
+     "capacity": 36
     }
    ],
    [
     {
-     "color": 1,
-     "capacity": 36
+     "color": 2,
+     "capacity": 35
     },
     {
      "color": 2,
@@ -189,29 +190,25 @@
     },
     {
      "color": 2,
-     "capacity": 32
+     "capacity": 38
     },
     {
-     "color": 2,
-     "capacity": 35
+     "color": 1,
+     "capacity": 37
     }
    ],
    [
     {
-     "color": 2,
-     "capacity": 22
-    },
-    {
      "color": 1,
-     "capacity": 24
+     "capacity": 23
     },
     {
      "color": 2,
-     "capacity": 27
+     "capacity": 26
     },
     {
-     "color": 2,
-     "capacity": 19
+     "color": 0,
+     "capacity": 15
     }
    ]
   ],
@@ -232,7 +229,7 @@
    "score": 1.5,
    "metrics": {
     "cubes": 328,
-    "groups": 12,
+    "groups": 11,
     "openColors": 3,
     "buriedColors": 0,
     "depth": 8,
@@ -241,7 +238,8 @@
     "slack": 2,
     "firstMoves": 3,
     "winnableOpenings": 3,
-    "doomedOpenings": 0
+    "doomedOpenings": 0,
+    "randomLoss": 0
    }
   }
  },
@@ -301,85 +299,59 @@
    [
     {
      "color": 2,
-     "capacity": 22
+     "capacity": 51
+    },
+    {
+     "color": 1,
+     "capacity": 34
+    },
+    {
+     "color": 2,
+     "capacity": 68
     },
     {
      "color": 0,
      "capacity": 16
-    },
-    {
-     "color": 1,
-     "capacity": 22
-    },
-    {
-     "color": 2,
-     "capacity": 41
-    },
-    {
-     "color": 2,
-     "capacity": 31
     }
    ],
    [
     {
      "color": 2,
-     "capacity": 13
+     "capacity": 46
+    },
+    {
+     "color": 2,
+     "capacity": 47
+    },
+    {
+     "color": 2,
+     "capacity": 53
+    },
+    {
+     "color": 2,
+     "capacity": 38
+    }
+   ],
+   [
+    {
+     "color": 3,
+     "capacity": 43
+    },
+    {
+     "color": 3,
+     "capacity": 31
     },
     {
      "color": 4,
      "capacity": 21
     },
     {
-     "color": 3,
-     "capacity": 34
-    },
-    {
-     "color": 2,
+     "color": 1,
      "capacity": 38
-    },
-    {
-     "color": 2,
-     "capacity": 29
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 21
-    },
-    {
-     "color": 2,
-     "capacity": 24
-    },
-    {
-     "color": 1,
-     "capacity": 26
-    },
-    {
-     "color": 3,
-     "capacity": 40
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 27
-    },
-    {
-     "color": 1,
-     "capacity": 24
-    },
-    {
-     "color": 2,
-     "capacity": 22
-    },
-    {
-     "color": 2,
-     "capacity": 35
     }
    ]
   ],
-  "slots": 2,
+  "slots": 3,
   "squad": 4,
   "spawnGap": 1,
   "fieldCap": 3,
@@ -390,22 +362,23 @@
    "lore": "An iron cauldron over a low fire, its green brew just beginning to bubble."
   },
   "generated": {
-   "profile": "standard",
+   "profile": "gentle",
    "seed": 1,
-   "attempt": 7,
+   "attempt": 0,
    "score": 2.75,
    "metrics": {
     "cubes": 486,
-    "groups": 18,
+    "groups": 12,
     "openColors": 5,
     "buriedColors": 0,
     "depth": 10,
     "parkers": 7,
     "minSlots": 1,
-    "slack": 1,
-    "firstMoves": 4,
-    "winnableOpenings": 4,
-    "doomedOpenings": 0
+    "slack": 2,
+    "firstMoves": 3,
+    "winnableOpenings": 3,
+    "doomedOpenings": 0,
+    "randomLoss": 0
    }
   }
  },
@@ -449,73 +422,59 @@
    [
     {
      "color": 0,
-     "capacity": 28
+     "capacity": 53
     },
-    {
-     "color": 0,
-     "capacity": 45
-    },
-    {
-     "color": 0,
-     "capacity": 43
-    },
-    {
-     "color": 2,
-     "capacity": 30
-    }
-   ],
-   [
-    {
-     "color": 0,
-     "capacity": 33
-    },
-    {
-     "color": 0,
-     "capacity": 47
-    },
-    {
-     "color": 0,
-     "capacity": 42
-    },
-    {
-     "color": 0,
-     "capacity": 48
-    }
-   ],
-   [
-    {
-     "color": 0,
-     "capacity": 42
-    },
-    {
-     "color": 0,
-     "capacity": 41
-    },
-    {
-     "color": 2,
-     "capacity": 38
-    },
-    {
-     "color": 2,
-     "capacity": 47
-    }
-   ],
-   [
     {
      "color": 1,
      "capacity": 10
     },
     {
-     "color": 0,
-     "capacity": 35
+     "color": 2,
+     "capacity": 37
     },
     {
      "color": 0,
-     "capacity": 35
+     "capacity": 59
+    }
+   ],
+   [
+    {
+     "color": 0,
+     "capacity": 58
+    },
+    {
+     "color": 0,
+     "capacity": 54
+    },
+    {
+     "color": 2,
+     "capacity": 37
+    },
+    {
+     "color": 0,
+     "capacity": 40
+    }
+   ],
+   [
+    {
+     "color": 0,
+     "capacity": 61
+    },
+    {
+     "color": 0,
+     "capacity": 44
+    },
+    {
+     "color": 2,
+     "capacity": 41
+    },
+    {
+     "color": 0,
+     "capacity": 70
     }
    ]
   ],
-  "slots": 2,
+  "slots": 3,
   "squad": 4,
   "spawnGap": 1,
   "fieldCap": 3,
@@ -526,22 +485,23 @@
    "lore": "A cluster of amethyst points growing from dark stone, purple as the sky after sunset."
   },
   "generated": {
-   "profile": "standard",
+   "profile": "gentle",
    "seed": 1,
    "attempt": 0,
-   "score": 1.75,
+   "score": 2,
    "metrics": {
     "cubes": 564,
-    "groups": 15,
+    "groups": 12,
     "openColors": 3,
     "buriedColors": 0,
     "depth": 6,
-    "parkers": 3,
+    "parkers": 4,
     "minSlots": 1,
-    "slack": 1,
-    "firstMoves": 4,
-    "winnableOpenings": 4,
-    "doomedOpenings": 0
+    "slack": 2,
+    "firstMoves": 3,
+    "winnableOpenings": 3,
+    "doomedOpenings": 0,
+    "randomLoss": 0
    }
   }
  },
@@ -590,7 +550,39 @@
    [
     {
      "color": 2,
-     "capacity": 41
+     "capacity": 26
+    },
+    {
+     "color": 2,
+     "capacity": 32
+    },
+    {
+     "color": 3,
+     "capacity": 4
+    },
+    {
+     "color": 2,
+     "capacity": 24
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 27
+    },
+    {
+     "color": 2,
+     "capacity": 40
+    },
+    {
+     "color": 2,
+     "capacity": 40
+    }
+   ],
+   [
+    {
+     "color": 1,
+     "capacity": 15
     },
     {
      "color": 2,
@@ -598,77 +590,25 @@
     },
     {
      "color": 2,
-     "capacity": 23
-    },
-    {
-     "color": 2,
-     "capacity": 30
-    },
-    {
-     "color": 2,
-     "capacity": 20
+     "capacity": 41
     }
    ],
    [
     {
-     "color": 3,
-     "capacity": 4
+     "color": 2,
+     "capacity": 49
     },
     {
      "color": 2,
-     "capacity": 29
+     "capacity": 51
     },
     {
      "color": 0,
-     "capacity": 40
-    },
-    {
-     "color": 2,
-     "capacity": 26
-    },
-    {
-     "color": 2,
-     "capacity": 28
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 18
-    },
-    {
-     "color": 2,
-     "capacity": 29
-    },
-    {
-     "color": 2,
-     "capacity": 18
-    },
-    {
-     "color": 2,
-     "capacity": 21
-    }
-   ],
-   [
-    {
-     "color": 2,
-     "capacity": 26
-    },
-    {
-     "color": 2,
-     "capacity": 21
-    },
-    {
-     "color": 0,
-     "capacity": 21
-    },
-    {
-     "color": 1,
-     "capacity": 15
+     "capacity": 61
     }
    ]
   ],
-  "slots": 2,
+  "slots": 3,
   "squad": 4,
   "spawnGap": 1,
   "fieldCap": 3,
@@ -679,22 +619,23 @@
    "lore": "The Scales of Libra, the sign of balance, weighing the light against the dark."
   },
   "generated": {
-   "profile": "standard",
+   "profile": "gentle",
    "seed": 1,
-   "attempt": 6,
+   "attempt": 1,
    "score": 2.25,
    "metrics": {
     "cubes": 443,
-    "groups": 18,
+    "groups": 13,
     "openColors": 3,
     "buriedColors": 1,
     "depth": 4,
     "parkers": 3,
     "minSlots": 1,
-    "slack": 1,
-    "firstMoves": 3,
-    "winnableOpenings": 3,
-    "doomedOpenings": 0
+    "slack": 2,
+    "firstMoves": 4,
+    "winnableOpenings": 4,
+    "doomedOpenings": 0,
+    "randomLoss": 0
    }
   }
  },
@@ -754,7 +695,29 @@
    [
     {
      "color": 0,
-     "capacity": 28
+     "capacity": 29
+    },
+    {
+     "color": 0,
+     "capacity": 21
+    },
+    {
+     "color": 3,
+     "capacity": 18
+    },
+    {
+     "color": 0,
+     "capacity": 46
+    },
+    {
+     "color": 0,
+     "capacity": 76
+    }
+   ],
+   [
+    {
+     "color": 2,
+     "capacity": 22
     },
     {
      "color": 4,
@@ -762,65 +725,47 @@
     },
     {
      "color": 0,
-     "capacity": 44
+     "capacity": 50
     },
     {
      "color": 2,
+     "capacity": 34
+    },
+    {
+     "color": 0,
+     "capacity": 24
+    }
+   ],
+   [
+    {
+     "color": 0,
+     "capacity": 38
+    },
+    {
+     "color": 0,
+     "capacity": 34
+    },
+    {
+     "color": 0,
+     "capacity": 25
+    },
+    {
+     "color": 0,
      "capacity": 41
     }
    ],
    [
     {
      "color": 0,
-     "capacity": 33
-    },
-    {
-     "color": 0,
-     "capacity": 48
-    },
-    {
-     "color": 0,
-     "capacity": 42
-    },
-    {
-     "color": 0,
-     "capacity": 49
-    }
-   ],
-   [
-    {
-     "color": 0,
-     "capacity": 43
-    },
-    {
-     "color": 0,
-     "capacity": 53
+     "capacity": 72
     },
     {
      "color": 2,
-     "capacity": 38
+     "capacity": 23
     },
-    {
-     "color": 3,
-     "capacity": 18
-    }
-   ],
-   [
     {
      "color": 1,
      "capacity": 10
-    },
-    {
-     "color": 0,
-     "capacity": 35
-    },
-    {
-     "color": 0,
-     "capacity": 35
-    },
-    {
-     "color": 0,
-     "capacity": 46
     }
    ]
   ],
@@ -837,20 +782,21 @@
   "generated": {
    "profile": "standard",
    "seed": 1,
-   "attempt": 0,
-   "score": 3.75,
+   "attempt": 4,
+   "score": 6.5,
    "metrics": {
     "cubes": 575,
-    "groups": 16,
+    "groups": 17,
     "openColors": 2,
     "buriedColors": 3,
     "depth": 12,
-    "parkers": 5,
+    "parkers": 6,
     "minSlots": 1,
     "slack": 1,
-    "firstMoves": 3,
-    "winnableOpenings": 3,
-    "doomedOpenings": 0
+    "firstMoves": 4,
+    "winnableOpenings": 4,
+    "doomedOpenings": 0,
+    "randomLoss": 0.4166666666666667
    }
   }
  }
