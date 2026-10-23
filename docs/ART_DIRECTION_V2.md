@@ -182,6 +182,7 @@ What the checker can see of these (exact definitions in section 5a):
   (P-3).
 - **A-33 [check] Backdrop share:** a declared backdrop family is at most 35 % of filled cells and
   has at least two shades (P-2).
+- **A-35 [check] Features:** a piece may declare legend characters as deliberate one-cell features (an eye glint, a rune dot), which are exempt from A-30 and A-34. The exemption is bounded: features are at most 2 % of the filled cells and each connected group of one feature character is at most 4 cells, so it cannot be used to switch the noise rules off.
 - **A-34 [check] Fragments:** same-family pieces smaller than 3 cells are at most 4 % of filled
   cells. Anything that must read at phone size (an eye, a rune, a gem) should be at least 2×2
   cells on grids of 24 or more; that part is hand-judged at G2.
@@ -202,7 +203,7 @@ stated.
 - **A-32 dither cell:** a filled cell whose four neighbours are all filled and all of a different
   family. (Empty and out-of-grid neighbours disqualify the cell, which is what separates it from an
   orphan.) The mean horizontal run is over maximal runs of consecutive identical _filled_ cells in a row; empty cells do not form runs.
-- **A-31 rectangle:** the largest axis-aligned rectangle made only of one legend character.
+- **A-31 rectangle and top shade:** a _shade_ is a (family, role), however many legend characters spell it; the rectangle is the largest axis-aligned one made only of one shade, and the top-shade share counts cells per shade.
 - **A-34 fragment:** a 4-connected group of same-family cells of fewer than 3 cells.
 - **A-13 / A-14** are evaluated on the shades a piece actually uses; "consecutive" means adjacent
   among the used roles in deep, shade, base, light, glint order.
@@ -228,12 +229,13 @@ caps families at 8 for readability, so the engine ceiling is never the binding l
 holds a palette of plain colours with no shade; carrying shades alongside families is the engine
 and pipeline work in M11.2 and M11.4.
 
-**What the later tasks inherit** (also recorded in the roadmap): M11.2 adds the per-cell shade to
-the level model and renderer (family still decides gameplay) alongside the larger grids. M11.4 adds
-`npm run art:check` implementing every rule marked **[check]** with the section 5a definitions,
-reports A-17 as a warning, enforces the provenance fields of section 6, and **replaces** the single
-distance-90 rule in `tools/art/check.ts`, which would otherwise reject every multi-shade ramp
-(shade steps are 44-164). Until then v1 art keeps using `check.ts` unchanged.
+**Where each part landed:** M11.2 added the per-cell shade to the level model and renderer
+(family still decides gameplay). M11.4 implemented every rule marked **[check]** in
+`tools/art/rules.ts` with the section 5a definitions (`npm run art:check`, part of `npm run
+verify`), reports A-17 as a warning, enforces the provenance fields of section 6, and uses the
+families-and-ramps rules for v2 art instead of the single distance-90 rule in `tools/art/check.ts`,
+which would reject every multi-shade ramp (steps are 44-164) and stays in place for v1 art. See
+[ART_PIPELINE.md](ART_PIPELINE.md).
 
 ## 8. Worked before / after
 
