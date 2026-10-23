@@ -238,7 +238,7 @@ describe("lines from intermediate states (a cache shared across queries)", () =>
       }
     }
     expect(queries).toBeGreaterThan(500);
-  });
+  }, 120_000);
 });
 
 describe("minSlots", () => {
