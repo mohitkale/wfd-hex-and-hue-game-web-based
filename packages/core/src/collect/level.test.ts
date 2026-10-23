@@ -161,3 +161,26 @@ describe("shades (display-only looks within a colour family)", () => {
     expect(withShades).toEqual(plain);
   });
 });
+
+describe("subject (what a finished picture is)", () => {
+  const subject = { id: "black-cat", name: "Black Cat", theme: "familiar", lore: "A cat." };
+
+  it("round-trips and never changes the game", () => {
+    const level = { ...fixtureB(), subject };
+    expect(validateCollectLevel(level)).toEqual([]);
+    expect(parseCollectLevel(JSON.parse(JSON.stringify(level)))).toEqual(level);
+    expect(hashState(createCollectState(level))).toBe(hashState(createCollectState(fixtureB())));
+  });
+
+  it("rejects missing or empty fields", () => {
+    expect(
+      validateCollectLevel({ ...fixtureB(), subject: { ...subject, lore: " " } }).join(),
+    ).toContain("subject.lore must be a non-empty string");
+    expect(() => parseCollectLevel({ ...fixtureB(), subject: { id: "x" } })).toThrow(
+      "subject.name must be a string",
+    );
+    expect(() => parseCollectLevel({ ...fixtureB(), subject: 3 })).toThrow(
+      "subject must be an object",
+    );
+  });
+});

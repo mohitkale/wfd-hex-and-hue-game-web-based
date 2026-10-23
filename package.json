@@ -26,6 +26,7 @@
     "art:preview": "tsx tools/art/preview.ts",
     "art:check": "tsx tools/art/artcheck.ts",
     "art:sheet": "tsx tools/art/sheet.ts",
+    "art:levels": "tsx tools/art/levels.ts",
     "audit:v1": "tsx tools/audit/run.ts",
     "familiar:sheet": "tsx tools/familiar/sheet.ts",
     "icons": "tsx tools/icons/build.ts",

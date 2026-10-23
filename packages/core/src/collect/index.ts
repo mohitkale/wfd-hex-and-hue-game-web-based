@@ -5,6 +5,7 @@ export {
   validateCollectLevel,
   type CellShades,
   type CollectLevel,
+  type LevelSubject,
   type GroupSpec,
 } from "./level";
 export {
