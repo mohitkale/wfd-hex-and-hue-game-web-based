@@ -4,7 +4,8 @@ import newer from "../save/fixtures/v1-newer.json";
 import unversioned from "../save/fixtures/v1-unversioned.json";
 import { migrate, SAVE_VERSION, defaultSave } from "../save/schema";
 import { emptyDailyBook, readDailyBook, recordDaily, saveDailyBook } from "./dailyBook";
-import { award, readPouch, savePouch, startingPouch } from "./pouch";
+import { importV1, untouched, v1Played } from "./importV1";
+import { award, parsePouch, readPouch, savePouch, startingPouch } from "./pouch";
 import { emptyTutorialBook, markDone, readTutorialBook, saveTutorialBook } from "./tutorialBook";
 import { emptySpellbook, readSpellbook, recordWin, saveSpellbook } from "./v2Spellbook";
 
@@ -129,5 +130,71 @@ describe("the v2 board beside a v1 save", () => {
     expect(migrate(JSON.parse(memoryStore(v2).getItem("hexhue.save") ?? "null"))).toEqual(
       defaultSave(),
     );
+  });
+});
+
+describe("carrying a v1 player's coins and boosters into v2 (docs/V2_MIGRATION.md)", () => {
+  const v1 = (name: string) => migrate(JSON.parse(fixture(name)));
+
+  it("a mid-game v1 save brings its coins and mapped boosters, once", () => {
+    const save = v1("v1-midgame"); // 137 coins; undo 1, shuffle 0, extraSlot 3, wand 2
+    expect(v1Played(save)).toBe(true);
+    const r = importV1(save, startingPouch())!;
+    expect(r.carried).toBe(true);
+    expect(r.pouch).toMatchObject({
+      coins: 137,
+      imported: true,
+      boosters: { undo: 1, extraSlot: 3, hint: 2 },
+    });
+    // The second time nothing happens, so a spent balance is never topped up again.
+    expect(importV1(save, r.pouch)).toBeNull();
+  });
+
+  it("works from every real-shaped fixture, with sane numbers", () => {
+    for (const name of FIXTURES) {
+      const save = v1(name);
+      const r = importV1(save, startingPouch());
+      if (!v1Played(save)) {
+        expect(r, name).toBeNull();
+        continue;
+      }
+      expect(r!.pouch.coins, name).toBe(save.coins);
+      for (const n of Object.values(r!.pouch.boosters))
+        expect(Number.isInteger(n) && n >= 0).toBe(true);
+    }
+    // The unversioned save has played and a clamped damaged one keeps its repairs.
+    expect(importV1(v1("v1-unversioned"), startingPouch())!.pouch.coins).toBe(40);
+    expect(importV1(v1("v1-damaged"), startingPouch())!.pouch.coins).toBe(0);
+  });
+
+  it("a brand-new v1 save (never played) carries nothing and is not marked, so a later session still can", () => {
+    const fresh = defaultSave();
+    expect(v1Played(fresh)).toBe(false);
+    expect(importV1(fresh, startingPouch())).toBeNull();
+  });
+
+  it("never overwrites v2 progress: a pouch that v2 play has changed is only marked as handled", () => {
+    const played = award(startingPouch(), "art-moon", { cubes: 400 }).pouch;
+    expect(untouched(played)).toBe(false);
+    const r = importV1(v1("v1-midgame"), played)!;
+    expect(r.carried).toBe(false);
+    expect(r.pouch).toEqual({ ...played, imported: true });
+  });
+
+  it("does not touch the v1 save and survives storage round trips", () => {
+    const raw = fixture("v1-midgame");
+    const store = memoryStore({ "hexhue.save": raw });
+    const save = migrate(JSON.parse(raw));
+    const r = importV1(save, readPouch(store).pouch)!;
+    savePouch(store, r.pouch);
+    expect(store.data.get("hexhue.save")).toBe(raw);
+    expect(readPouch(store).pouch).toEqual(r.pouch);
+    // A restart reads the flag back and does not import again.
+    expect(importV1(save, readPouch(store).pouch)).toBeNull();
+  });
+
+  it("an old stored pouch without the flag reads as not yet imported", () => {
+    expect(parsePouch({ coins: 5, boosters: {}, paid: [] }).imported).toBe(false);
+    expect(parsePouch({ imported: "yes" }).imported).toBe(false);
   });
 });

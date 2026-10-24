@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0 (unreleased: release candidate, awaiting approval)
+
+A new game on the same site: **v2 replaces the track puzzle**. See
+[docs/RELEASE_NOTES_v2.0.0.md](docs/RELEASE_NOTES_v2.0.0.md) for the player-facing notes and
+[docs/V2_MIGRATION.md](docs/V2_MIGRATION.md) for what happens to existing saves.
+
+- **Game:** summon groups of familiars that physically fetch, carry and deliver the cubes of a
+  hand-drawn picture; a group's number is real remaining capacity; holding slots, genuine
+  deadlocks, wax seals; interactive four-level tutorial; daily challenge; Spellbook gallery by
+  world; world atmospheres and completion moments.
+- **Never blocks play (unchanged):** no lives, energy or timers; free instant Retry. Boosters are
+  now Undo, +1 Slot and Hint, earned with coins. 2× speed is an optional rewarded ad for one level.
+- **Quality:** every shipped level is solver-verified and gated in CI (`production:check`); a
+  consent-gated, anonymous gameplay event stream; an in-game settings menu.
+- **Migration:** coins and boosters carry over once; the v1 save is never touched. `?engine=v1`
+  still runs the old game as a fallback.
+- **App:** the v2 board is part of the offline shell (hashed chunk, precached).
+
 ## 1.0.0 (2026-10-23)
 
 First public release.

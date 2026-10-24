@@ -27,14 +27,6 @@ describe("deploy headers", () => {
     expect(nginxSite).toMatch(/location = \/manifest\.webmanifest \{[^}]*no-cache/);
   });
 
-  it("the unhashed v2 review chunk (outside /_astro/) is always revalidated on both hosts; hashed bundles stay immutable", () => {
-    expect(headersFor(netlify, "/v2/CollectScene.js")["Cache-Control"]).toBe("no-cache");
-    expect(headersFor(netlify, "/_astro/play.abc.js")["Cache-Control"]).toBe(
-      "public, max-age=31536000, immutable",
-    );
-    expect(nginxSite).toMatch(/location \/v2\/ \{[^}]*no-cache/);
-  });
-
   it("every nginx location that sets headers also sends the security headers", () => {
     // nginx drops inherited add_header in a location that adds its own: each needs the include.
     const blocks = [...nginxSite.matchAll(/location [^{]+\{[^}]*\}/g)].map((m) => m[0]);

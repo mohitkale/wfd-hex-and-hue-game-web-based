@@ -1,7 +1,11 @@
 # Running the v2 review build
 
-The v2 board is **not** part of the shipped game. It loads only when asked for, as a separate chunk,
-so players of v1 see nothing different (see `docs/V2_PROTOTYPE_SPEC.md` §6).
+> **v2.0.0 release candidate:** v2 is now the default engine (`/play/` runs it); the old track game
+> runs with `?engine=v1` (or a build with `PUBLIC_ENGINE=v1`). The `?engine=v2` URLs below still work
+> and are now the same as no flag. The text below was written when v2 was a review-only chunk.
+
+The v2 board loaded only when asked for, as a separate chunk, so players of v1 saw nothing different
+(see `docs/V2_PROTOTYPE_SPEC.md` §6).
 
 ```bash
 npm install     # once
@@ -20,7 +24,7 @@ Open one of:
 | add `&cb=1`                       | Colour-blind symbols on familiars, carried cubes and groups                                                              |
 | add `&speed=2`                    | Start at 2× (the 1×/2× button also toggles it; review builds only)                                                       |
 
-A production build can include it permanently with `PUBLIC_ENGINE=v2 npm run build`.
+A production build makes v1 the default with `PUBLIC_ENGINE=v1 npm run build`.
 
 ## How to play
 

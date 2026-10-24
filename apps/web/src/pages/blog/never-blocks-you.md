@@ -16,26 +16,26 @@ your progress is never taken away.
 
 ## Every booster can be earned
 
-Undo, Shuffle, +1 Slot and the Magic Wand all cost coins, and you earn coins by clearing mosaics,
-with a bonus when you don't use boosters. Some optional rewards can be unlocked by watching an ad
-if you want, but nothing requires it, and when no ad is available the game simply carries on.
+Undo, +1 Slot and Hint all cost coins (or one from your stock), and you earn coins by clearing
+pictures, with a bonus for each day's challenge. You can choose to watch an ad to play a level at
+double speed, but nothing requires it, and when no ad is available the game simply carries on.
 
 ## A way out of every corner
 
-If a level really doesn't click, after a few tries you can skip it and come back later. The idle
-hint system also gently points at a good next move when you have been thinking for a while.
+If a level really doesn't click, Undo takes back your last move, Hint points at a move that keeps
+the level winnable, and Retry starts over at no cost.
 
 ## Every level is solvable
 
-Behind every mosaic there is a solver: a program that searches for a winning sequence of launches.
+Behind every mosaic there is a solver: a program that searches for a winning sequence of summons.
 A level only ships if the solver finds one, so a lost board always means "try a different order",
 never "this was impossible".
 
 ## Comfortable to play
 
 Color symbols put a shape on every color, so matching never depends on telling hues apart.
-Reduced motion turns off particles, flashes and shakes. Sound and music each have their own
-volume, and vibration can be switched off.
+Reduced motion turns off particles, flashes and shakes. Sound, music and vibration each have their
+own switch.
 
 ## Free, offline, yours
 

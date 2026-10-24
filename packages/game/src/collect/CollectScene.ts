@@ -22,6 +22,7 @@ import { getRewards, safeShow, type AdResult } from "../rewards";
 import { stepFrame } from "./frameStep";
 import { CollectHud } from "./CollectHud";
 import { BoosterTray, undoBadge } from "./BoosterTray";
+import { importV1 } from "./importV1";
 import { buildSettingsPanel } from "./SettingsPanel";
 import { GameplayTracker, emitVia } from "./gameplayTracker";
 import { getAnalytics, safeFlush, track } from "../analytics";
@@ -313,6 +314,14 @@ export class CollectScene extends Phaser.Scene {
       this.unsubscribe = [];
     });
     this.build();
+    // A v1 player's coins and boosters come across once (docs/V2_MIGRATION.md); the v1 save is not touched.
+    whenSaveReady(this, (save) => {
+      const imported = save ? importV1(save.data, this.pouch) : null;
+      if (!imported) return;
+      this.commitPouch(imported.pouch);
+      if (imported.carried)
+        this.toaster.show("Welcome back: your coins and boosters came with you", 3600);
+    });
     // Saved settings arrive after the scene starts: pick up the colour-blind setting (and a changed
     // reduced-motion setting) when they do, rebuilding once if they differ from what was drawn.
     whenSaveReady(this, (save) => {

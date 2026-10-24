@@ -3,8 +3,9 @@
 Web-first, free-to-play magical color-sorting puzzle (track-around "pixel flow" mechanic) for the
 witchy / pagan / astrology / fantasy community. Repo: `mohitkale/wfd-hex-and-hue-game-web-based`.
 
-- Gameplay rules: `docs/GAME_DESIGN.md` (v1 track mechanic, shipped as v1.0.0). **v2 rules:**
-  `docs/GAME_DESIGN_V2.md` (source of truth for the new engine).
+- Gameplay rules: **v2** `docs/GAME_DESIGN_V2.md` (source of truth; the default engine in the v2.0.0
+  release candidate). `docs/GAME_DESIGN.md` is the v1 track mechanic, shipped as v1.0.0 and kept as
+  the `?engine=v1` fallback.
 - Plan and progress: `docs/ROADMAP.md` (milestones `M0…M15`, one PR per task, mirrored as GitHub
   milestones + issues). `M0…M7` are the shipped v1.0.0 record; `M8…M15` are the v2.0.0 redesign.
 - Why v2 exists and what is reusable: `docs/V2_GAMEPLAY_AUDIT.md`.
@@ -64,8 +65,9 @@ content/        worlds, level configs and ASCII pixel art (source of truth for l
 tools/levels/   level pipeline: content → packages/game/src/levels/generated/*.json (+ CI check)
 ```
 
-- v2 engine lives beside v1 in `packages/core/src/collect/` and is unreachable by default
-  (`?engine=v2`) until the switch in M15.5, because **`main` is the deploy branch**. Do not edit v1
+- v2 engine lives beside v1 in `packages/core/src/collect/`. **Until the M15.5 PR is approved and
+  merged it is unreachable by default (`?engine=v2`), because `main` is the deploy branch; the M15.5
+  PR makes it the default (`?engine=v1` is the fallback; docs/V2_MIGRATION.md).** Do not edit v1
   modules except to fix bugs; never leave `main` in a state that would break the shipped game.
 - `core` is deterministic: seeded RNG only, no `Date.now()`/`Math.random()` in logic, state is plain
   serializable data. Renderer interpolates between sim steps; it never mutates game state directly.

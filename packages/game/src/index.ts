@@ -12,7 +12,7 @@ import { CONSENT_EVENT, createAnalytics, readConsent, safeFlush, track } from ".
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
-import { v2Requested } from "./collect/engineFlag";
+import { useV2 } from "./collect/engineFlag";
 import { theme } from "./theme";
 
 /** MediaQueryList change listeners (Safari before 14 only has the old addListener API). */
@@ -75,9 +75,9 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
-  // The v2 board (`?engine=v2`, review builds only) is a separate chunk, loaded only when asked for;
-  // without the flag nothing of it is requested and the game below is exactly the shipped one.
-  if (v2Requested(window.location.search, import.meta.env?.PUBLIC_ENGINE)) {
+  // The v2 board is the game (v2.0.0). It is a separate chunk, loaded here; `?engine=v1` skips it and
+  // runs the old track game that stays below as the fallback (see collect/engineFlag.ts).
+  if (useV2(window.location.search, import.meta.env?.PUBLIC_ENGINE)) {
     void import("./collect/CollectScene")
       .then(({ CollectScene }) => {
         const start = () => {
@@ -90,8 +90,8 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
         else game.events.once(Phaser.Core.Events.READY, start);
       })
       .catch((error: unknown) => {
-        // Offline, or a stale/removed review chunk: stay on the title screen and say why.
-        console.error("The v2 board could not be loaded (review build only).", error);
+        // A chunk that failed to load: the old title screen stays up, so the player is never left blank.
+        console.error("The v2 board could not be loaded.", error);
       });
   }
   // Audio stays silent until the first tap or key (browser rule), then follows the saved settings.
