@@ -3,8 +3,9 @@ import { startingPouch, type Pouch } from "./pouch";
 
 /**
  * Carrying a player's coins and boosters over from the shipped v1 game (v2.0.0, docs/V2_MIGRATION.md).
- * v1 keeps its own save (`hexhue.save`) and v2 its own books (`hexhue.v2.*`): nothing is rewritten or
- * deleted, so the old save stays exactly as it was (a rollback to v1 loses nothing). What comes
+ * v1 keeps its own save (`hexhue.save`) and v2 its own books (`hexhue.v2.*`): the import never writes
+ * the v1 save (only the shared settings change there, when edited in the v2 Menu), so a rollback to v1
+ * loses no progress. What comes
  * across, once:
  *
  * | v1 | v2 |

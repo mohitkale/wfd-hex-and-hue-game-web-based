@@ -4,10 +4,11 @@ What happens to a player's saves when the site switches to the v2 game, and how 
 
 ## Principle
 
-**Nothing is rewritten or deleted.** v1 keeps its save (`hexhue.save`, format version 1, in IndexedDB
-or `localStorage`); v2 keeps its own small books (`hexhue.v2.*` in `localStorage`). The v1 save is
-read, never written, by v2. A rollback to v1 therefore loses nothing: v1 finds its save exactly as it
-left it.
+**The import never rewrites or deletes the v1 save.** v1 keeps its save (`hexhue.save`, format
+version 1, in IndexedDB or `localStorage`); v2 keeps its own small books (`hexhue.v2.*` in
+`localStorage`). The one thing v2 does write into the v1 save is the shared **settings** (sound, music,
+vibration, colour symbols, reduced motion) when the player changes them in the v2 Menu. Levels, stars,
+coins, boosters and tips in it are never touched, so a rollback to v1 loses no progress.
 
 ## What carries over (once, automatically)
 
@@ -49,6 +50,9 @@ v2 returns.
 
 ## Known limits
 
+- The import runs when the save has loaded (normally at once, at most about 2.5 s). If the player has
+  already spent or earned in that window, the v2 pouch counts as touched and the v1 balances are not
+  imported (the pouch is only marked as handled). Rare, and conservative on purpose.
 - v1's progress (levels, stars) is not shown anywhere in v2. If the owner wants a "your v1 Spellbook"
   carry-over, that is a product decision and a new task.
 - The old site pages (Spellbook gallery of v1 mosaics, share cards) still describe v1's 60 mosaics.

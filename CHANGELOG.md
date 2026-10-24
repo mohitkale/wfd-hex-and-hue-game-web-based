@@ -14,7 +14,7 @@ A new game on the same site: **v2 replaces the track puzzle**. See
   now Undo, +1 Slot and Hint, earned with coins. 2× speed is an optional rewarded ad for one level.
 - **Quality:** every shipped level is solver-verified and gated in CI (`production:check`); a
   consent-gated, anonymous gameplay event stream; an in-game settings menu.
-- **Migration:** coins and boosters carry over once; the v1 save is never touched. `?engine=v1`
+- **Migration:** coins and boosters carry over once; the import never touches the v1 save (only shared settings are edited in place). `?engine=v1`
   still runs the old game as a fallback.
 - **App:** the v2 board is part of the offline shell (hashed chunk, precached).
 

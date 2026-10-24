@@ -292,7 +292,7 @@ shared:
    starts it. Without the
    flag the code path is unchanged. The existing DPR-change handler restarts every non-`play` scene
    and would restart the v2 scene mid-game, so that one `continue` is extended to the v2 scene key.
-2. **Chunk name, location and budget (as built in M10.2).** The v2 scene is the lazily loaded
+2. **Chunk name, location and budget (as built in M10.2; superseded in the M15.5 release candidate, where the chunk is a normal hashed `_astro/` bundle that is precached; see docs/DEPLOY.md).** The v2 scene is the lazily loaded
    `v2/CollectScene.js`: a **stable, unhashed name, outside `_astro/`**. (A hashed name is embedded
    in the play bundle that imports it, so every v2-only change would also change the shipped bundle
    and the service worker version; the first attempt, a hashed chunk in `_astro/`, did exactly that

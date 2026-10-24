@@ -31,7 +31,7 @@ agree.
 ## If you played before
 
 Your coins and boosters come with you (Shuffle and Magic Wand become Hints). Your old levels and stars
-stay in the old game, which is still available at `/play/?engine=v1`. See
+stay untouched in the old game, which is still available at `/play/?engine=v1`. See
 [V2_MIGRATION.md](V2_MIGRATION.md).
 
 ## Known limits (be honest in the announcement)
@@ -40,4 +40,5 @@ stay in the old game, which is still available at `/play/?engine=v1`. See
   play. The three worlds are not filled (4 of 60 planned levels are placed on the difficulty curve).
 - First-time-player testing (gate G3) and on-device performance are still to be done
   ([V2_PLAYTEST.md](V2_PLAYTEST.md), [QA.md](QA.md)).
+- Dev levels (`?level=big`, the art pieces and so on) are reachable by URL for anyone, and pay a one-time first-clear amount like any level. Low stakes; gate them if it matters.
 - No world map in v2 yet; the Spellbook is the gallery.

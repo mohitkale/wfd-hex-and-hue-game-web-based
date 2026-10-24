@@ -86,5 +86,5 @@ removed).
 
 To roll back without a code change, build with `PUBLIC_ENGINE=v1` (set it in the Netlify or Docker
 build environment): `/play/` then runs the v1 game and never requests the v2 chunk. Players can also
-use `/play/?engine=v1`. Saves are untouched either way (docs/V2_MIGRATION.md). Do not tag or deploy the
+use `/play/?engine=v1`. Progress in saves is untouched either way (docs/V2_MIGRATION.md). If the v2 chunk fails to load (offline with a stale service worker, a deploy mismatch), the player lands on the v1 title screen with their v1 progress and no message; a visible retry is a follow-up. Do not tag or deploy the
 release without the owner's explicit approval (roadmap G4).

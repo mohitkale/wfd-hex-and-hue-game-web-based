@@ -99,19 +99,22 @@ describe("the v2 board beside a v1 save", () => {
     expect(readTutorialBook(store)).toEqual({ book: emptyTutorialBook(), ok: true });
   });
 
-  it.each(FIXTURES)("a whole v2 session (%s present) never touches the v1 save", (name) => {
-    const raw = fixture(name);
-    const store = memoryStore({ "hexhue.save": raw });
-    savePouch(store, award(startingPouch(), "art-moon", { cubes: 400 }).pouch);
-    saveSpellbook(store, recordWin(emptySpellbook(), "moon", 1).book);
-    saveDailyBook(store, recordDaily(emptyDailyBook(), "2026-10-24", 9, 1).book);
-    saveTutorialBook(store, markDone(emptyTutorialBook(), "tutorial-summon"));
-    // The v1 text is byte-for-byte what it was, and every v2 key is in its own namespace.
-    expect(store.data.get("hexhue.save")).toBe(raw);
-    const written = [...store.data.keys()].filter((k) => k !== "hexhue.save");
-    expect(written.length).toBeGreaterThanOrEqual(4);
-    for (const k of written) expect(k.startsWith("hexhue.v2.")).toBe(true);
-  });
+  it.each(FIXTURES)(
+    "a whole v2 session (%s present) never touches the v1 save (the Menu edits only shared settings)",
+    (name) => {
+      const raw = fixture(name);
+      const store = memoryStore({ "hexhue.save": raw });
+      savePouch(store, award(startingPouch(), "art-moon", { cubes: 400 }).pouch);
+      saveSpellbook(store, recordWin(emptySpellbook(), "moon", 1).book);
+      saveDailyBook(store, recordDaily(emptyDailyBook(), "2026-10-24", 9, 1).book);
+      saveTutorialBook(store, markDone(emptyTutorialBook(), "tutorial-summon"));
+      // The v1 text is byte-for-byte what it was, and every v2 key is in its own namespace.
+      expect(store.data.get("hexhue.save")).toBe(raw);
+      const written = [...store.data.keys()].filter((k) => k !== "hexhue.save");
+      expect(written.length).toBeGreaterThanOrEqual(4);
+      for (const k of written) expect(k.startsWith("hexhue.v2.")).toBe(true);
+    },
+  );
 
   it("v1 coins and booster counts are not the v2 pouch: neither moves the other", () => {
     const v1 = migrate(JSON.parse(fixture("v1-midgame")));

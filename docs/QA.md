@@ -109,15 +109,14 @@ slower phone.
 
 ## Downloads (`npm run budget`, production build)
 
-| Item                                  | Size          | Budget                                                                                      |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------- |
-| Play page JS (Phaser and v1 game)     | 392.5 KB gzip | 450 KB                                                                                      |
-| v2 board chunk (`v2/CollectScene.js`) | 40.1 KB gzip  | **43 KB** (raised from 40 in M14.5; the tutorial, boosters, daily and events took it to 40) |
-| Whole build                           | 2,471 KB      | 3,072 KB                                                                                    |
+| Item                                             | Size          | Budget                                                                                      |
+| ------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------- |
+| Play page JS (Phaser, v1 and v2)                 | 434.1 KB gzip | 450 KB                                                                                      |
+| v2 board chunk (`_astro/CollectScene.<hash>.js`) | 41.5 KB gzip  | **43 KB** (raised from 40 in M14.5; the tutorial, boosters, daily and events took it to 40) |
+| Whole build                                      | 2,471 KB      | 3,072 KB                                                                                    |
 
 The CI perf budget was updated for v2 in M14.5 (40 → 43 KB for the chunk) and needed nothing more here.
-The v2 chunk loads only with `?engine=v2` today; at the M15.5 switch it becomes part of the shell and
-the 450 KB play-page budget must be re-set with it (the sum is about 433 KB gzip).
+In the M15.5 release candidate the v2 chunk is a hashed bundle in `_astro/` (precached, counted in the play-page total, which is 434.1 of 450 KB: little headroom).
 
 ## Layout and cube size
 

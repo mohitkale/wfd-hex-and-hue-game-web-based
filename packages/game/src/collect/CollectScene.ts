@@ -316,7 +316,9 @@ export class CollectScene extends Phaser.Scene {
     this.build();
     // A v1 player's coins and boosters come across once (docs/V2_MIGRATION.md); the v1 save is not touched.
     whenSaveReady(this, (save) => {
-      const imported = save ? importV1(save.data, this.pouch) : null;
+      // The scene may have been restarted while the save loaded.
+      if (!save || !this.scene.isActive()) return;
+      const imported = importV1(save.data, this.pouch);
       if (!imported) return;
       this.commitPouch(imported.pouch);
       if (imported.carried)
