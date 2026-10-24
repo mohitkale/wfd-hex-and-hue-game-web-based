@@ -7,7 +7,8 @@ import { violation } from "./invariants";
 import type { CollectLevel } from "./level";
 import { CollectSession, replay } from "./session";
 import { isSettled, step } from "./sim";
-import { createCollectState, fromJSON, hashState, type CollectState } from "./state";
+import { EMPTY } from "../level";
+import { cloneState, createCollectState, fromJSON, hashState, type CollectState } from "./state";
 
 /**
  * M15.1: cross-cutting conformance tests. The rule-by-rule tests live next to each module
@@ -41,7 +42,9 @@ function choose(s: CollectState, rng: ReturnType<typeof createRng>): Action | nu
 function play(
   level: CollectLevel,
   seed: number,
-  hooks: { tick?: (s: CollectState, events: CollectEvent[]) => void } = {},
+  hooks: {
+    tick?: (s: CollectState, events: CollectEvent[], before: CollectState) => void;
+  } = {},
 ): CollectState {
   const rng = createRng(seed);
   const s = createCollectState(level);
@@ -50,12 +53,14 @@ function play(
     if (isSettled(s) || rng.next() < 0.2) {
       const a = choose(s, rng);
       if (a) {
+        const before = cloneState(s);
         const events = apply(s, a);
-        hooks.tick?.(s, events);
+        hooks.tick?.(s, events, before);
       }
     }
+    const before = cloneState(s);
     const events = step(s);
-    if (events.length > 0 || s.status !== "playing") hooks.tick?.(s, events);
+    if (events.length > 0 || s.status !== "playing") hooks.tick?.(s, events, before);
     if (isSettled(s) && legalActions(s).length === 0) break;
   }
   return s;
@@ -70,7 +75,7 @@ describe("counts, and no duplicate or teleported pickups (every tick of whole ga
     let pickups = 0;
     let deliveries = 0;
     const final = play(level, 7, {
-      tick: (s, events) => {
+      tick: (s, events, before) => {
         expect(violation(s)).toBeNull();
         // Every cube is on the board, carried, or delivered: nothing appears or vanishes.
         const onBoard = s.grid.filter((c) => c !== -1 && c !== undefined).length;
@@ -79,6 +84,7 @@ describe("counts, and no duplicate or teleported pickups (every tick of whole ga
         for (const e of events) {
           if (e.type === "cubePickedUp") {
             // Only a cube that was on the board can be picked up, and only once.
+            expect(before.grid[e.cube], "picked a cube that was not on the board").not.toBe(EMPTY);
             expect(picked.has(e.cube)).toBe(false);
             picked.add(e.cube);
             pickups++;
@@ -86,6 +92,8 @@ describe("counts, and no duplicate or teleported pickups (every tick of whole ga
         }
       },
     });
+    // The run really ended (a stuck board that stayed "playing" would hide regressions).
+    expect(final.status).not.toBe("playing");
     expect(deliveries).toBe(final.deliveredTotal);
     expect(pickups).toBe(final.deliveredTotal + carried(final));
   });
@@ -95,6 +103,7 @@ describe("win and loss are exclusive and final", () => {
   it.each(LEVELS.map((l) => [l.name, l.level] as const))("%s", (_name, level) => {
     for (const seed of [1, 2, 3]) {
       const s = play(level, seed);
+      expect(s.status, `${seed}`).not.toBe("playing");
       if (s.status === "won") {
         expect(s.deliveredTotal).toBe(s.cubesTotal);
         expect(s.groups.every((g) => g.status === "completed")).toBe(true);
@@ -151,34 +160,60 @@ describe("simultaneous collectors", () => {
 });
 
 describe("resume from a saved state", () => {
-  it.each(LEVELS.slice(0, 24).map((l) => [l.name, l.level] as const))(
-    "%s: saved mid-game as JSON, restored and played on, it matches the uninterrupted game tick by tick",
+  const interesting = { carrying: 0, parked: 0, late: 0 };
+
+  it.each(LEVELS.slice(0, 30).map((l) => [l.name, l.level] as const))(
+    "%s: saved as JSON at several points (early, carrying, parked, late), each restored copy matches the live game tick by tick",
     (_name, level) => {
       const rng = createRng(99);
       const live = createCollectState(level);
-      let resumed: CollectState | null = null;
-      const saveAt = rng.int(1, 5);
+      const copies: CollectState[] = [];
+      let sawCarrying = false;
+      let sawParked = false;
+      const save = () => copies.push(fromJSON(JSON.parse(JSON.stringify(live))));
+      let ticks = 0;
       for (let i = 0; i < 20_000 && live.status === "playing"; i++) {
-        if (i === saveAt) resumed = fromJSON(JSON.parse(JSON.stringify(live)));
-        // Both copies get the same action choices (the rng is only consumed for `live`).
+        if (i === 2) save();
+        if (!sawCarrying && carried(live) > 0) {
+          sawCarrying = true;
+          interesting.carrying++;
+          save();
+        }
+        if (!sawParked && live.slots.some((x) => x !== null)) {
+          sawParked = true;
+          interesting.parked++;
+          save();
+        }
+        if (ticks === 40) {
+          interesting.late++;
+          save();
+        }
+        // Every copy gets the same action choices (the rng is only consumed for `live`).
         const act = isSettled(live) || rng.next() < 0.2;
         const a = act ? choose(live, rng) : null;
         if (a) {
           apply(live, a);
-          if (resumed) apply(resumed, a);
+          for (const c of copies) apply(c, a);
         }
         const e1 = step(live);
-        if (resumed) {
-          expect(step(resumed)).toEqual(e1);
-          expect(hashState(resumed)).toBe(hashState(live));
-          expect(violation(resumed)).toBeNull();
+        ticks++;
+        for (const c of copies) {
+          expect(step(c)).toEqual(e1);
+          expect(hashState(c)).toBe(hashState(live));
+          expect(violation(c)).toBeNull();
         }
         if (isSettled(live) && legalActions(live).length === 0) break;
       }
-      expect(resumed).not.toBeNull();
-      expect(resumed!.status).toBe(live.status);
+      expect(copies.length).toBeGreaterThan(0);
+      for (const c of copies) expect(c.status).toBe(live.status);
     },
   );
+
+  it("the snapshots above include states with a carried cube, a parked group and a late game", () => {
+    expect(interesting.carrying).toBeGreaterThan(5);
+    expect(interesting.parked).toBeGreaterThan(5);
+    expect(interesting.late).toBeGreaterThan(5);
+  });
 
   it("a state saved before any action, and one saved after the game ended, both restore exactly", () => {
     const fresh = createCollectState(fixtureB());
@@ -278,5 +313,63 @@ describe("Undo and boosters keep the game exact", () => {
         );
       }
     }
+  });
+
+  it("Undo is exact in the middle of a game too: familiars out, cubes carried, groups parked", () => {
+    let checked = 0;
+    let carriedAtTap = 0;
+    for (const { level } of LEVELS) {
+      const rng = createRng(21);
+      const session = new CollectSession(level);
+      for (let i = 0; i < 400 && session.state.status === "playing"; i++) {
+        const legal = legalActions(session.state as CollectState);
+        const midFlight = !isSettled(session.state) && legal.length > 0;
+        if (midFlight && rng.next() < 0.5) {
+          const before = hashState(session.state as CollectState);
+          if (carried(session.state as CollectState) > 0) carriedAtTap++;
+          session.tap(legal[rng.int(0, legal.length - 1)]!);
+          for (let k = 0; k < 6; k++) session.tick();
+          expect(session.undo()).toBe(true);
+          expect(hashState(session.state as CollectState)).toBe(before);
+          expect(violation(session.state as CollectState)).toBeNull();
+          checked++;
+        } else if (isSettled(session.state) && legal.length > 0) {
+          session.tap(legal[rng.int(0, legal.length - 1)]!);
+        }
+        if (session.tick() === null && legal.length === 0) break;
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
+    expect(carriedAtTap).toBeGreaterThan(3);
+  });
+
+  it("an Extra Slot taken mid-game equals a level built with it, from there to the end", () => {
+    let checked = 0;
+    for (const { level } of LEVELS.slice(0, 30)) {
+      const rng = createRng(8);
+      const withSlot = new CollectSession(level);
+      const built = new CollectSession({ ...level, slots: level.slots + 1 });
+      let added = false;
+      for (let i = 0; i < 3_000 && withSlot.state.status === "playing"; i++) {
+        if (!added && i === 12 && isSettled(withSlot.state) === false) {
+          expect(withSlot.addSlot()).toBe(true);
+          added = true;
+          checked++;
+        }
+        const a = choose(withSlot.state as CollectState, rng);
+        if (a && (isSettled(withSlot.state) || rng.next() < 0.2)) {
+          withSlot.tap(a);
+          built.tap(a);
+        }
+        withSlot.tick();
+        built.tick();
+        if (added) {
+          expect(hashState(withSlot.state as CollectState)).toBe(
+            hashState(built.state as CollectState),
+          );
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(3);
   });
 });
