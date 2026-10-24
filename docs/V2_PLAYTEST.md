@@ -8,8 +8,8 @@ release candidate) stays blocked until real findings are recorded and approved h
 
 ## What the build is
 
-- The v2 board is reachable at `/play/?engine=v2` on the deployed site (and `npm run dev`, then
-  `http://localhost:4400/play/?engine=v2`). A **first visit starts in the four-level tutorial**
+- The v2 board is reachable at `/play/?engine=v2` on the deployed site (and `npm run dev`, usually
+  `http://localhost:4321/play/?engine=v2`). A **first visit starts in the four-level tutorial**
   ([V2_ONBOARDING.md](V2_ONBOARDING.md)); afterwards the player is on the slice level. Other doors,
   for the facilitator only: `?level=slice` (skips the tutorial), `?level=art-black-cat` and the other
   `art-*` pictures, `?level=daily`, `?view=spellbook`.
@@ -50,7 +50,7 @@ One row per tester per item. Record what happened, in their words where possible
 | --- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
 | 1   | **Controls**        | Do they tap columns, waiting groups and Undo without help? Any wrong taps or missed taps? Does anything feel slow or unresponsive?                                                         | ok / struggled / blocked     |
 | 2   | **Tutorial**        | Did they complete all four tutorial levels? Where did they stop or get stuck? Did they read, ignore or skip the hints (Skip)? _(This is the M14.2 criterion that only humans can answer.)_ | completed / partly / skipped |
-| 3   | **Collectors**      | Do they watch the familiars fetch and carry? Do they enjoy it, ignore it, or find it slow? Do they ever want 2× (and is the ad offer clear)?                                               | enjoyed / neutral / slow     |
+| 3   | **Collectors**      | Do they watch the familiars fetch and carry? Do they enjoy it, ignore it, or find it slow? Do they ever want 2× (only on a build with an ad provider; otherwise there is no button)?       | enjoyed / neutral / slow     |
 | 4   | **Numbers**         | Can they say what the number on a group means? (Ask: "what does the 8 mean?")                                                                                                              | understood / partly / no     |
 | 5   | **Art**             | Do they recognise the picture as it fills or when it finishes? Do they care?                                                                                                               | recognised / no / cared      |
 | 6   | **Decisions**       | Do they make intentional choices (picking an order, saving a group for later), or tap at random? Quote what they say they're planning.                                                     | planning / mixed / random    |
@@ -61,7 +61,7 @@ One row per tester per item. Record what happened, in their words where possible
 | 11  | **Feel**            | On a phone: does it feel native (no scroll, no zoom, no lag)? Any readability problem with cube size? Anything on the board too small to tap or read?                                      | good / issues                |
 | 12  | **Their own words** | "What would you tell a friend about it?" "What was confusing?" "What would make you come back?"                                                                                            | verbatim                     |
 
-Also note: device, browser, whether sound and haptics were on, and any crash or visual glitch.
+Also note: the commit or build tested, device, browser, whether sound and haptics were on, and any crash or visual glitch.
 
 ## Findings
 
@@ -74,9 +74,12 @@ go in this document. Fixes that follow become new tasks in the M15 milestone.
 
 ## Also asked of whoever holds a phone (carried from M15.3, docs/QA.md "Not measured")
 
+- **Offline v2 from an installed PWA** (expected to fail until M15.5 moves the v2 chunk into the
+  service worker's shell; record what happens, or state it is deferred to M15.5).
 - **On-device frame rate** of `/play/?engine=v2&level=dense&profile=1` (steps in
   [V2_PERF.md](V2_PERF.md#real-device-measurement-not-done-tracked-as-m153-issue-103)); record device,
-  browser and the numbers.
+  browser and the numbers. The profiler (`window.__collect`) only exists in a build made with
+  `PUBLIC_ENGINE=v2` or in dev; the deployed site may not expose it, so follow the V2_PERF.md steps.
 - Whether the booster tray's buttons (about 30 px tall) are comfortable to tap, and whether cubes are
   readable on the smallest phone in the session (cube size on short phones fell with the tray: QA.md).
 - Touch feel, audio unlock and haptics on iOS Safari and Android Chrome.
