@@ -16,7 +16,7 @@ _is anything a player can reach broken, trivial, or inconsistent?_
 
 The tutorial levels, the slice, and every art piece's level (which is also the daily pool), plus any
 `SHIPPED` piece (none yet; the 60 world slots, M13.1, are unfilled). Dev levels (`?level=dense`,
-`big`, `swarm`, ...) are not production. A test pins the list to what the game can load.
+`big`, `swarm`, ...) are not production. A test requires every level the game can load by name (`DEV_LEVELS`) to be either in this list or in an explicit dev-only allowlist with a reason, so a new player-facing level cannot slip past the gate.
 
 ## What fails
 
@@ -34,6 +34,10 @@ Deviations are keyed by the exact issue text and carry a reason (`KNOWN` in
 cannot make decisions, so every cheap player wins them (V2_MEASURES.md). That is the known debt:
 they stay playable, but need a layered redesign before they count as daily or world content. The
 report says so rather than hiding it.
+
+**Read PASS carefully.** Of the 11 levels, five art levels carry the recorded trivial deviation and
+the sixth (`art-black-cat`) is only tutorial/easy grade. PASS means no level is broken, unsolvable
+or newly trivial; it does not mean the daily pool is good.
 
 ## What stays human
 

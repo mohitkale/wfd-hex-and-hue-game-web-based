@@ -5,6 +5,7 @@ import { ART_LEVELS } from "../../packages/game/src/collect/artLevels";
 import { TUTORIAL_IDS } from "../../packages/game/src/collect/tutorialLevels";
 import { SLICE_ID } from "../../packages/game/src/collect/slice";
 import { SHIPPED } from "../../content/v2art";
+import { DEV_LEVELS } from "../../packages/game/src/collect/levels";
 import { KNOWN, REPORT, checkAll, inventory, markdown, run, type Entry } from "./production";
 import { readFileSync } from "node:fs";
 
@@ -43,6 +44,32 @@ describe("the real inventory", () => {
   it("has a recorded reason for every deviation, and none that no longer occurs", () => {
     for (const reason of Object.values(KNOWN)) expect(reason.length).toBeGreaterThan(20);
     expect(result.rows.flatMap((r) => r.known).length).toBe(Object.keys(KNOWN).length);
+  });
+
+  it("every level the game loads by name is production or explicitly dev-only", () => {
+    const DEV_ONLY: Record<string, string> = {
+      parking: "slot-parking demo",
+      purple12: "dev board",
+      seals: "wax-seal tutorial: seals are not shipped in any level yet (docs/V2_VARIETY.md)",
+      moon: "demo picture",
+      swarm: "renderer stress board",
+      dense: "density test board",
+      dense24: "density test board",
+      dense40: "density test board",
+      big: "renderer worst case",
+    };
+    const production = new Set(entries.map((e) => e.level.id));
+    for (const [key, make] of Object.entries(DEV_LEVELS)) {
+      const id = make().id;
+      const listed = production.has(id) || Object.hasOwn(DEV_ONLY, key);
+      expect(listed, `${key} (${id}) is loadable but neither production nor dev-only`).toBe(true);
+    }
+    for (const reason of Object.values(DEV_ONLY)) expect(reason.length).toBeGreaterThan(5);
+  });
+
+  it("a shipped piece id is matched to its art level id", () => {
+    expect(checkAll(entries, KNOWN, ["black-cat"]).failures).toEqual([]);
+    expect(checkAll(entries, KNOWN, ["nope"]).failures.join()).toMatch(/nope: shipped/);
   });
 
   it("covers every shipped piece (none yet)", () => {

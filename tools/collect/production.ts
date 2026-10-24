@@ -210,7 +210,9 @@ export function checkAll(
       failures.push(`stale known deviation (no longer occurs, remove it): ${key}`);
   }
   for (const id of shipped) {
-    if (!seen.has(id)) failures.push(`${id}: shipped but not in the production inventory`);
+    // `SHIPPED` lists piece ids; a piece's level id is `art-<piece id>`.
+    if (!seen.has(`art-${id}`) && !seen.has(id))
+      failures.push(`${id}: shipped but not in the production inventory`);
   }
   if (rows.length === 0) failures.push("the production inventory is empty");
   return { rows, failures };
@@ -228,7 +230,7 @@ export function markdown(result: Result): string {
     "(`npm run production:check`). Method and policy: [V2_PRODUCTION.md](V2_PRODUCTION.md).",
     "",
     failures.length === 0
-      ? `**Gate: PASS** (${rows.length} levels, ${rows.reduce((n, r) => n + r.known.length, 0)} recorded deviations).`
+      ? `**Gate: PASS** (${rows.length} levels) **with ${rows.reduce((n, r) => n + r.known.length, 0)} recorded deviations**: levels beaten by every cheap player, listed below. PASS means nothing is broken or newly trivial, not that the levels are good.`
       : `**Gate: FAIL**: ${failures.map((f) => `\`${f}\``).join("; ")}`,
     "",
     "| Level | Kind | Board | Cubes | Colours | Groups | Slots (min) | Solved (moves) | Cheap players won | Random | Tiers fitted | Issues |",
