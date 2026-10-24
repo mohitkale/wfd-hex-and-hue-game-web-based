@@ -21,6 +21,17 @@ import { Emitter, Particles } from "./particles";
 import { getRewards, safeShow, type AdResult } from "../rewards";
 import { stepFrame } from "./frameStep";
 import { CollectHud } from "./CollectHud";
+import { BoosterTray, undoBadge } from "./BoosterTray";
+import { MAX_EXTRA_SLOTS, useExtraSlot, useHint, useUndo, type UseResult } from "./boosterUse";
+import {
+  award,
+  paymentFor,
+  PRICES,
+  readPouch,
+  savePouch,
+  startingPouch,
+  type Pouch,
+} from "./pouch";
 import {
   applyAdResult,
   initialSpeedState,
@@ -60,6 +71,7 @@ import { TickClock } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
 import {
   dailyMoment,
+  isDone,
   practiceLine,
   readDailyBook,
   recordDaily,
@@ -143,6 +155,12 @@ export class CollectScene extends Phaser.Scene {
   private revealSeen = false;
   private portal!: PortalView;
   private hud!: CollectHud;
+  private tray: BoosterTray | null = null;
+  /** The v2 pouch (M14.4): coins and booster stock; it is only written back when it was read cleanly. */
+  private pouch: Pouch = startingPouch();
+  private pouchOk = false;
+  /** This win's coins were paid (a relayout or end card must not pay twice). */
+  private winPaid = false;
   /** The tutorial being played (M14.2), its level id and layer, and whether its win was recorded. */
   private tutorial: Tutorial | null = null;
   private tutorialId: string | null = null;
@@ -172,9 +190,13 @@ export class CollectScene extends Phaser.Scene {
     this.overlay = [];
     this.reveal = null;
     this.winRecord = null;
+    this.winPaid = false;
     this.revealSeen = false;
     this.demo = null;
     this.marks = new Map();
+    const read = readPouch(browserStore());
+    this.pouch = read.pouch;
+    this.pouchOk = read.ok;
     this.frameTime = 0;
     ensureTextures(this);
     this.cameras.main.setBackgroundColor(theme.night);
@@ -239,6 +261,7 @@ export class CollectScene extends Phaser.Scene {
         }
         this.demo = null;
         this.winRecord = null;
+        this.winPaid = false;
         this.revealSeen = false;
         this.rebuild();
       }),
@@ -338,10 +361,13 @@ export class CollectScene extends Phaser.Scene {
       insets: this.insets(),
       boardWidth: level.width,
       boardHeight: level.height,
-      slots: level.slots,
+      // Slots gained from the Extra Slot booster are part of the state.
+      slots: state.params.slots,
       columns: level.columns.length,
       fieldCap: level.fieldCap,
       portalX: level.portalX ?? collect.defaultPortalX(level.width),
+      // The tutorial teaches without a shop: its boosters are free and there is no tray.
+      tray: this.tutorialId === null,
     });
     this.toaster = new Toast(this, this.layout);
     this.atlas = ensureFamiliarAtlas(this, level.palette);
@@ -401,6 +427,13 @@ export class CollectScene extends Phaser.Scene {
     this.rebuildMarks(state);
     this.panels.sync(state);
     this.buildHud();
+    this.tray = this.tutorialId
+      ? null
+      : new BoosterTray(this, this.layout, {
+          onSlot: () => this.boost(useExtraSlot(this.pouch, this.session, false)),
+          onHint: () => this.boost(useHint(this.pouch, this.session, false)),
+        });
+    this.syncPouch();
     this.tutorialLayer = this.tutorial
       ? new TutorialLayer(this, this.layout, () => this.skipTutorial())
       : null;
@@ -454,11 +487,101 @@ export class CollectScene extends Phaser.Scene {
 
   private buildHud(): void {
     this.hud = new CollectHud(this, this.layout, this.session.level.name, this.speedView(), {
-      onUndo: () => this.session.undo(),
+      onUndo: () => this.undo(),
       onRestart: () => this.session.restart(),
       onSpeed: () => this.onSpeedTap(),
     });
     this.hud.setProgress(progressOf(this.session.state).fraction);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Boosters (M14.4, docs/V2_BOOSTERS.md)
+  // -------------------------------------------------------------------------------------------
+
+  /** Stores a changed pouch (never over one that could not be read) and refreshes what shows it. */
+  private commitPouch(next: Pouch): void {
+    this.pouch = next;
+    if (this.pouchOk) savePouch(browserStore(), next);
+    this.syncPouch();
+  }
+
+  private syncPouch(): void {
+    this.tray?.sync(this.pouch, this.session.extraSlots < MAX_EXTRA_SLOTS);
+    this.hud.setUndoBadge(this.tutorialId ? "" : undoBadge(this.pouch));
+  }
+
+  /** Undo is a booster outside the tutorial: it costs one from stock or its price in coins. */
+  private undo(): void {
+    this.demo = null;
+    this.boost(useUndo(this.pouch, this.session, this.tutorialId !== null));
+  }
+
+  /** Applies the outcome of a booster: store the pouch, say what happened, show a hint's target. */
+  private boost(r: UseResult): void {
+    if (this.overlay.length > 0 && !r.used) return;
+    this.commitPouch(r.pouch);
+    this.toaster.show(r.message, 2600);
+    if (!r.used) return;
+    if (r.suggest) this.highlight(r.suggest);
+    // The layout changes with the slot count; Undo and Retry rebuild on their own.
+    else if (r.message.startsWith("An extra slot")) this.rebuild();
+  }
+
+  /** A hint's target pulses briefly on the board. */
+  private highlight(action: collect.Action): void {
+    const r =
+      action.kind === "select"
+        ? this.layout.columns[action.column]
+        : this.layout.slots[action.slot];
+    if (!r) return;
+    const ring = this.add
+      .rectangle(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
+      .setStrokeStyle(Math.max(2, 3 * this.dpr), theme.glow, 1)
+      .setDepth(30);
+    this.tweens.add({
+      targets: ring,
+      alpha: { from: 1, to: 0.15 },
+      duration: isReducedMotion(this) ? 1 : 420,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  private reviveProps(): { revive?: { label: string; onPress: () => void } } {
+    const revive = this.reviveOffer();
+    return revive ? { revive } : {};
+  }
+
+  /** The end card's Extra Slot offer after a slots-full loss, with what it costs. */
+  private reviveOffer(): { label: string; onPress: () => void } | undefined {
+    const state = this.session.state;
+    if (this.tutorialId || state.lossReason !== "slotsFull") return undefined;
+    if (this.session.extraSlots >= MAX_EXTRA_SLOTS) return undefined;
+    const pay = paymentFor(this.pouch, "extraSlot");
+    if (pay.kind === "short") return undefined;
+    const label =
+      pay.kind === "owned"
+        ? `Extra slot (${this.pouch.boosters.extraSlot} left)`
+        : `Extra slot · ${PRICES.extraSlot}✦`;
+    return { label, onPress: () => this.boost(useExtraSlot(this.pouch, this.session, false)) };
+  }
+
+  /** Pays coins for a win once: the first clear of a level pays by size, a replay a token. */
+  private payWin(): void {
+    if (this.winPaid || this.tutorialId) return;
+    this.winPaid = true;
+    const date = this.dailyDate;
+    const dailyBonus =
+      date !== null &&
+      date === utcDate(Date.now()) &&
+      !isDone(readDailyBook(browserStore()).book, date);
+    const r = award(this.pouch, this.session.level.id, {
+      cubes: this.session.state.cubesTotal,
+      dailyBonus,
+    });
+    this.commitPouch(r.pouch);
+    this.toaster.show(`+${r.coins} ✦`, 2400);
   }
 
   private speedView(): SpeedView {
@@ -599,7 +722,10 @@ export class CollectScene extends Phaser.Scene {
       if (e.type === "groupCompleted") {
         this.cubes.setSeals(sealMap(this.session.state));
         this.celebrateGroup(e.group);
-      } else if (e.type === "won") this.celebrateWin();
+      } else if (e.type === "won") {
+        this.celebrateWin();
+        this.payWin();
+      }
     }
     playCues(planCues(batch.events), this.sinks);
     if (marksChanged) this.cubes.setMarks(this.marks);
@@ -842,7 +968,8 @@ export class CollectScene extends Phaser.Scene {
       delay,
       reduced: isReducedMotion(this),
       onRetry: () => this.session.restart(),
-      onUndo: () => this.session.undo(),
+      onUndo: () => this.undo(),
+      ...(!won ? this.reviveProps() : {}),
       ...(won && this.tutorialId ? { next: this.tutorialWin()! } : {}),
       // Pointed at by the tutorial's last hint: Undo becomes the main button.
       emphasizeUndo: !won && this.tutorial?.update(state)?.target?.kind === "undo",

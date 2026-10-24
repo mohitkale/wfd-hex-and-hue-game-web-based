@@ -1,6 +1,7 @@
 import { apply, explain, IllegalActionError, type Action, type ActionCheck } from "./actions";
 import type { CollectEvent, TickBatch } from "./events";
 import { validateCollectLevel, type CollectLevel } from "./level";
+import { addSlot, canAddSlot } from "./boosters";
 import { isSettled, step } from "./sim";
 import { cloneState, createCollectState, type CollectState } from "./state";
 
@@ -106,6 +107,8 @@ export class CollectSession {
   private current: CollectState;
   private entries: LogEntry[] = [];
   private history: Snapshot[] = [];
+  /** Slots gained from the Extra Slot booster this level; they survive Undo and Retry. */
+  private extra = 0;
   private listeners = new Set<(batch: TickBatch) => void>();
   private replaceListeners = new Set<(reason: "undo" | "restart") => void>();
 
@@ -181,6 +184,34 @@ export class CollectSession {
     return batch;
   }
 
+  /** How many holding slots the Extra Slot booster has added to this level. */
+  get extraSlots(): number {
+    return this.extra;
+  }
+
+  /** Whether Extra Slot would do anything (not once the game is won). */
+  get canAddSlot(): boolean {
+    return canAddSlot(this.current);
+  }
+
+  /**
+   * Extra Slot booster: one more holding slot for the rest of the level, kept through Undo and Retry.
+   * After a `slotsFull` loss it revives the game (docs/V2_BOOSTERS.md). Returns false when it has no
+   * effect (the game is won). The caller charges for it; this changes the game only.
+   */
+  addSlot(): boolean {
+    if (!canAddSlot(this.current)) return false;
+    // Undo must not take the slot away: every earlier snapshot gains it too.
+    for (const snap of this.history) {
+      snap.state.params.slots++;
+      snap.state.slots.push(null);
+    }
+    this.extra++;
+    const events = addSlot(this.current);
+    this.emit({ tick: this.current.tick, events });
+    return true;
+  }
+
   /** Restores the state before the last action (and drops it from the log). Works out of a loss. */
   undo(): boolean {
     const snap = this.history.pop();
@@ -193,6 +224,7 @@ export class CollectSession {
 
   restart(): void {
     this.current = createCollectState(this.level);
+    for (let i = 0; i < this.extra; i++) addSlot(this.current);
     this.entries = [];
     this.history = [];
     this.notifyReplace("restart");

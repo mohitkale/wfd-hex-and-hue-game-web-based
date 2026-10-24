@@ -40,6 +40,8 @@ export {
   type ActionCheck,
 } from "./actions";
 export { isSettled, runUntilSettled, step } from "./sim";
+export { addSlot, canAddSlot } from "./boosters";
+export { HINT_BUDGET, hintFor, type Hint } from "./hint";
 export { nearestTarget, hasAssignable, type Target } from "./targeting";
 export { computeDist, paddedIndex, topologyFor } from "./grid";
 export type { CollectEvent, LossReason, TickBatch } from "./events";

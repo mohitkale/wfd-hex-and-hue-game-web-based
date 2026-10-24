@@ -15,6 +15,8 @@ export interface EndCardOptions {
   reduced: boolean;
   onRetry: () => void;
   onUndo: () => void;
+  /** A slots-full loss: Extra Slot revives the game (label says what it costs). */
+  revive?: { label: string; onPress: () => void };
   /** A tutorial win: the way on ("Next", or "Play" after the last tutorial level). */
   next?: { label: string; onPress: () => void };
   /** A tutorial loss: Undo is the thing to press, so it becomes the primary button and says why. */
@@ -106,6 +108,19 @@ export function buildEndCard(
     scene.add.existing(undo);
     undo.setAlpha(0);
     parts.push(undo);
+  }
+  if (!o.won && o.revive) {
+    const revive = new Button(
+      scene,
+      cx,
+      l.frame.y + l.frame.h * 0.5 + (undoLeads ? 60 : o.canUndo ? 120 : 60) * dpr,
+      bw,
+      o.revive.label,
+      { dpr, primary: false, onPress: o.revive.onPress },
+    ).setDepth(51);
+    scene.add.existing(revive);
+    revive.setAlpha(0);
+    parts.push(revive);
   }
   scene.tweens.add({ targets: parts, alpha: 1, delay: o.delay, duration: o.reduced ? 1 : 260 });
   return parts;

@@ -5,6 +5,7 @@ import type { Insets, Rect } from "../layout";
  * for every screen shape):
  *
  *   ┌ HUD: title · undo · retry · speed ┐
+ *   │ tray: coins · extra slot · hint   │  (levels with boosters)
  *   │  ┌ ring ───────────────────────┐  │
  *   │  │ mosaic (cubes)              │  │  familiars walk the ring and emptied cells
  *   │  └──────────── ◉ portal ───────┘  │
@@ -26,12 +27,16 @@ export interface CollectLayoutInput {
   columns: number;
   fieldCap: number;
   portalX: number;
+  /** Reserve a strip under the HUD for the booster tray (M14.4). */
+  tray?: boolean;
 }
 
 export interface CollectLayout {
   dpr: number;
   frame: Rect;
   hud: Rect;
+  /** The booster tray under the HUD (zero height when the level has none). */
+  tray: Rect;
   /** The mosaic plus its one-cell ring. */
   boardRect: Rect;
   /** Cell size in whole device pixels. */
@@ -50,6 +55,7 @@ export const CSS = {
   gap: 8,
   sidePad: 12,
   field: 46,
+  tray: 34,
   slot: 54,
   columnsMin: 110,
   columnsMax: 172,
@@ -98,7 +104,9 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const fieldY = slotY - gap - fieldH;
   const field = row(inner, input.fieldCap, px(CSS.slot) * 2, gap, fieldY, fieldH);
 
-  const boardTop = hud.y + hud.h;
+  const trayH = input.tray ? px(CSS.tray) : 0;
+  const tray: Rect = { x: inner.x, y: hud.y + hud.h, w: inner.w, h: trayH };
+  const boardTop = tray.y + trayH + (trayH > 0 ? Math.round(gap / 2) : 0);
   const boardBottom = fieldY - gap;
   const ringW = input.boardWidth + 2;
   const ringH = input.boardHeight + 2;
@@ -111,7 +119,7 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
     w: bw,
     h: bh,
   };
-  return { dpr, frame, hud, boardRect, cell, stride: ringW, field, slots, columns };
+  return { dpr, frame, hud, tray, boardRect, cell, stride: ringW, field, slots, columns };
 }
 
 /** Screen position of the centre of padded-grid cell `idx`. */

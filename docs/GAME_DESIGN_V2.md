@@ -277,8 +277,10 @@ There is no timer. Actions happen between ticks.
    and becomes `working`; `nextSpawn = tick + 1`.
 2. **Resume** a `waiting` group (tap it in its slot). Legal under the same two conditions. It leaves
    its slot (freeing it) and becomes `working`; `nextSpawn = tick + 1`.
-3. **Boosters** (Undo, extra slot, …) are defined in M14.4; Undo restores the state before the last
-   select/resume.
+3. **Boosters** (Undo, Extra Slot, Hint; docs/V2_BOOSTERS.md): Undo restores the state before the last
+   select/resume; Extra Slot adds a holding slot for the level (and revives a `slotsFull` loss); Hint
+   names a move that keeps the level winnable. They are not game actions: they change no rule and
+   cost nothing unless they do something.
 
 Illegal taps do nothing to the game (the UI explains why: "no reachable cube of this colour yet", or
 "too many groups working"). They never cost anything.
@@ -405,8 +407,8 @@ timer and never artificially slow movement.
 - 1× is always free. 2× is a presentation speed that unlocks for the current level only through an
   optional rewarded ad (M14.3); with no working ad provider it is not offered. It never changes
   outcomes.
-- Boosters are re-specified for this model in M14.4 and must each have a tested effect. Retry is
-  always free; there are no lives, energy or forced ads.
+- Boosters are Undo, Extra Slot and Hint (docs/V2_BOOSTERS.md), each with a tested effect, paid from
+  stock or coins that winning earns. Retry is always free; there are no lives, energy or forced ads.
 
 ## 14. Worked examples (fixtures for M9.5)
 

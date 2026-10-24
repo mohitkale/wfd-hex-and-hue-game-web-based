@@ -19,6 +19,8 @@ export type CollectEvent =
   /** A working group ran out of assignable cubes with capacity left (`remaining > 0`). */
   | { type: "groupParked"; group: number; slot: number; remaining: number }
   | { type: "slotReleased"; slot: number }
+  /** The Extra Slot booster added holding slot `slot` (docs/V2_BOOSTERS.md). */
+  | { type: "slotAdded"; slot: number }
   | { type: "groupCompleted"; group: number }
   | { type: "won" }
   /** `group` is the group that ran dry for `slotsFull`, otherwise `null`. */
