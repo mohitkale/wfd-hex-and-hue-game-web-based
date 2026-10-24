@@ -26,19 +26,19 @@ the matrix of docs/QA.md.
 ## The device matrix
 
 24×24 board, five slots, four columns (the typical level), sizes in CSS px
-(`npm run layout:matrix`):
+(`npm run layout:matrix`; since M14.4 it includes the 30 CSS px booster tray under the HUD, which costs the shortest phones up to 0.5 CSS px per cube):
 
 | Device              | Viewport @ dpr | Cube | Column     | Slot | Front number | Field number |
 | ------------------- | -------------- | ---- | ---------- | ---- | ------------ | ------------ |
-| iPhone SE (1st gen) | 320×568 @2     | 11.5 | 70×113.5   | 44   | 22.5         | 19           |
-| iPhone SE (2nd gen) | 375×667 @2     | 13.5 | 82×133.5   | 51.5 | 26           | 22           |
+| iPhone SE (1st gen) | 320×568 @2     | 11   | 70×113.5   | 44   | 22.5         | 19           |
+| iPhone SE (2nd gen) | 375×667 @2     | 12.5 | 82×133.5   | 51.5 | 26           | 22           |
 | iPhone 15           | 393×852 @3     | 14   | 86×170.3   | 54   | 27.3         | 23           |
 | Pixel 7             | 412×915 @2.625 | 14.9 | 90.7×172.2 | 54.1 | 29           | 23.2         |
 | Galaxy S8           | 360×740 @3     | 12.7 | 78×148     | 54   | 25           | 23           |
 | iPad                | 768×1024 @2    | 17.5 | 108×172    | 54   | 34.5         | 23           |
-| iPad (landscape)    | 1024×768 @2    | 16.5 | 108×153.5  | 54   | 33           | 23           |
+| iPad (landscape)    | 1024×768 @2    | 15.5 | 108×153.5  | 54   | 33           | 23           |
 | Desktop             | 1440×900 @1    | 17   | 108×172    | 54   | 35           | 23           |
-| Phone (landscape)   | 844×390 @3     | 7.7  | 112.3×78   | 33.3 | 23.3         | 14.3         |
+| Phone (landscape)   | 844×390 @3     | 7    | 112.3×78   | 33.3 | 23.3         | 14.3         |
 
 ## What the tests guarantee (`interface.test.ts`)
 

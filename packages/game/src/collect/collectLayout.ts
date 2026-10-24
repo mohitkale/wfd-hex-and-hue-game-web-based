@@ -55,7 +55,7 @@ export const CSS = {
   gap: 8,
   sidePad: 12,
   field: 46,
-  tray: 34,
+  tray: 30,
   slot: 54,
   columnsMin: 110,
   columnsMax: 172,
@@ -106,7 +106,7 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
 
   const trayH = input.tray ? px(CSS.tray) : 0;
   const tray: Rect = { x: inner.x, y: hud.y + hud.h, w: inner.w, h: trayH };
-  const boardTop = tray.y + trayH + (trayH > 0 ? Math.round(gap / 2) : 0);
+  const boardTop = tray.y + trayH;
   const boardBottom = fieldY - gap;
   const ringW = input.boardWidth + 2;
   const ringH = input.boardHeight + 2;

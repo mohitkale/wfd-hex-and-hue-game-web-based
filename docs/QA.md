@@ -67,3 +67,87 @@ Fixed during QA:
 Also verified this milestone: offline play, the update toast and install flow (M6.4), the CSP on
 every page with zero violations (M7.3), analytics consent end to end (M7.2), and the Docker image
 smoke test in CI.
+
+# v2 board QA (M15.3)
+
+Checked on 2026-10-24 on `main` after M15.2. **No real phone, no Safari, no Firefox and no installed
+PWA was available**; everything below is the desktop Claude app's browser pane (Chromium) emulating
+a 390×800 phone at dpr 2 on the Astro dev server (unminified), plus Node. The on-device 60 fps
+measurement that M11.2 and M10.3 deferred is **still not done**: see "Not measured".
+
+## Frame cost (`?engine=v2&level=<id>&profile=1`)
+
+CPU time per frame, not vsync-bound frame time (the pane's refresh is not reliable; see
+[V2_PERF.md](V2_PERF.md)). Groups started at once, 8 s warm-up, 10 s sampled, ~550 frames each. The
+sprite pool equalled the engine's familiar count (`countsMatch`) every time and never exceeded
+`squad × fieldCap`.
+
+| Level                          | Cubes | Familiars (peak / limit) | Submit median | Submit p95 | Submit max | `update` median | `update` p95 | `update` max |
+| ------------------------------ | ----- | ------------------------ | ------------- | ---------- | ---------- | --------------- | ------------ | ------------ |
+| `big` (40×40, stress)          | 1,600 | 30 / 36                  | 1.5 ms        | 3.1 ms     | 3.4 ms     | 0.3 ms          | 3.1 ms       | 7.9 ms       |
+| `dense` (32×32 shaded orb)     | 772   | 20 / 20                  | 1.2 ms        | 2.7 ms     | 3.4 ms     | 0.2 ms          | 2.0 ms       | 8.7 ms       |
+| `art-black-cat` (a real piece) | 575   | 12 / 12                  | 1.2 ms        | 2.3 ms     | 2.7 ms     | 0.1 ms          | 0.4 ms       | 3.2 ms       |
+
+Against M10.3 (`big`: 1.5 / 3.7 ms) the M11–M14 additions (shading, seals, HUD, tray, boosters,
+gameplay events) cost nothing measurable. These are desktop numbers: a phone core is slower by a
+factor nobody here has measured, so **60 fps on a mid-range phone remains a hypothesis**.
+
+## Engine cost (`npm run perf:engine`, Node, eager bot)
+
+Pathfinding is not per frame: a route is found when a familiar gets a target and the distance map
+is refreshed only when a cube is picked up. Per tick, on this machine:
+
+| Level              | Cubes   | Ticks       | Mean           | p99            | Worst tick   |
+| ------------------ | ------- | ----------- | -------------- | -------------- | ------------ |
+| slice              | 196     | 212         | 0.008 ms       | 0.035 ms       | 0.05 ms      |
+| the six art pieces | 312–575 | 1,162–2,636 | 0.001–0.004 ms | 0.005–0.019 ms | 0.03–0.64 ms |
+| `dense`            | 772     | 2,156       | 0.003 ms       | 0.006 ms       | 1.1 ms       |
+| `big`              | 1,600   | 3,211       | 0.004 ms       | 0.008 ms       | 0.56 ms      |
+
+At 24 ticks a second (48 at 2×) the engine is a rounding error next to rendering, even at a 100×
+slower phone.
+
+## Downloads (`npm run budget`, production build)
+
+| Item                                  | Size          | Budget                                                                                      |
+| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------- |
+| Play page JS (Phaser and v1 game)     | 392.5 KB gzip | 450 KB                                                                                      |
+| v2 board chunk (`v2/CollectScene.js`) | 40.1 KB gzip  | **43 KB** (raised from 40 in M14.5; the tutorial, boosters, daily and events took it to 40) |
+| Whole build                           | 2,471 KB      | 3,072 KB                                                                                    |
+
+The CI perf budget was updated for v2 in M14.5 (40 → 43 KB for the chunk) and needed nothing more here.
+The v2 chunk loads only with `?engine=v2` today; at the M15.5 switch it becomes part of the shell and
+the 450 KB play-page budget must be re-set with it (the sum is about 433 KB gzip).
+
+## Layout and cube size
+
+The layout matrix ([V2_INTERFACE.md](V2_INTERFACE.md)) and the density tool
+([V2_ART_DENSITY.md](V2_ART_DENSITY.md)) now include the 30 CSS px booster tray under the HUD. **A
+finding from this work:** the tray was added in M14.4 without re-running them, and on the shortest
+phones it made cubes smaller than the M11.2 floors (iPhone SE 1st gen 32 per side: 8.0 px against
+8.5; Galaxy S 40 per side: 7.7 against 8). The tray was slimmed (34 → 30 px, no extra gap) and the floors
+were lowered to what the layout now achieves (6.5 / 7.5 / 8, was 7 / 8 / 8.5; no shipped piece is
+over 32 high, the widest is 40 by 20). Phones 852 px tall and up are unaffected. If readability on a
+small phone is a problem at G3, the next lever is hiding the tray on short phones.
+
+## Compatibility
+
+| Area                                                                     | Status                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chromium (this pane, emulating Android Chrome's UA and a 390×800 screen) | Plays, measured above; the only console error was a dev-server 404 for `sw.js` / `favicon.ico` (the service worker exists only in production builds)                                                                                                                                                                                                                               |
+| Mobile Safari, Android Chrome on a device, Firefox, Safari desktop       | **Not tested**                                                                                                                                                                                                                                                                                                                                                                     |
+| Installed PWA, offline                                                   | **Not tested; known gap.** The v2 chunk is deliberately outside the service worker's precache (`apps/web/src/pwa/serviceWorker.ts`, tested), so v2 would not work offline after install (only page navigations are cached at runtime, never script subresources, so one online visit does not rescue it). M15.5 must move it into the shell and re-test offline on a real install. |
+| Reduced motion                                                           | Implemented on the v2 board (no trails, sparks, fountains or squash; stationary completion; motes still) and unit-tested (`ambient`, `completion`, `feedback`); not re-checked by eye in this pass                                                                                                                                                                                 |
+| Colour-blind mode                                                        | Checked by eye (`?cb=1`): a symbol on every familiar and every group badge. **Cubes on the board carry no symbol**; matching is by colour there, with the badge symbols as the key                                                                                                                                                                                                 |
+| Sound and haptics                                                        | The v2 board honours the saved sound and haptics settings. **There is no sound, music or colour-blind control inside the v2 screens**: those live in the v1 menu. The M15.5 switch needs a settings entry point                                                                                                                                                                    |
+| Touch targets                                                            | HUD buttons are 44 css px zones; the tray pills are about 30 px tall and 60–70 px wide (below 44 px high): the nearest thing to a tap-target exception                                                                                                                                                                                                                             |
+
+## Not measured (carried into M15.5 / G3)
+
+1. **On-device frame rate**, including the 32×32 `dense` board: needs a person with a reference phone
+   (steps in [V2_PERF.md](V2_PERF.md#real-device-measurement-not-done-tracked-as-m153-issue-103);
+   `?engine=v2&level=dense&profile=1`). **Open.**
+2. GPU time and memory on a tile-based mobile GPU (the static layer is a ~12 MB texture at dpr 3).
+3. WebGL context loss on a real device (verified only with `WEBGL_lose_context` on desktop).
+4. Real touch feel, audio unlock and haptics on iOS and Android.
+5. Offline play of v2 from an installed PWA.
