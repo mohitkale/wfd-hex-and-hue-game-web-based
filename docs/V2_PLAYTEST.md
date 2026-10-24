@@ -13,6 +13,8 @@ release candidate) stays blocked until real findings are recorded and approved h
   ([V2_ONBOARDING.md](V2_ONBOARDING.md)); afterwards the player is on the slice level. Other doors,
   for the facilitator only: `?level=slice` (skips the tutorial), `?level=art-black-cat` and the other
   `art-*` pictures, `?level=daily`, `?view=spellbook`.
+- The **Menu** button under the HUD opens sound, music, vibration, colour-symbol and reduced-motion
+  switches without leaving the level.
 - Boosters, coins and the optional 2× ad are described in [V2_BOOSTERS.md](V2_BOOSTERS.md) and
   [V2_SPEED.md](V2_SPEED.md). With no ad provider configured there is no 2× button.
 - Use a fresh browser profile (or clear site data) for each tester: progress lives in `localStorage`
@@ -80,7 +82,7 @@ go in this document. Fixes that follow become new tasks in the M15 milestone.
   [V2_PERF.md](V2_PERF.md#real-device-measurement-not-done-tracked-as-m153-issue-103)); record device,
   browser and the numbers. The profiler (`window.__collect`) only exists in a build made with
   `PUBLIC_ENGINE=v2` or in dev; the deployed site may not expose it, so follow the V2_PERF.md steps.
-- Whether the booster tray's buttons (about 30 px tall) are comfortable to tap, and whether cubes are
+- Whether the booster tray's buttons (drawn about 30 px tall, 44 px tap zones) are comfortable to tap, and whether cubes are
   readable on the smallest phone in the session (cube size on short phones fell with the tray: QA.md).
 - Touch feel, audio unlock and haptics on iOS Safari and Android Chrome.
 
