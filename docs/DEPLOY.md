@@ -76,3 +76,15 @@ game in an iframe, change `frame-ancestors 'self'` to list them.
 - [ ] `/play/` loads, plays offline after one visit, and shows "A new version is ready" after the
       next deploy.
 - [ ] Optional analytics: the consent banner appears once, and events reach PostHog after "Allow".
+
+## The v2.0.0 switch and rolling back
+
+v2 is the default engine in the release candidate (`packages/game/src/collect/engineFlag.ts`); there is
+nothing new to configure. The v2 board is a hashed chunk in `_astro/`, precached by the service worker
+like the rest of the shell (the earlier unhashed `v2/` path, its cache headers and nginx location were
+removed).
+
+To roll back without a code change, build with `PUBLIC_ENGINE=v1` (set it in the Netlify or Docker
+build environment): `/play/` then runs the v1 game and never requests the v2 chunk. Players can also
+use `/play/?engine=v1`. Progress in saves is untouched either way (docs/V2_MIGRATION.md). If the v2 chunk fails to load (offline with a stale service worker, a deploy mismatch), the player lands on the v1 title screen with their v1 progress and no message; a visible retry is a follow-up. Do not tag or deploy the
+release without the owner's explicit approval (roadmap G4).

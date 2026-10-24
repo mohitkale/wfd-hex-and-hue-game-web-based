@@ -109,15 +109,14 @@ slower phone.
 
 ## Downloads (`npm run budget`, production build)
 
-| Item                                  | Size          | Budget                                                                                      |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------- |
-| Play page JS (Phaser and v1 game)     | 392.5 KB gzip | 450 KB                                                                                      |
-| v2 board chunk (`v2/CollectScene.js`) | 40.1 KB gzip  | **43 KB** (raised from 40 in M14.5; the tutorial, boosters, daily and events took it to 40) |
-| Whole build                           | 2,471 KB      | 3,072 KB                                                                                    |
+| Item                                             | Size          | Budget                                                                                      |
+| ------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------- |
+| Play page JS (Phaser, v1 and v2)                 | 434.1 KB gzip | 450 KB                                                                                      |
+| v2 board chunk (`_astro/CollectScene.<hash>.js`) | 41.5 KB gzip  | **43 KB** (raised from 40 in M14.5; the tutorial, boosters, daily and events took it to 40) |
+| Whole build                                      | 2,471 KB      | 3,072 KB                                                                                    |
 
 The CI perf budget was updated for v2 in M14.5 (40 → 43 KB for the chunk) and needed nothing more here.
-The v2 chunk loads only with `?engine=v2` today; at the M15.5 switch it becomes part of the shell and
-the 450 KB play-page budget must be re-set with it (the sum is about 433 KB gzip).
+In the M15.5 release candidate the v2 chunk is a hashed bundle in `_astro/` (precached, counted in the play-page total, which is 434.1 of 450 KB: little headroom).
 
 ## Layout and cube size
 
@@ -136,7 +135,7 @@ small phone is a problem at G3, the next lever is hiding the tray on short phone
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Chromium (this pane, emulating Android Chrome's UA and a 390×800 screen) | Plays, measured above; the only console error was a dev-server 404 for `sw.js` / `favicon.ico` (the service worker exists only in production builds)                                                                                                                                                                                                                                 |
 | Mobile Safari, Android Chrome on a device, Firefox, Safari desktop       | **Not tested**                                                                                                                                                                                                                                                                                                                                                                       |
-| Installed PWA, offline                                                   | **Not tested; known gap.** The v2 chunk is deliberately outside the service worker's precache (`apps/web/src/pwa/serviceWorker.ts`, tested), so v2 would not work offline after install (only page navigations are cached at runtime, never script subresources, so one online visit does not rescue it). M15.5 must move it into the shell and re-test offline on a real install.   |
+| Installed PWA, offline                                                   | **Not tested on a real install.** In the M15.5 release candidate the v2 chunk is a hashed bundle in `_astro/`, so it is part of the precached shell (a unit test pins this); whether a real installed PWA then plays v2 offline is still to be checked                                                                                                                               |
 | Reduced motion                                                           | Implemented on the v2 board (no trails, sparks, fountains or squash; stationary completion; motes still) and unit-tested (`ambient`, `completion`, `feedback`); not re-checked by eye in this pass                                                                                                                                                                                   |
 | Colour-blind mode                                                        | Checked by eye (`?cb=1`): a symbol on every familiar and every group badge. **Cubes on the board carry no symbol**; matching is by colour there, with the badge symbols as the key                                                                                                                                                                                                   |
 | Sound and haptics                                                        | The v2 board honours the saved sound and haptics settings. **A Menu button in the v2 tray now opens a settings panel over the board (sound, music, vibration, colour symbols, reduced motion, and the anonymous-stats choice where analytics exist); the game waits while it is open and the level is kept. Volume sliders are not in it (on/off only); they stay in the v1 settings |
@@ -150,4 +149,4 @@ small phone is a problem at G3, the next lever is hiding the tray on short phone
 2. GPU time and memory on a tile-based mobile GPU (the static layer is a ~12 MB texture at dpr 3).
 3. WebGL context loss on a real device (verified only with `WEBGL_lose_context` on desktop).
 4. Real touch feel, audio unlock and haptics on iOS and Android.
-5. Offline play of v2 from an installed PWA.
+5. Offline play of v2 from an installed PWA (precached in the RC; unverified on a device).

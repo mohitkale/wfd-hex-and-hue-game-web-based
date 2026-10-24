@@ -12,9 +12,9 @@
  */
 
 /**
- * Pages and files that make up the playable game. Everything else is cached at runtime. (The v2
- * review board lives in `v2/`, outside this rule on purpose: it is never precached and does not
- * change the worker version.)
+ * Pages and files that make up the playable game. Everything else is cached at runtime. The v2 board
+ * is a hashed chunk in `_astro/` (since v2 became the default engine), so it is precached with the
+ * rest and plays offline.
  */
 function isShell(file: string): boolean {
   return (

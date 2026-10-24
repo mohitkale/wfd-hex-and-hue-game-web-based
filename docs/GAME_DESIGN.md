@@ -1,3 +1,6 @@
+> **Superseded by v2.0.0.** This is the rule set of the track game, kept as the `?engine=v1`
+> fallback. The game is now [GAME_DESIGN_V2.md](GAME_DESIGN_V2.md).
+
 # Hex & Hue: Magic Pixel Puzzle — Game Design Spec
 
 _A Little Magic in Every Color._

@@ -29,9 +29,13 @@ describe("service worker build", () => {
     ]);
   });
 
-  it("never precaches the v2 review board chunk (it lives in v2/, outside the shell)", () => {
-    const files = ["play/index.html", "_astro/play.abc.js", "v2/CollectScene.js"];
-    expect(shellFiles(files)).toEqual(["_astro/play.abc.js", "play/index.html"]);
+  it("precaches the v2 board chunk: it is a hashed bundle in _astro/, so v2 plays offline", () => {
+    const files = ["play/index.html", "_astro/play.abc.js", "_astro/CollectScene.Xy12ab.js"];
+    expect(shellFiles(files)).toEqual([
+      "_astro/CollectScene.Xy12ab.js",
+      "_astro/play.abc.js",
+      "play/index.html",
+    ]);
   });
 
   it("maps navigations to their page keys", () => {

@@ -30,6 +30,8 @@ export interface Pouch {
   boosters: Record<Booster, number>;
   /** Ids of the levels whose first clear has been paid. */
   paid: string[];
+  /** The shipped game's coins and boosters have been carried over (once; see `importV1`). */
+  imported: boolean;
 }
 
 export const startingPouch = (): Pouch => ({
@@ -37,6 +39,7 @@ export const startingPouch = (): Pouch => ({
   coins: STARTING_KIT.coins,
   boosters: { ...STARTING_KIT.boosters },
   paid: [],
+  imported: false,
 });
 
 const count = (v: unknown, fallback: number): number =>
@@ -58,7 +61,13 @@ export function parsePouch(json: unknown): Pouch {
   const paid = Array.isArray(o.paid)
     ? [...new Set(o.paid.filter((x): x is string => typeof x === "string" && x !== ""))]
     : [];
-  return { version: 1, coins: count(o.coins, fresh.coins), boosters, paid };
+  return {
+    version: 1,
+    coins: count(o.coins, fresh.coins),
+    boosters,
+    paid,
+    imported: o.imported === true,
+  };
 }
 
 export type Payment =
