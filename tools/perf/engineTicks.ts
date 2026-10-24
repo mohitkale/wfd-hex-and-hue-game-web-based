@@ -1,7 +1,7 @@
 /**
  * Engine cost per tick on the v2 levels (docs/QA.md, M15.3): how long `step` takes, in Node, with
  * an eager bot keeping the board busy. Pathfinding is not per frame: a route is computed when a
- * familiar is given a target, the distance map only when a cube is picked up. This measures the sum.
+ * familiar is given a target, the distance map only when a cube is picked up. This measures `session.tick()` only (a tap's own work is not included).
  *
  *   npm run perf:engine
  *
