@@ -5,3 +5,4 @@ coverage
 package-lock.json
 packages/game/src/levels/generated
 packages/game/src/collect/generated
+docs/V2_PRODUCTION_REPORT.md

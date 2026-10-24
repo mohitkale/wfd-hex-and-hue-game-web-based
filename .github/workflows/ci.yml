@@ -27,6 +27,8 @@ jobs:
       # The v2 art library (M11.4) and the v2 level quality gate (M12.6): both fail the build.
       - run: npm run art:check
       - run: npm run levels:check
+      # Every level a player can reach: solved, played by the simulated players, report current (M15.2).
+      - run: npm run production:check
       - run: npm run build
       - run: npm run budget
 
