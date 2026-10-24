@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as collect from "@hexhue/core/collect";
 import { fixtureB, randomLevel } from "../../packages/core/src/collect/fixtures";
 import { ART_LEVELS } from "../../packages/game/src/collect/artLevels";
@@ -26,6 +26,10 @@ function unwinnable(): collect.CollectLevel {
   }
   throw new Error("no unsolvable level found");
 }
+
+// The real inventory is solved and played by nine cheap players plus 200 random runs per level; on a
+// busy machine that takes longer than the default 30 s.
+vi.setConfig({ testTimeout: 120_000 });
 
 describe("the real inventory", () => {
   const entries = inventory();

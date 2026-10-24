@@ -22,6 +22,7 @@ import { getRewards, safeShow, type AdResult } from "../rewards";
 import { stepFrame } from "./frameStep";
 import { CollectHud } from "./CollectHud";
 import { BoosterTray, undoBadge } from "./BoosterTray";
+import { buildSettingsPanel } from "./SettingsPanel";
 import { GameplayTracker, emitVia } from "./gameplayTracker";
 import { getAnalytics, safeFlush, track } from "../analytics";
 import { MAX_EXTRA_SLOTS, useExtraSlot, useHint, useUndo, type UseResult } from "./boosterUse";
@@ -158,6 +159,9 @@ export class CollectScene extends Phaser.Scene {
   private portal!: PortalView;
   private hud!: CollectHud;
   private tray: BoosterTray | null = null;
+  /** The settings panel is open over the board: play waits, and a rebuild keeps it open. */
+  private settingsOpen = false;
+  private settingsObjects: Phaser.GameObjects.GameObject[] = [];
   /** Anonymous gameplay events for this level (M14.5); the provider enforces consent. */
   private stats!: GameplayTracker;
   /** The v2 pouch (M14.4): coins and booster stock; it is only written back when it was read cleanly. */
@@ -191,6 +195,7 @@ export class CollectScene extends Phaser.Scene {
     // board"): field initialisers do not re-run, so anything left from the last session is reset.
     this.overlayTimer?.remove();
     this.overlayTimer = null;
+    this.settingsOpen = false;
     this.overlay = [];
     this.reveal = null;
     this.winRecord = null;
@@ -460,6 +465,7 @@ export class CollectScene extends Phaser.Scene {
       : new BoosterTray(this, this.layout, {
           onSlot: () => this.boost(useExtraSlot(this.pouch, this.session, false)),
           onHint: () => this.boost(useHint(this.pouch, this.session, false)),
+          onMenu: () => this.openSettings(),
         });
     this.syncPouch();
     this.tutorialLayer = this.tutorial
@@ -468,6 +474,8 @@ export class CollectScene extends Phaser.Scene {
     this.refreshTutorial();
     this.buildInput();
     this.clock.reset();
+    this.settingsObjects = [];
+    if (this.settingsOpen) this.showSettings();
     if (state.status !== "playing") this.showEnd(0);
   }
 
@@ -542,6 +550,31 @@ export class CollectScene extends Phaser.Scene {
   private retry(): void {
     this.stats.retry(this.session.state.status);
     this.session.restart();
+  }
+
+  /** Settings over the board (sound, motion, colour symbols...): the game waits and the level is kept. */
+  private openSettings(): void {
+    if (this.settingsOpen || this.overlay.length > 0) return;
+    this.settingsOpen = true;
+    this.showSettings();
+  }
+
+  private showSettings(): void {
+    this.settingsObjects = buildSettingsPanel(this, this.layout, {
+      onChanged: (id, value) => {
+        if (id === "haptics") this.haptics.enabled = value === true;
+        // Colour symbols and motion change what is drawn: redraw from the session (the panel reopens).
+        else if (id === "colorblind") {
+          this.colorblind = value === true;
+          this.rebuild();
+        } else if (id === "motion") this.rebuild();
+      },
+      onClose: () => {
+        this.settingsOpen = false;
+        for (const o of this.settingsObjects) o.destroy();
+        this.settingsObjects = [];
+      },
+    });
   }
 
   /** Undo is a booster outside the tutorial: it costs one from stock or its price in coins. */
@@ -703,7 +736,7 @@ export class CollectScene extends Phaser.Scene {
   /** `fromDemo` marks taps made by the demo player; any other tap takes over and ends the demo. */
   private tap(action: collect.Action, fromDemo = false): void {
     if (!fromDemo) this.demo = null;
-    if (this.overlay.length > 0) return;
+    if (this.overlay.length > 0 || this.settingsOpen) return;
     const result = this.session.tap(action);
     if (!result.ok) {
       const reason = result.reason;
@@ -814,12 +847,12 @@ export class CollectScene extends Phaser.Scene {
     this.frameTime = time;
     const profileStart = this.profile ? performance.now() : 0;
     // The game waits while an ad is on screen.
-    const adWait = this.speedState.adPending;
+    const adWait = this.speedState.adPending || this.settingsOpen;
     // Active play only: not an ad wait, an end card or a hidden tab.
     if (!adWait && this.session.state.status === "playing" && !document.hidden) {
       this.stats.active(delta);
     }
-    const due = stepFrame(this.session, this.clock, delta, this.speed, this.speedState.adPending);
+    const due = stepFrame(this.session, this.clock, delta, this.speed, adWait);
     if (this.profile) this.profile.ticks += due;
     this.familiars.update(
       this.session.state.tick,

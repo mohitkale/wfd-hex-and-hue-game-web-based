@@ -6,7 +6,11 @@ import { PRICES, type Booster, type Pouch } from "./pouch";
 export interface TrayHandlers {
   onSlot: () => void;
   onHint: () => void;
+  onMenu: () => void;
 }
+
+/** A tap target is at least this tall (css px), however small the pill drawn in it. */
+export const MIN_TAP_CSS = 44;
 
 /** What a booster pill says: its stock, or its price when the stock is empty. */
 export function pillLabel(name: string, pouch: Pouch, booster: Booster): string {
@@ -25,11 +29,13 @@ export const undoBadge = (pouch: Pouch): string =>
  */
 export class BoosterTray {
   private readonly coins: Phaser.GameObjects.Text;
+  private readonly menu: Phaser.GameObjects.Text;
   private readonly slot: Phaser.GameObjects.Text;
   private readonly hint: Phaser.GameObjects.Text;
+  private readonly zones: [Phaser.GameObjects.Text, Phaser.GameObjects.Zone][];
 
   constructor(
-    scene: Phaser.Scene,
+    private readonly scene: Phaser.Scene,
     private readonly layout: CollectLayout,
     handlers: TrayHandlers,
   ) {
@@ -45,28 +51,42 @@ export class BoosterTray {
       .text(tray.x + 2 * dpr, cy, "", style(theme.textDim))
       .setOrigin(0, 0.5)
       .setDepth(20);
+    this.zones = [];
     const pill = (right: number, onPress: () => void) => {
       const text = scene.add
-        .text(right, cy, "", { ...style(theme.text), padding: { x: 10 * dpr, y: 6 * dpr } })
+        .text(right, cy, "", { ...style(theme.text), padding: { x: 10 * dpr, y: 4 * dpr } })
         .setOrigin(1, 0.5)
         .setDepth(21)
         .setBackgroundColor("#2a1c52");
-      text.setInteractive({ useHandCursor: true });
-      text.on("pointerdown", onPress);
+      // The drawn pill is small; the zone around it is a proper tap target (at least 44 css px tall).
+      const zone = scene.add
+        .zone(right, cy, 10, 10)
+        .setDepth(22)
+        .setInteractive({ useHandCursor: true });
+      zone.on("pointerdown", onPress);
+      this.zones.push([text, zone]);
       return text;
     };
     const right = tray.x + tray.w;
     this.hint = pill(right, handlers.onHint);
-    // The Slot pill sits left of Hint; laid out after the first sync, when the widths are known.
     this.slot = pill(right, handlers.onSlot);
+    this.menu = pill(right, handlers.onMenu);
   }
 
   /** Updates the labels from the pouch; `slotsLeft` is false when the level has gained its maximum. */
   sync(pouch: Pouch, slotsLeft: boolean): void {
+    const gap = 8 * this.layout.dpr;
     this.coins.setText(`✦ ${pouch.coins}`);
     this.hint.setText(pillLabel("Hint", pouch, "hint"));
     this.slot.setText(slotsLeft ? pillLabel("+Slot", pouch, "extraSlot") : "+Slot max");
     this.slot.setAlpha(slotsLeft ? 1 : 0.5);
-    this.slot.setX(this.hint.x - this.hint.width - 8 * this.layout.dpr);
+    this.menu.setText("Menu");
+    this.slot.setX(this.hint.x - this.hint.width - gap);
+    this.menu.setX(this.slot.x - this.slot.width - gap);
+    const { tray, dpr } = this.layout;
+    const tall = Math.max(tray.h, MIN_TAP_CSS * dpr);
+    for (const [text, zone] of this.zones) {
+      zone.setPosition(text.x - text.width / 2, tray.y + tray.h / 2).setSize(text.width, tall);
+    }
   }
 }
