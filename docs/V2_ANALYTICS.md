@@ -15,7 +15,8 @@ Anonymous, consent-gated events that say where v2 levels are too hard, too easy 
 - **No PII.** Properties are level ids, counts, whole seconds, flags and fixed choices; a test
   rejects any property outside the documented list or of another type. The random id exists only
   after consent and no profile or location is requested.
-- Analytics can never affect play: `track` swallows errors, the tracker only counts.
+- Analytics can never affect play: `track` swallows errors (the tracker itself only counts), and the
+  page flushes on `visibilitychange` to hidden as well as `pagehide`, since phones often fire only one.
 
 ## Events
 

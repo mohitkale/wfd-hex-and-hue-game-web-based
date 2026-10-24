@@ -34,12 +34,12 @@ export const BUDGETS: Budget[] = [
   },
   {
     // The v2 review board and engine (`?engine=v2`): its own allowance until v2 replaces v1.
-    // Raised 40 → 46 KB in M14.5: the tutorial, boosters, daily and analytics took the chunk to 40 KB.
+    // Raised 40 → 43 KB in M14.5: the tutorial, boosters, daily and analytics took the chunk to 40 KB.
     label: "v2 collect chunk",
     match: (f) => f.path === "v2/CollectScene.js",
     measure: "gzip",
     per: "total",
-    max: 46 * KB,
+    max: 43 * KB,
   },
   {
     label: "each HTML page",

@@ -253,9 +253,15 @@ export class CollectScene extends Phaser.Scene {
       this.stats.abandon();
       safeFlush(getAnalytics(this), true);
     };
+    // Backgrounding a phone often fires no `pagehide`: flush then too (without ending the attempt).
+    const onVisibility = () => {
+      if (document.hidden) safeFlush(getAnalytics(this), true);
+    };
     window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
     this.events.once("shutdown", () => {
       window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
       this.stats.abandon();
     });
     const line = demoLineFromSearch(search, level);
@@ -710,7 +716,7 @@ export class CollectScene extends Phaser.Scene {
       if (cue) playCues([cue], this.sinks);
       return;
     }
-    this.stats.move();
+    if (!fromDemo) this.stats.move();
     this.panels.sync(this.session.state);
   }
 
