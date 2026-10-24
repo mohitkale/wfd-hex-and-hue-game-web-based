@@ -22,6 +22,8 @@ import { getRewards, safeShow, type AdResult } from "../rewards";
 import { stepFrame } from "./frameStep";
 import { CollectHud } from "./CollectHud";
 import { BoosterTray, undoBadge } from "./BoosterTray";
+import { GameplayTracker, emitVia } from "./gameplayTracker";
+import { getAnalytics, safeFlush, track } from "../analytics";
 import { MAX_EXTRA_SLOTS, useExtraSlot, useHint, useUndo, type UseResult } from "./boosterUse";
 import {
   award,
@@ -156,6 +158,8 @@ export class CollectScene extends Phaser.Scene {
   private portal!: PortalView;
   private hud!: CollectHud;
   private tray: BoosterTray | null = null;
+  /** Anonymous gameplay events for this level (M14.5); the provider enforces consent. */
+  private stats!: GameplayTracker;
   /** The v2 pouch (M14.4): coins and booster stock; it is only written back when it was read cleanly. */
   private pouch: Pouch = startingPouch();
   private pouchOk = false;
@@ -238,6 +242,28 @@ export class CollectScene extends Phaser.Scene {
     }
     this.colorblind = params.get("cb") === "1";
     this.session = new collect.CollectSession(level);
+    this.stats = new GameplayTracker(
+      emitVia(this),
+      level.id,
+      this.tutorialId ? "tutorial" : this.dailyDate ? "daily" : level.subject ? "picture" : "other",
+    );
+    this.stats.start();
+    // Closing the page mid-attempt is an abandon; flush with a beacon, which survives the unload.
+    const onHide = () => {
+      this.stats.abandon();
+      safeFlush(getAnalytics(this), true);
+    };
+    // Backgrounding a phone often fires no `pagehide`: flush then too (without ending the attempt).
+    const onVisibility = () => {
+      if (document.hidden) safeFlush(getAnalytics(this), true);
+    };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    this.events.once("shutdown", () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+      this.stats.abandon();
+    });
     const line = demoLineFromSearch(search, level);
     if (line) this.demo = { line, next: 0, readyAt: 0 };
     // The first sealed level of a visit explains the seals once; it never waits on a tap.
@@ -376,6 +402,8 @@ export class CollectScene extends Phaser.Scene {
 
     // Two HUD buttons, or three when there is a 2× offer (or an unlocked switch) to show.
     this.hudButtons = this.speedView().show ? 3 : 2;
+    // Whether the optional 2× ad can be offered here (once per level, never in the tutorial).
+    if (!this.tutorialId) this.stats.adOffer("speed2x", getRewards(this).isAvailable("speed2x"));
     this.bakeStaticLayer();
     this.portal = new PortalView(this, this.layout, this.session.state.params.portal);
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
@@ -488,7 +516,7 @@ export class CollectScene extends Phaser.Scene {
   private buildHud(): void {
     this.hud = new CollectHud(this, this.layout, this.session.level.name, this.speedView(), {
       onUndo: () => this.undo(),
-      onRestart: () => this.session.restart(),
+      onRestart: () => this.retry(),
       onSpeed: () => this.onSpeedTap(),
     });
     this.hud.setProgress(progressOf(this.session.state).fraction);
@@ -510,6 +538,12 @@ export class CollectScene extends Phaser.Scene {
     this.hud.setUndoBadge(this.tutorialId ? "" : undoBadge(this.pouch));
   }
 
+  /** Retry: always free and instant; the events say how the attempt stood and begin the next. */
+  private retry(): void {
+    this.stats.retry(this.session.state.status);
+    this.session.restart();
+  }
+
   /** Undo is a booster outside the tutorial: it costs one from stock or its price in coins. */
   private undo(): void {
     this.demo = null;
@@ -522,6 +556,8 @@ export class CollectScene extends Phaser.Scene {
     this.commitPouch(r.pouch);
     this.toaster.show(r.message, 2600);
     if (!r.used) return;
+    if (r.paid?.booster === "undo") this.stats.undo(r.paid.how);
+    else if (r.paid) this.stats.booster(r.paid.booster, r.paid.how);
     if (r.suggest) this.highlight(r.suggest);
     // The layout changes with the slot count; Undo and Retry rebuild on their own.
     else if (r.relayout) this.rebuild();
@@ -633,6 +669,7 @@ export class CollectScene extends Phaser.Scene {
     const current = token === this.adToken;
     // A late result of an older wait never touches a newer one's state; only a completed ad still counts.
     if (!current && result !== "rewarded") return;
+    track(this, "ad_result", { placement: "speed2x", result });
     const outcome = applyAdResult(this.speedState, levelId, result);
     this.speedState = current
       ? outcome.state
@@ -679,6 +716,7 @@ export class CollectScene extends Phaser.Scene {
       if (cue) playCues([cue], this.sinks);
       return;
     }
+    if (!fromDemo) this.stats.move();
     this.panels.sync(this.session.state);
   }
 
@@ -722,8 +760,11 @@ export class CollectScene extends Phaser.Scene {
       if (e.type === "groupCompleted") {
         this.cubes.setSeals(sealMap(this.session.state));
         this.celebrateGroup(e.group);
+      } else if (e.type === "lost") {
+        this.stats.loss(e.reason);
       } else if (e.type === "won") {
         this.celebrateWin();
+        this.stats.win();
         this.payWin();
       }
     }
@@ -773,6 +814,11 @@ export class CollectScene extends Phaser.Scene {
     this.frameTime = time;
     const profileStart = this.profile ? performance.now() : 0;
     // The game waits while an ad is on screen.
+    const adWait = this.speedState.adPending;
+    // Active play only: not an ad wait, an end card or a hidden tab.
+    if (!adWait && this.session.state.status === "playing" && !document.hidden) {
+      this.stats.active(delta);
+    }
     const due = stepFrame(this.session, this.clock, delta, this.speed, this.speedState.adPending);
     if (this.profile) this.profile.ticks += due;
     this.familiars.update(
@@ -872,7 +918,7 @@ export class CollectScene extends Phaser.Scene {
       onShare: (text) => this.share(text),
       instant: this.revealSeen,
       onSpellbook: () => this.openSpellbook(),
-      onAgain: () => this.session.restart(),
+      onAgain: () => this.retry(),
     });
     this.reveal = overlay;
     this.overlay = overlay.objects;
@@ -967,7 +1013,7 @@ export class CollectScene extends Phaser.Scene {
       canUndo: this.session.canUndo,
       delay,
       reduced: isReducedMotion(this),
-      onRetry: () => this.session.restart(),
+      onRetry: () => this.retry(),
       onUndo: () => this.undo(),
       ...(!won ? this.reviveProps() : {}),
       ...(won && this.tutorialId ? { next: this.tutorialWin()! } : {}),

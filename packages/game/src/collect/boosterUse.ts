@@ -1,4 +1,5 @@
 import * as collect from "@hexhue/core/collect";
+import type { PlayPaid } from "../analytics/types";
 import { pay, paymentFor, type Booster, type Pouch } from "./pouch";
 
 /**
@@ -16,6 +17,8 @@ export interface UseResult {
   used: boolean;
   /** One line for the player. */
   message: string;
+  /** Which paid booster was used and how it was paid for (for the gameplay events). */
+  paid?: { booster: Booster; how: PlayPaid };
   /** The board must be laid out again (the slot count changed). */
   relayout?: boolean;
   /** A hint's suggestion, to highlight on the board. */
@@ -23,6 +26,10 @@ export interface UseResult {
 }
 
 const nothing = (pouch: Pouch, message: string): UseResult => ({ pouch, used: false, message });
+
+/** How a booster that has just worked is paid for, as the analytics say it. */
+const howPaid = (pouch: Pouch, booster: Booster, free: boolean): PlayPaid =>
+  free ? "free" : paymentFor(pouch, booster).kind === "owned" ? "owned" : "coins";
 
 /** Charges for a booster that has just worked; `free` (the tutorial) charges nothing. */
 function charge(pouch: Pouch, booster: Booster, free: boolean): Pouch {
@@ -43,7 +50,13 @@ export function useUndo(pouch: Pouch, session: collect.CollectSession, free: boo
   const short = affordable(pouch, "undo", free);
   if (short) return nothing(pouch, short);
   session.undo();
-  return { pouch: charge(pouch, "undo", free), used: true, message: "Undone" };
+  const how = howPaid(pouch, "undo", free);
+  return {
+    pouch: charge(pouch, "undo", free),
+    used: true,
+    message: "Undone",
+    paid: { booster: "undo", how },
+  };
 }
 
 /** Extra Slot: one more holding slot for this level; after a slots-full loss it revives the game. */
@@ -68,6 +81,7 @@ export function useExtraSlot(
   const revived = session.state.lossReason === "slotsFull";
   session.addSlot();
   return {
+    paid: { booster: "extraSlot", how: howPaid(pouch, "extraSlot", free) },
     pouch: charge(pouch, "extraSlot", free),
     used: true,
     relayout: true,
@@ -88,12 +102,19 @@ export function useHint(pouch: Pouch, session: collect.CollectSession, free: boo
         a.kind === "select"
           ? `Summon column ${a.column + 1}`
           : `Resume the group waiting in slot ${a.slot + 1}`;
-      return { pouch: charge(pouch, "hint", free), used: true, message, suggest: a };
+      return {
+        pouch: charge(pouch, "hint", free),
+        used: true,
+        message,
+        suggest: a,
+        paid: { booster: "hint", how: howPaid(pouch, "hint", free) },
+      };
     }
     case "doomed":
       return {
         pouch: charge(pouch, "hint", free),
         used: true,
+        paid: { booster: "hint", how: howPaid(pouch, "hint", free) },
         message: "No play wins from here. Undo, or Retry (free)",
       };
     case "wait":

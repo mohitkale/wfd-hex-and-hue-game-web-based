@@ -198,3 +198,21 @@ describe("refusals that must cost nothing", () => {
     expect(r.pouch).toEqual(startingPouch());
   });
 });
+
+describe("what the gameplay events are told", () => {
+  it("reports how each booster was paid for", () => {
+    const s = new collect.CollectSession(fixtureB());
+    s.tap(select(0));
+    expect(useUndo(startingPouch(), s, false).paid).toEqual({ booster: "undo", how: "owned" });
+    s.tap(select(0));
+    expect(useUndo({ ...broke(), coins: 99 }, s, false).paid).toEqual({
+      booster: "undo",
+      how: "coins",
+    });
+    s.tap(select(0));
+    expect(useUndo(broke(), s, true).paid).toEqual({ booster: "undo", how: "free" });
+    expect(useHint(startingPouch(), s, false).paid).toEqual({ booster: "hint", how: "owned" });
+    expect(useExtraSlot(broke(), s, true).paid).toEqual({ booster: "extraSlot", how: "free" });
+    expect(useExtraSlot(broke(), s, false).paid).toBeUndefined();
+  });
+});
