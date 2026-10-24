@@ -103,6 +103,20 @@ describe("collect layout", () => {
     expect(l.cell).toBeGreaterThanOrEqual(Math.floor(9 * dpr)); // a 22×22 board stays usable
   });
 
+  it.each(devices)("%s: the booster tray sits between the HUD and the board", (_n, w, h, dpr) => {
+    const none = computeCollectLayout(input(w, h, dpr));
+    const l = computeCollectLayout(input(w, h, dpr, { tray: true }));
+    expect(none.tray.h).toBe(0);
+    expect(l.tray.h).toBeGreaterThan(0);
+    expect(l.tray.y).toBe(l.hud.y + l.hud.h);
+    expect(l.boardRect.y).toBeGreaterThanOrEqual(l.tray.y + l.tray.h);
+    expect(l.tray.x).toBeGreaterThanOrEqual(l.frame.x);
+    expect(l.tray.x + l.tray.w).toBeLessThanOrEqual(l.frame.x + l.frame.w);
+    // The tray costs the board at most a little: a 22×22 board stays usable with it.
+    expect(l.cell).toBeGreaterThanOrEqual(Math.floor(8 * dpr));
+    expect(l.cell).toBeLessThanOrEqual(none.cell);
+  });
+
   it("respects safe-area insets and a thumb-sized column zone", () => {
     const l = computeCollectLayout(
       input(393, 852, 3, { insets: { top: 141, right: 0, bottom: 102, left: 0 } }),

@@ -1,6 +1,6 @@
 import type Phaser from "phaser";
 import { theme } from "../theme";
-import { HUD_ZONE_CSS, hudButtonX, type CollectLayout } from "./collectLayout";
+import { HUD_BUTTON_CSS, HUD_ZONE_CSS, hudButtonX, type CollectLayout } from "./collectLayout";
 import { progressFill, progressTrack } from "./progress";
 import type { SpeedView } from "./speedRule";
 
@@ -19,6 +19,7 @@ export class CollectHud {
   private readonly speedLabel: Phaser.GameObjects.Text | null;
   private readonly bar: Phaser.GameObjects.Graphics;
   private shown = -1;
+  private readonly undoBadge: Phaser.GameObjects.Text;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -68,7 +69,22 @@ export class CollectHud {
       hit.on("pointerdown", onPress);
     });
     this.speedLabel = speedLabel;
+    // How many Undos are in stock, at the corner of the Undo button (M14.4).
+    const size = Math.round(HUD_BUTTON_CSS * dpr);
+    this.undoBadge = scene.add
+      .text(hudButtonX(l, 0, 3) + size / 2, cy - size / 2 + 2 * dpr, "", {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${Math.round(11 * dpr)}px`,
+        color: "#f6d97a",
+      })
+      .setOrigin(0.5)
+      .setDepth(23);
     this.bar = scene.add.graphics().setDepth(20);
+  }
+
+  setUndoBadge(text: string): void {
+    this.undoBadge.setText(text);
   }
 
   setSpeedLabel(label: string): void {

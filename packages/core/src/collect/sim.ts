@@ -146,6 +146,54 @@ function dispatch(s: CollectState, groupId: number, events: CollectEvent[]): voi
 }
 
 /**
+ * Phase 3, pass 2: a working group with no familiar and no assignable cube parks in the lowest free
+ * slot, or loses the game when none is free. Returns true when the game was lost (the pass stops
+ * there and the state is frozen).
+ */
+function stall(s: CollectState, events: CollectEvent[]): boolean {
+  for (const g of s.groups) {
+    if (g.status !== "working") continue;
+    if (familiarCount(s, g.id) > 0 || hasAssignable(s, g.color)) continue;
+    const slot = s.slots.indexOf(null);
+    if (slot === -1) {
+      s.status = "lost";
+      s.lossReason = "slotsFull";
+      events.push({ type: "lost", reason: "slotsFull", group: g.id });
+      return true;
+    }
+    s.slots[slot] = g.id;
+    g.status = "waiting";
+    events.push({ type: "groupParked", group: g.id, slot, remaining: remaining(g) });
+  }
+  return false;
+}
+
+/** Phase 4: win is tested first, then a settled state with no legal action is a deadlock. */
+function updateStatus(s: CollectState, events: CollectEvent[]): void {
+  if (s.deliveredTotal === s.cubesTotal) {
+    s.status = "won";
+    events.push({ type: "won" });
+  } else if (isSettled(s) && legalActions(s).length === 0) {
+    s.status = "lost";
+    s.lossReason = "deadlock";
+    events.push({ type: "lost", reason: "deadlock", group: null });
+  }
+}
+
+/**
+ * Finishes the tick a `slotsFull` loss interrupted, after a slot was added (the Extra Slot booster,
+ * docs/V2_BOOSTERS.md): the stalled group parks in the new slot, the rest of the pass and phase 4
+ * run exactly as they would have. The tick counter is not advanced.
+ */
+export function reviveFromSlotsFull(s: CollectState): CollectEvent[] {
+  const events: CollectEvent[] = [];
+  s.status = "playing";
+  s.lossReason = null;
+  if (!stall(s, events)) updateStatus(s, events);
+  return events;
+}
+
+/**
  * One tick (GAME_DESIGN_V2 §7). Phase 0 begin, 1 act, 2 dispatch, 3 resolve (complete, then
  * stall), 4 status. A no-op, returning no events, when the game is over or settled.
  */
@@ -167,31 +215,9 @@ export function step(s: CollectState): CollectEvent[] {
       events.push({ type: "groupCompleted", group: g.id });
     }
   }
-  // Phase 3, pass 2: stall (park) or lose.
-  for (const g of s.groups) {
-    if (g.status !== "working") continue;
-    if (familiarCount(s, g.id) > 0 || hasAssignable(s, g.color)) continue;
-    const slot = s.slots.indexOf(null);
-    if (slot === -1) {
-      s.status = "lost";
-      s.lossReason = "slotsFull";
-      events.push({ type: "lost", reason: "slotsFull", group: g.id });
-      return events;
-    }
-    s.slots[slot] = g.id;
-    g.status = "waiting";
-    events.push({ type: "groupParked", group: g.id, slot, remaining: remaining(g) });
-  }
-
-  // Phase 4: status. Win is tested first.
-  if (s.deliveredTotal === s.cubesTotal) {
-    s.status = "won";
-    events.push({ type: "won" });
-  } else if (isSettled(s) && legalActions(s).length === 0) {
-    s.status = "lost";
-    s.lossReason = "deadlock";
-    events.push({ type: "lost", reason: "deadlock", group: null });
-  }
+  // Phase 3, pass 2 and phase 4.
+  if (stall(s, events)) return events;
+  updateStatus(s, events);
   return events;
 }
 
