@@ -169,3 +169,32 @@ describe("Hint", () => {
     expect(useHint(broke(), s, true).pouch).toEqual(broke());
   });
 });
+
+describe("refusals that must cost nothing", () => {
+  it("Extra Slot after a deadlock is refused without charge or cap use", () => {
+    const s = new collect.CollectSession(fixtureB());
+    s.tap(select(0));
+    settle(s);
+    const dead = s.state as collect.CollectState;
+    dead.status = "lost";
+    dead.lossReason = "deadlock";
+    const r = useExtraSlot(startingPouch(), s, false);
+    expect(r.used).toBe(false);
+    expect(r.pouch).toEqual(startingPouch());
+    expect(s.extraSlots).toBe(0);
+  });
+
+  it("Undo after a win is refused without charge", () => {
+    const s = new collect.CollectSession(
+      board(["RRR"], [[["R", 2]], [["R", 1]]], { colors: "R", slots: 2, squad: 1, spawnGap: 1 }),
+    );
+    s.tap(select(0));
+    settle(s);
+    s.tap(select(1));
+    settle(s);
+    expect(s.state.status).toBe("won");
+    const r = useUndo(startingPouch(), s, false);
+    expect(r.used).toBe(false);
+    expect(r.pouch).toEqual(startingPouch());
+  });
+});

@@ -16,6 +16,8 @@ export interface UseResult {
   used: boolean;
   /** One line for the player. */
   message: string;
+  /** The board must be laid out again (the slot count changed). */
+  relayout?: boolean;
   /** A hint's suggestion, to highlight on the board. */
   suggest?: collect.Action;
 }
@@ -36,6 +38,7 @@ function affordable(pouch: Pouch, booster: Booster, free: boolean): string | nul
 
 /** Undo: back to before the last select/resume. */
 export function useUndo(pouch: Pouch, session: collect.CollectSession, free: boolean): UseResult {
+  if (session.state.status === "won") return nothing(pouch, "The level is already won");
   if (!session.canUndo) return nothing(pouch, "Nothing to undo");
   const short = affordable(pouch, "undo", free);
   if (short) return nothing(pouch, short);
@@ -49,17 +52,25 @@ export function useExtraSlot(
   session: collect.CollectSession,
   free: boolean,
 ): UseResult {
-  if (!session.canAddSlot) return nothing(pouch, "The level is already won");
+  if (!session.canAddSlot) {
+    return nothing(
+      pouch,
+      session.state.status === "won"
+        ? "The level is already won"
+        : "A slot can't undo a deadlock. Undo or Retry",
+    );
+  }
   if (session.extraSlots >= MAX_EXTRA_SLOTS) {
     return nothing(pouch, `A level can gain ${MAX_EXTRA_SLOTS} extra slots at most`);
   }
   const short = affordable(pouch, "extraSlot", free);
   if (short) return nothing(pouch, short);
-  const revived = session.state.status === "lost";
+  const revived = session.state.lossReason === "slotsFull";
   session.addSlot();
   return {
     pouch: charge(pouch, "extraSlot", free),
     used: true,
+    relayout: true,
     message: revived ? "An extra slot opened and the game goes on" : "An extra slot opened",
   };
 }

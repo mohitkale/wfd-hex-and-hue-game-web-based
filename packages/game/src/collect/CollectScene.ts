@@ -524,7 +524,7 @@ export class CollectScene extends Phaser.Scene {
     if (!r.used) return;
     if (r.suggest) this.highlight(r.suggest);
     // The layout changes with the slot count; Undo and Retry rebuild on their own.
-    else if (r.message.startsWith("An extra slot")) this.rebuild();
+    else if (r.relayout) this.rebuild();
   }
 
   /** A hint's target pulses briefly on the board. */

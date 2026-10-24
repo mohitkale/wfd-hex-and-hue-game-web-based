@@ -58,7 +58,8 @@ Stored apart from the shipped game's save, in `localStorage` key `hexhue.v2.pouc
 Any booster is within three first clears of even the smallest level (tested); replays are slow on
 purpose (14 replays buy an Extra Slot), so farming is possible but pointless.
 
-**Persistence.** A pouch that could not be read is never overwritten (as for the Spellbook and the
+**Persistence.** With no usable storage nothing is saved, so a player in that state starts every
+visit with the starting kit (harmless for play). A pouch that could not be read is never overwritten (as for the Spellbook and the
 daily book); a corrupt field falls back on its own and a negative count clamps to 0, never a top-up.
 
 **Migration of v1 booster counts.** None. The v1 save (`hexhue.save`) keeps `coins` and

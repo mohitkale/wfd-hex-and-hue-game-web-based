@@ -134,7 +134,11 @@ export class CollectSession {
     return this.current;
   }
 
-  /** The effective action log (truncated by undo). */
+  /**
+   * The effective action log (truncated by undo). It records select/resume only: after `addSlot()`
+   * it no longer replays on the plain level (the slot count differs), so anything that replays a log
+   * must also apply `extraSlots` first.
+   */
   get log(): readonly LogEntry[] {
     return this.entries.slice();
   }
