@@ -562,12 +562,12 @@ export class CollectScene extends Phaser.Scene {
   private showSettings(): void {
     this.settingsObjects = buildSettingsPanel(this, this.layout, {
       onChanged: (id, value) => {
-        if (id === "haptics") this.haptics.enabled = value === true;
-        // Colour symbols and motion change what is drawn: redraw from the session (the panel reopens).
+        if (id === "haptics") this.haptics.enabled = value;
+        // Colour symbols change what is drawn: redraw from the session (the panel reopens).
         else if (id === "colorblind") {
-          this.colorblind = value === true;
+          this.colorblind = value;
           this.rebuild();
-        } else if (id === "motion") this.rebuild();
+        }
       },
       onClose: () => {
         this.settingsOpen = false;

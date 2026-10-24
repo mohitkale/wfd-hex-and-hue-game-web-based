@@ -1,6 +1,7 @@
 import type Phaser from "phaser";
 import { getAnalytics, privacySignal, readConsent, writeConsent } from "../analytics";
 import { getSave } from "../save";
+import { defaultSave } from "../save/schema";
 import { theme } from "../theme";
 import { Button } from "../view/Button";
 import { Segmented, Toggle } from "../view/controls";
@@ -15,8 +16,8 @@ import {
 } from "./settingsModel";
 
 export interface PanelHandlers {
-  /** A switch changed (the scene applies what needs a redraw, e.g. colour symbols). */
-  onChanged: (id: ToggleId | "motion", value: boolean | string) => void;
+  /** A switch was saved (the scene applies what needs a redraw, e.g. colour symbols). */
+  onChanged: (id: ToggleId, value: boolean) => void;
   onClose: () => void;
 }
 
@@ -46,11 +47,18 @@ export function buildSettingsPanel(
   );
   const left = l.frame.x + 24 * dpr;
   const right = l.frame.x + l.frame.w - 24 * dpr;
-  const settings = getSave(scene)?.data.settings;
-  const change = (apply: (s: NonNullable<typeof settings>) => NonNullable<typeof settings>) =>
-    getSave(scene)?.update((d) => {
+  // Without a loaded save the rows show the defaults (and a change cannot be stored, so none is applied).
+  const saved = getSave(scene);
+  const settings = saved?.data.settings ?? defaultSave().settings;
+  // A short frame (small phone, big insets) drops the grey notes and tightens the rows so Done never covers a control.
+  const compact = l.frame.h < 640 * dpr;
+  const change = (apply: (s: typeof settings) => typeof settings): boolean => {
+    if (!saved) return false;
+    saved.update((d) => {
       d.settings = apply(d.settings);
     });
+    return true;
+  };
   let y = l.frame.y + 40 * dpr;
   push(
     scene.add
@@ -78,22 +86,22 @@ export function buildSettingsPanel(
   const canVibrate = typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
   const row = (text: string, note: string, value: boolean, onChange: (v: boolean) => void) => {
     label(text, y, 16, theme.text);
-    if (note) label(note, y + 20 * dpr, 11, theme.textDim);
+    if (note && !compact) label(note, y + 20 * dpr, 11, theme.textDim);
     const toggle = push(
       new Toggle(scene, right - 26 * dpr, y + (note ? 8 * dpr : 0), dpr, value, onChange),
     );
     toggle.setDepth(61);
-    y += (note ? 62 : 50) * dpr;
+    y += (note && !compact ? 62 : compact ? 44 : 50) * dpr;
   };
   for (const t of TOGGLES) {
-    row(t.label, noteFor(t, canVibrate), settings?.[t.id] ?? true, (v) => {
-      change((s) => withToggle(s, t.id, v));
-      handlers.onChanged(t.id, v);
+    row(t.label, noteFor(t, canVibrate), settings[t.id], (v) => {
+      if (change((s) => withToggle(s, t.id, v))) handlers.onChanged(t.id, v);
     });
   }
   label("Reduce motion", y, 16, theme.text);
-  label("Calmer effects: no particles, flashes or shakes", y + 20 * dpr, 11, theme.textDim);
-  y += 56 * dpr;
+  if (!compact)
+    label("Calmer effects: no particles, flashes or shakes", y + 20 * dpr, 11, theme.textDim);
+  y += (compact ? 44 : 56) * dpr;
   const segment = push(
     new Segmented(
       scene,
@@ -102,11 +110,9 @@ export function buildSettingsPanel(
       Math.min(110 * dpr, (right - left) / 3),
       dpr,
       MOTION_OPTIONS,
-      settings?.reducedMotion ?? "system",
-      (v) => {
-        change((s) => withMotion(s, v));
-        handlers.onChanged("motion", v);
-      },
+      settings.reducedMotion,
+      // The saved change reaches the scene through the registry's `reducedMotion` flag, which redraws it.
+      (v) => void change((s) => withMotion(s, v)),
     ),
   );
   segment.setDepth(61);
