@@ -1,0 +1,7 @@
+{
+  "levels": { "moonlit-01": { "stars": 2, "wins": 1 } },
+  "coins": 40,
+  "boosters": { "undo": 2, "shuffle": 2, "extraSlot": 2, "wand": 2 },
+  "settings": { "sound": false },
+  "stats": { "plays": 3, "wins": 1, "losses": 2 }
+}
