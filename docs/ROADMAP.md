@@ -160,7 +160,7 @@ _Polish the complete loop while keeping monetization fair._
 - [x] **M14.2** Improve onboarding — Teach by interaction. _Needs M14.1._
 - [x] **M14.3** Correct the 2× speed rule — 2× unlocks only through an optional rewarded ad for the current level; replace the alternating free/ad policy. _Needs M9.4._
 - [x] **M14.4** Rebalance boosters and economy — Define and test each booster under the new rules. _Needs M9.5, M12.6._
-- [ ] **M14.5** Instrument gameplay quality — Consent-gated anonymous gameplay events. _Needs M14.1._
+- [x] **M14.5** Instrument gameplay quality — Consent-gated anonymous gameplay events. _Needs M14.1._
 
 ### M15 — Quality assurance, playtesting, optimization and v2.0.0 release
 
