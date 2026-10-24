@@ -28,6 +28,7 @@ export function table(): string {
       columns: 4,
       fieldCap: 3,
       portalX: 11,
+      tray: true,
     });
     const css = (v: number) => v / dpr;
     const front = badgeBox(l, "column", 0, 0);

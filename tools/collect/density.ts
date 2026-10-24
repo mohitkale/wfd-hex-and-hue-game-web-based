@@ -36,6 +36,8 @@ export function cubeCss(
     boardHeight: size,
     ...panels,
     portalX: Math.floor((size - 1) / 2),
+    // The booster tray (M14.4) is on every non-tutorial level, so it takes board height too.
+    tray: true,
   });
   return l.cell / dpr;
 }

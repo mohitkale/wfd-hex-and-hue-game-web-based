@@ -40,6 +40,7 @@
     "familiar:sheet": "tsx tools/familiar/sheet.ts",
     "icons": "tsx tools/icons/build.ts",
     "budget": "tsx tools/perf/check.ts",
+    "perf:engine": "tsx tools/perf/engineTicks.ts",
     "density": "tsx tools/collect/density.ts"
   },
   "devDependencies": {
