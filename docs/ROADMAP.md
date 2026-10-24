@@ -166,7 +166,7 @@ _Polish the complete loop while keeping monetization fair._
 
 _Deliver a production-quality upgrade validated by automated tests and human playtesting. Contains gates G3 and G4._
 
-- [ ] **M15.1** Comprehensive gameplay tests — Test every rule and the save/resume path. _Needs M14.5._
+- [x] **M15.1** Comprehensive gameplay tests — Test every rule and the save/resume path. _Needs M14.5._
 - [ ] **M15.2** Gameplay regression and strategy testing — Validate every production level. _Needs M15.1._
 - [ ] **M15.3** Performance and compatibility — Measure frame time and compatibility. Includes the on-device 60 fps measurement of the 32×32 shaded board (`?engine=v2&level=dense`) deferred from M11.2, which had no reference phone. _Needs M15.1._
 - [ ] **M15.4** Human playability validation **(human gate)** — Run and record a small session with first-time players. _Needs M15.2, M15.3._ Box ticked only when real findings are recorded (G3); stays unticked while awaiting humans. **Includes the M14.2 criterion:** record whether first-time players completed the tutorial (`docs/V2_ONBOARDING.md`) and where they got stuck.

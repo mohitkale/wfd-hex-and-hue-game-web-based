@@ -1,0 +1,7 @@
+{
+  "version": 9,
+  "levels": { "moonlit-01": { "stars": 3, "wins": 1 } },
+  "coins": 10,
+  "boosters": { "undo": 1, "shuffle": 1, "extraSlot": 1, "wand": 1 },
+  "futureField": { "a": 1 }
+}

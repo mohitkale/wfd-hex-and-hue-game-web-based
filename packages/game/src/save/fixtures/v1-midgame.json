@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "levels": {
+    "moonlit-01": { "stars": 3, "wins": 2 },
+    "moonlit-02": { "stars": 2, "wins": 1 },
+    "moonlit-03": { "stars": 1, "wins": 4 },
+    "crystal-01": { "stars": 3, "wins": 1 }
+  },
+  "skipped": ["moonlit-04"],
+  "coins": 137,
+  "boosters": { "undo": 1, "shuffle": 0, "extraSlot": 3, "wand": 2 },
+  "speedTurns": 5,
+  "settings": {
+    "haptics": true,
+    "sound": true,
+    "music": false,
+    "sfxVolume": 0.6,
+    "musicVolume": 0.3,
+    "colorblind": true,
+    "reducedMotion": "on"
+  },
+  "stats": { "plays": 31, "wins": 19, "losses": 12 },
+  "lastPlayed": { "world": 0, "level": 3 },
+  "tips": ["select", "slots", "wand"]
+}
