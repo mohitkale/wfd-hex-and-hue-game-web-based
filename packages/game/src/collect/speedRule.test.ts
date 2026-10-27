@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createRewards, MockProvider, NoneProvider } from "../rewards";
 import {
   applyAdResult,
+  effectiveSpeed,
+  sprinting,
   enterLevel,
   initialSpeedState,
   restoreSpeed,
@@ -17,13 +19,13 @@ import { ART_LEVELS } from "./artLevels";
 import { TUTORIAL } from "./tutorialLevels";
 import { moonlitHat } from "./slice";
 
-/** M14.3: 1× is free; 2× only through an optional rewarded ad, for one level; and it never changes outcomes. */
+/** M14.3: 1× is free; 3× only through an optional rewarded ad, for one level; and it never changes outcomes. */
 
 const view = (state: SpeedState, over: Partial<Parameters<typeof speedView>[0]> = {}) =>
   speedView({ levelId: "L", state, providerAvailable: true, speed: 1, ...over });
 
 describe("what the HUD offers", () => {
-  it("with no working provider there is no 2× offer at all", () => {
+  it("with no working provider there is no 3× offer at all", () => {
     expect(view(initialSpeedState(), { providerAvailable: false })).toEqual({
       show: false,
       label: "",
@@ -32,7 +34,7 @@ describe("what the HUD offers", () => {
   });
 
   it("with a provider the offer says it is an ad, and a tap watches it", () => {
-    expect(view(initialSpeedState())).toEqual({ show: true, label: "2×▶", action: "watch" });
+    expect(view(initialSpeedState())).toEqual({ show: true, label: "3×▶", action: "watch" });
   });
 
   it("while an ad is on screen the button says so, and a tap on it ends the wait (a provider that hangs never traps the game)", () => {
@@ -43,28 +45,28 @@ describe("what the HUD offers", () => {
     });
   });
 
-  it("once unlocked it is a plain 1×/2× switch, even if the provider goes away", () => {
+  it("once unlocked it is a plain 1×/3× switch, even if the provider goes away", () => {
     const s: SpeedState = { unlockedFor: "L", declinedFor: null, adPending: false };
-    expect(view(s, { speed: 2, providerAvailable: false })).toEqual({
+    expect(view(s, { speed: 3, providerAvailable: false })).toEqual({
       show: true,
-      label: "2×",
+      label: "3×",
       action: "toggle",
     });
     expect(view(s, { speed: 1 }).label).toBe("1×");
   });
 
-  it("2× unlocked for another level does not carry over: here the ad is offered again", () => {
+  it("3× unlocked for another level does not carry over: here the ad is offered again", () => {
     const s: SpeedState = { unlockedFor: "other", declinedFor: null, adPending: false };
     expect(view(s).action).toBe("watch");
   });
 });
 
 describe("what an ad's result does", () => {
-  it("a completed ad unlocks 2× for this level and says so", () => {
+  it("a completed ad unlocks 3× for this level and says so", () => {
     const out = applyAdResult(initialSpeedState(), "L", "rewarded");
-    expect(out.speed).toBe(2);
+    expect(out.speed).toBe(3);
     expect(out.state.unlockedFor).toBe("L");
-    expect(out.message).toBe("2× unlocked for this level");
+    expect(out.message).toBe("3× unlocked for this level");
   });
 
   it("closing it early grants nothing, changes nothing and may be tried again", () => {
@@ -83,13 +85,13 @@ describe("what an ad's result does", () => {
     expect(view(out.state).show).toBe(false);
   });
 
-  it("no fake reward: only `rewarded` ever gives 2×", () => {
+  it("no fake reward: only `rewarded` ever gives 3×", () => {
     for (const r of ["dismissed", "unavailable"] as const)
       expect(applyAdResult(initialSpeedState(), "L", r).speed).toBe(1);
   });
 });
 
-describe("2× is for the current level only", () => {
+describe("3× is for the current level only", () => {
   it("another level starts at 1× with the offer back; the same level keeps it (a retry)", () => {
     const unlocked: SpeedState = { unlockedFor: "L", declinedFor: null, adPending: true };
     expect(enterLevel(unlocked, "L")).toEqual({
@@ -105,7 +107,7 @@ describe("2× is for the current level only", () => {
 });
 
 describe("the provider decides whether anything is offered", () => {
-  it("PUBLIC_REWARDS=none (and an unset production build) advertises no 2×", () => {
+  it("PUBLIC_REWARDS=none (and an unset production build) advertises no 3×", () => {
     for (const env of [
       { PUBLIC_REWARDS: "none" },
       { DEV: false },
@@ -151,18 +153,18 @@ describe("speed never changes the outcome", () => {
   ];
 
   it.each(levels.map((l) => [l.id, l] as const))(
-    "%s: the same actions give the same log, state and win at 1× and 2×",
+    "%s: the same actions give the same log, state and win at 1× and 3×",
     (_id, level) => {
       const solved = collect.solve(level, 200_000);
       expect(solved.status).toBe("solved");
       const one = play(level, solved.line!, 1);
-      const two = play(level, solved.line!, 2);
+      const two = play(level, solved.line!, 3);
       expect(one.session.state.status).toBe("won");
       expect(two.session.state.status).toBe("won");
       expect(two.session.log).toEqual(one.session.log);
       expect(collect.hashState(two.session.state)).toBe(collect.hashState(one.session.state));
-      // It really was faster: about half the frames.
-      expect(two.frames).toBeLessThan(one.frames * 0.7);
+      // It really was faster: about a third of the frames.
+      expect(two.frames).toBeLessThan(one.frames * 0.5);
     },
     120_000,
   );
@@ -171,25 +173,25 @@ describe("speed never changes the outcome", () => {
 describe("the level's speed when it starts", () => {
   const unlocked: SpeedState = { unlockedFor: "L", declinedFor: null, adPending: true };
 
-  it("restores 2× only for the very level it was unlocked for, and never an ad in flight", () => {
-    expect(restoreSpeed(unlocked, 2, "L", false)).toEqual({
+  it("restores 3× only for the very level it was unlocked for, and never an ad in flight", () => {
+    expect(restoreSpeed(unlocked, 3, "L", false)).toEqual({
       state: { unlockedFor: "L", declinedFor: null, adPending: false },
-      speed: 2,
+      speed: 3,
     });
     // Unlocked but switched back to 1×, or kept speed from another level: 1×.
     expect(restoreSpeed(unlocked, 1, "L", false).speed).toBe(1);
-    expect(restoreSpeed(unlocked, 2, "M", false)).toEqual({ state: initialSpeedState(), speed: 1 });
+    expect(restoreSpeed(unlocked, 3, "M", false)).toEqual({ state: initialSpeedState(), speed: 1 });
     expect(restoreSpeed(undefined, undefined, "L", false)).toEqual({
       state: initialSpeedState(),
       speed: 1,
     });
-    expect(restoreSpeed(initialSpeedState(), 2, "L", false).speed).toBe(1); // a stale 2 never unlocks
+    expect(restoreSpeed(initialSpeedState(), 3, "L", false).speed).toBe(1); // a stale 3 never unlocks
   });
 
   it("the review override unlocks the level it opens (and only when the caller says it is allowed)", () => {
     expect(restoreSpeed(undefined, undefined, "L", true)).toEqual({
       state: { unlockedFor: "L", declinedFor: null, adPending: false },
-      speed: 2,
+      speed: 3,
     });
     expect(restoreSpeed(undefined, undefined, "L", false).speed).toBe(1);
   });
@@ -226,5 +228,50 @@ describe("the Undo ring on the HUD", () => {
     const r = targetRect(l, { kind: "undo" })!;
     const slot0 = hudButtonX(l, 0, 3);
     expect(r.x + r.w / 2).toBeCloseTo(slot0);
+  });
+});
+
+describe("the free end-game sprint", () => {
+  const state = (o: Partial<Parameters<typeof sprinting>[0]> = {}) => ({
+    status: "playing",
+    columns: [[], []],
+    slots: [null, null],
+    groups: [{ status: "working" }, { status: "completed" }],
+    ...o,
+  });
+
+  it("starts when nothing is queued or waiting and a group is still working", () => {
+    expect(sprinting(state())).toBe(true);
+    expect(effectiveSpeed(1, true)).toBe(3);
+    expect(effectiveSpeed(1, false)).toBe(1);
+    expect(effectiveSpeed(3, false)).toBe(3);
+  });
+
+  it("does not while a decision is left: a queued group, a waiting group, or nobody working", () => {
+    expect(sprinting(state({ columns: [[4], []] }))).toBe(false);
+    expect(sprinting(state({ slots: [2, null] }))).toBe(false);
+    expect(sprinting(state({ groups: [{ status: "completed" }] }))).toBe(false);
+  });
+
+  it("never once the game is over", () => {
+    expect(sprinting(state({ status: "won" }))).toBe(false);
+    expect(sprinting(state({ status: "lost" }))).toBe(false);
+  });
+
+  it("is only about speed: a real game finished at the sprint's speed matches one at 1×", () => {
+    for (const level of [moonlitHat(), ...TUTORIAL.map((t) => t.make())]) {
+      const line = collect.solve(level, 200_000).line!;
+      const run = (speedAt: (s: collect.CollectState) => 1 | 3) => {
+        const session = new collect.CollectSession(level);
+        const clock = new TickClock();
+        let next = 0;
+        for (let f = 0; f < 400_000 && session.state.status === "playing"; f++) {
+          if (next < line.length && collect.isSettled(session.state)) session.tap(line[next++]!);
+          stepFrame(session, clock, 1000 / 60, speedAt(session.state));
+        }
+        return collect.hashState(session.state);
+      };
+      expect(run((s) => effectiveSpeed(1, sprinting(s)))).toBe(run(() => 1));
+    }
   });
 });

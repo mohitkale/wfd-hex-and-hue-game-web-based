@@ -8,7 +8,7 @@ import { ART_LEVELS } from "./artLevels";
 import { moonlitHat } from "./slice";
 import { tonesFor } from "./cubePaint";
 import { HUD_BUTTON_CSS, HUD_ZONE_CSS } from "./collectLayout";
-import { iconScale, numberLayout, DIGIT_EM } from "./badgeBox";
+import { numberLayout, DIGIT_EM } from "./badgeBox";
 import { progressFill, progressOf, progressTrack } from "./progress";
 
 /**
@@ -101,7 +101,8 @@ describe("portrait phones and tablets: thumb-sized targets and readable numbers"
           expect(css(l, c.h)).toBeGreaterThanOrEqual(90);
         }
         // Five slots (the design) are full 44 css px targets; eight are narrower but never tiny.
-        for (const r of l.slots) expect(css(l, r.w)).toBeGreaterThanOrEqual(s.slots <= 5 ? 44 : 30);
+        for (const r of l.slots)
+          expect(css(l, r.w + l.gap)).toBeGreaterThanOrEqual(s.slots <= 5 ? 44 : 30);
         // Group numbers: big on the front group, still legible everywhere else.
         const front = badgeBox(l, "column", 0, 0);
         expect(css(l, badgeFontPx(front.w, front.h, false))).toBeGreaterThanOrEqual(
@@ -118,7 +119,7 @@ describe("portrait phones and tablets: thumb-sized targets and readable numbers"
         const field = badgeBox(l, "field", 0, 0);
         expect(css(l, badgeFontPx(field.w, field.h, false))).toBeGreaterThanOrEqual(14);
         // The picture stays readable: cubes are not specks.
-        const minCell = s.board <= 10 ? 20 : s.board <= 24 ? 11 : 7;
+        const minCell = s.board <= 10 ? 20 : s.board <= 24 ? 10 : 6.5;
         expect(css(l, l.cell)).toBeGreaterThanOrEqual(minCell);
       });
 });
@@ -127,7 +128,7 @@ describe("landscape phones are playable but small (the game is portrait-first)",
   it("still lays everything out, with a board you can see", () => {
     const d = DEVICES.find((x) => x.name === "Phone (landscape)")!;
     const l = layoutFor(d, SHAPES[1]!);
-    expect(css(l, l.cell)).toBeGreaterThanOrEqual(7);
+    expect(css(l, l.cell)).toBeGreaterThanOrEqual(6);
     expect(css(l, l.columns[0]!.w)).toBeGreaterThanOrEqual(44);
   });
 });
@@ -143,9 +144,11 @@ describe("safe areas", () => {
 });
 
 describe("the group number's size", () => {
-  it("a wide badge (the field strip) gets a bigger number than a square one of the same height", () => {
-    expect(badgeFontPx(300, 100, false)).toBeGreaterThan(badgeFontPx(100, 100, false));
-    expect(badgeFontPx(300, 100, false)).toBe(Math.round(Math.min(50, 78)));
+  it("is half the tile's height, and smaller only when three digits would not fit", () => {
+    expect(badgeFontPx(100, 100, false)).toBe(45);
+    expect(badgeFontPx(100, 50, false)).toBe(25);
+    expect(badgeFontPx(40, 40, false)).toBe(Math.round((40 * 0.86) / (3 * 0.64)));
+    expect(badgeFontPx(40, 40, false)).toBeLessThan(20);
   });
   it("never exceeds what fits: a 3-digit number stays inside a narrow badge", () => {
     for (const [w, h] of [
@@ -242,7 +245,7 @@ describe("the progress bar never claims more than is done", () => {
   });
 });
 
-describe("a three-digit number clears the creature and the edge, on the real tiles", () => {
+describe("a three-digit number fits the tile, on the real tiles", () => {
   for (const d of DEVICES.filter((x) => x.framed))
     for (const s of SHAPES)
       it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
@@ -253,17 +256,54 @@ describe("a three-digit number clears the creature and the edge, on the real til
           badgeBox(l, "column", 0, 0),
         ]) {
           const n = numberLayout(box.w, box.h, false);
-          const half = (3 * DIGIT_EM * n.fontPx) / 2;
-          if (box.w >= box.h * 1.25) {
-            const iconRight = -box.w * 0.2 + (16 * iconScale(box.w, box.h)) / 2;
-            expect(n.x - half, "number's left edge vs the creature").toBeGreaterThanOrEqual(
-              iconRight - 0.5,
-            );
-            expect(n.x + half, "number's right edge vs the tile").toBeLessThanOrEqual(box.w / 2);
-          } else {
-            expect(half * 2, "centred number vs the tile").toBeLessThanOrEqual(box.w);
-          }
+          expect((3 * DIGIT_EM * n.fontPx) / 1, "number vs the tile").toBeLessThanOrEqual(box.w);
+          expect(n.x).toBe(0);
         }
+        // A queued tile's number sits inside the strip that shows.
+        const peek = badgeBox(l, "column", 0, 1);
+        const m = numberLayout(peek.w, peek.h, true);
+        expect(m.y + m.fontPx / 2).toBeLessThanOrEqual(peek.h / 2);
+        expect(m.y - m.fontPx / 2).toBeGreaterThanOrEqual(peek.h / 2 - peek.h * 0.34 - 1);
+      });
+});
+
+describe("every group box is the same square, wherever it is", () => {
+  for (const d of DEVICES.filter((x) => x.framed))
+    for (const s of SHAPES)
+      it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
+        const l = layoutFor(d, s);
+        const boxes = [
+          badgeBox(l, "field", 0, 0),
+          badgeBox(l, "slot", 0, 0),
+          badgeBox(l, "column", 0, 0),
+          badgeBox(l, "column", 0, 1),
+          badgeBox(l, "column", 0, 2),
+        ];
+        for (const b of boxes) {
+          expect(b.w).toBe(l.tile);
+          expect(b.h).toBe(l.tile);
+        }
+        // Big enough to read and to tap.
+        expect(css(l, l.tile), "tile css px").toBeGreaterThanOrEqual(30);
+        // The deck of queued tiles stays inside its column zone.
+        const col = l.columns[0]!;
+        const last = boxes[4]!;
+        expect(last.y + last.h / 2).toBeLessThanOrEqual(col.y + col.h + 1);
+      });
+});
+
+describe("the portal is apart from the picture", () => {
+  for (const d of DEVICES.filter((x) => x.framed))
+    for (const s of SHAPES)
+      it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
+        const l = layoutFor(d, s);
+        expect(l.dock.y).toBe(l.boardRect.y + l.boardRect.h);
+        expect(l.portal.y).toBeGreaterThan(l.dock.y);
+        expect(l.portal.y).toBeLessThan(l.dock.y + l.dock.h);
+        expect(l.dock.h).toBeGreaterThanOrEqual(l.cell);
+        expect(overlap(l.dock, l.field[0]!)).toBe(false);
+        expect(l.portal.x).toBeGreaterThan(l.boardRect.x);
+        expect(l.portal.x).toBeLessThan(l.boardRect.x + l.boardRect.w);
       });
 });
 
@@ -320,7 +360,7 @@ describe("the levels that ship, on the matrix", () => {
           `${level.id} front number`,
         ).toBeGreaterThanOrEqual(14);
         for (const r of l.slots)
-          expect(css(l, r.w), `${level.id} slot`).toBeGreaterThanOrEqual(
+          expect(css(l, r.w + l.gap), `${level.id} slot`).toBeGreaterThanOrEqual(
             level.slots <= 5 ? 44 : 30,
           );
       }

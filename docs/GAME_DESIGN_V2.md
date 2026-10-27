@@ -355,7 +355,7 @@ Undo and boosters can recover from a loss (M14.4). Retry is always free and inst
 The player may select another group while others are still working, up to `fieldCap` at once. Their
 familiars share the open space and never block each other (they may overlap). Because the tick
 rules fix every ordering, the result of a given **action log** (a list of `(tick, action)`) is
-unique. Speed (1× or 2×) changes only how many ticks are shown per second; the same log gives the
+unique. Speed (1× or 3×) changes only how many ticks are shown per second; the same log gives the
 same outcome at either speed (a human tapping at the same _visual_ moment at different speeds taps at
 different ticks, which is a different log). Actions logged at the same tick apply in log order.
 
@@ -404,9 +404,10 @@ timer and never artificially slow movement.
 
 ## 13. Speed, rewards, boosters
 
-- 1× is always free. 2× is a presentation speed that unlocks for the current level only through an
-  optional rewarded ad (M14.3); with no working ad provider it is not offered. It never changes
-  outcomes.
+- 1× is always free and the default. 3× is a presentation speed that unlocks for the current level only
+  through an optional rewarded ad (M14.3); with no working ad provider it is not offered. The last
+  deliveries, once no decision is left (nothing queued or waiting), are shown at 3× for free
+  (docs/V2_SPEED.md). Speed never changes outcomes.
 - Boosters are Undo, Extra Slot and Hint (docs/V2_BOOSTERS.md), each with a tested effect, paid from
   stock or coins that winning earns. Retry is always free; there are no lives, energy or forced ads.
 
@@ -532,7 +533,7 @@ selecting two groups of one colour against a single reachable cube is a poor cho
 | `spawnGap` | 2 ticks                         | Between spawns of one group. Level constant.                                  |
 | Pickup     | 1 tick                          | Fixed.                                                                        |
 | Deliver    | 1 tick                          | Fixed.                                                                        |
-| Tick rate  | tuned in M10 (≈ 8–12 / s at 1×) | Presentation only; 2× doubles it.                                             |
+| Tick rate  | tuned in M10 (≈ 8–12 / s at 1×) | Presentation only; 3× triples it.                                             |
 | `portalX`  | `⌊(W−1)/2⌋`                     | Level may override.                                                           |
 | Max board  | 40×40 (+ 1-cell ring)           | Sized from mobile tests in M11.2.                                             |
 

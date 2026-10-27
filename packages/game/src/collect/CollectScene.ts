@@ -37,6 +37,10 @@ import {
 } from "./pouch";
 import {
   applyAdResult,
+  BOOST,
+  effectiveSpeed,
+  sprinting,
+  type Speed,
   initialSpeedState,
   restoreSpeed,
   speedView,
@@ -61,7 +65,6 @@ import {
 import { progressOf } from "./progress";
 import {
   HUD_BUTTON_CSS,
-  cellCenter,
   computeCollectLayout,
   hudButtonX,
   type CollectLayout,
@@ -130,7 +133,7 @@ export class CollectScene extends Phaser.Scene {
   private atlas = "";
   /** 24 ticks a second at 1× (one cell per tick): crossing a 20-cell board takes under a second. */
   private readonly clock = new TickClock(24);
-  private speed: 1 | 2 = 1;
+  private speed: Speed = 1;
   /** The 2× rule (M14.3): per level, through an optional rewarded ad; kept across scene restarts. */
   private speedState: SpeedState = initialSpeedState();
   /** Which wait for an ad is the current one, and how to end it early (the button, Retry, Undo). */
@@ -226,13 +229,13 @@ export class CollectScene extends Phaser.Scene {
     this.tutorialSaved = false;
     const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     const params = new URLSearchParams(search);
-    // 2× is unlocked for this level only (a retry keeps it, another level starts at 1×). `?speed=2` is
+    // 2× is unlocked for this level only (a retry keeps it, another level starts at 1×). `?speed=3` is
     // a review override and exists in development builds only: it is not an ad reward.
     const restored = restoreSpeed(
       this.registry.get("v2.speedState") as SpeedState | undefined,
       this.registry.get("v2.speed"),
       level.id,
-      params.get("speed") === "2" && import.meta.env?.DEV === true,
+      params.get("speed") === "3" && import.meta.env?.DEV === true,
     );
     this.speedState = restored.state;
     this.speed = restored.speed;
@@ -410,7 +413,7 @@ export class CollectScene extends Phaser.Scene {
     // Whether the optional 2× ad can be offered here (once per level, never in the tutorial).
     if (!this.tutorialId) this.stats.adOffer("speed2x", getRewards(this).isAvailable("speed2x"));
     this.bakeStaticLayer();
-    this.portal = new PortalView(this, this.layout, this.session.state.params.portal);
+    this.portal = new PortalView(this, this.layout);
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
     this.model.resync(state);
     this.emitter = new Emitter(new Particles(160), this.layout.cell, reduced);
@@ -448,15 +451,7 @@ export class CollectScene extends Phaser.Scene {
       this.portal.pulse();
       this.panels.badge(group)?.pulse();
     };
-    this.panels = new PanelsView(
-      this,
-      this.layout,
-      level.palette,
-      this.atlas,
-      dpr,
-      this.colorblind,
-      reduced,
-    );
+    this.panels = new PanelsView(this, this.layout, level.palette, dpr, this.colorblind, reduced);
     this.rebuildMarks(state);
     this.panels.sync(state);
     this.buildHud();
@@ -501,6 +496,15 @@ export class CollectScene extends Phaser.Scene {
     g.lineStyle(Math.max(1, dpr), theme.mist, 0.18);
     g.strokeRoundedRect(l.boardRect.x, l.boardRect.y, l.boardRect.w, l.boardRect.h, l.cell * 0.8);
     paintPanelFrames(g, l, dpr);
+    // The dock under the picture: the portal sits here, clear of the cubes, so every flight shows.
+    g.fillStyle(theme.dusk, 0.5);
+    g.fillRoundedRect(
+      l.dock.x + l.cell,
+      l.dock.y,
+      l.dock.w - 2 * l.cell,
+      l.dock.h * 0.92,
+      l.cell * 0.7,
+    );
     const cy = l.hud.y + l.hud.h / 2;
     const size = Math.round(HUD_BUTTON_CSS * dpr);
     for (let i = 0; i < this.hudButtons; i++) {
@@ -511,7 +515,7 @@ export class CollectScene extends Phaser.Scene {
       g.strokeCircle(x, cy, size / 2);
     }
     // Only the area with static content (HUD, board, field and slot rows), not the columns below.
-    const bottom = Math.max(...l.slots.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
+    const bottom = Math.max(...l.slots.map((r) => r.y + r.h), l.dock.y + l.dock.h);
     const rt = this.add
       .renderTexture(l.frame.x, l.frame.y, l.frame.w, bottom - l.frame.y)
       .setOrigin(0, 0)
@@ -668,11 +672,11 @@ export class CollectScene extends Phaser.Scene {
     this.registry.set("v2.speed", this.speed);
   }
 
-  /** The speed button: switch 1×/2× once unlocked, or watch the optional ad that unlocks it. */
+  /** The speed button: switch 1×/3× once unlocked, or watch the optional ad that unlocks it. */
   private onSpeedTap(): void {
     const view = this.speedView();
     if (view.action === "toggle") {
-      this.speed = this.speed === 1 ? 2 : 1;
+      this.speed = this.speed === 1 ? BOOST : 1;
       this.saveSpeed();
       this.hud.setSpeedLabel(`${this.speed}×`);
     } else if (view.action === "watch") {
@@ -683,7 +687,7 @@ export class CollectScene extends Phaser.Scene {
   }
 
   /**
-   * Shows the rewarded ad for 2×. The game waits while it is on screen, but never for long and never
+   * Shows the rewarded ad for 3×. The game waits while it is on screen, but never for long and never
    * for good: the button, Retry or Undo end the wait at any moment (a provider that hangs just becomes
    * "no ad"), and whatever happens play carries on, at 1× unless the ad was completed.
    */
@@ -707,7 +711,7 @@ export class CollectScene extends Phaser.Scene {
     this.speedState = current
       ? outcome.state
       : { ...outcome.state, adPending: this.speedState.adPending };
-    if (outcome.speed === 2) this.speed = 2;
+    if (outcome.speed === BOOST) this.speed = BOOST;
     this.saveSpeed();
     const view = this.speedView();
     // Rebuild only when the HUD changed shape (a button appeared or went away); else just the label.
@@ -726,7 +730,8 @@ export class CollectScene extends Phaser.Scene {
     });
     this.layout.slots.forEach((r, slot) => {
       const zone = this.add
-        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
+        // The zone spans the gap between tiles too, so a small phone still gets a 44 px target.
+        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h + this.layout.gap)
         .setDepth(25)
         .setInteractive({ useHandCursor: true });
       zone.on("pointerdown", () => this.tap({ kind: "resume", slot }));
@@ -830,14 +835,14 @@ export class CollectScene extends Phaser.Scene {
     const colorIndex = this.session.state.groups[group]!.color;
     const color = tonesFor(this.session.level.palette[colorIndex]!).light;
     const badge = this.panels.badge(group);
-    const at = badge ?? cellCenter(this.layout, this.session.state.params.portal);
+    const at = badge ?? this.layout.portal;
     this.emitter.bloom(at.x, at.y, color, this.frameTime);
     this.emitter.sparks(at.x, at.y, color, 10, this.frameTime, 1.8);
   }
 
   /** Every cube is in: a fountain of the level's colours from the portal. */
   private celebrateWin(): void {
-    const p = cellCenter(this.layout, this.session.state.params.portal);
+    const p = this.layout.portal;
     const colors = this.session.level.palette.map((hex) => tonesFor(hex).light);
     this.emitter.fountain(p.x, p.y, colors, this.frameTime);
   }
@@ -852,13 +857,15 @@ export class CollectScene extends Phaser.Scene {
     if (!adWait && this.session.state.status === "playing" && !document.hidden) {
       this.stats.active(delta);
     }
-    const due = stepFrame(this.session, this.clock, delta, this.speed, adWait);
+    // The last deliveries play at 3× for free once no decision is left (never in the tutorial).
+    const shown = effectiveSpeed(this.speed, !this.tutorialId && sprinting(this.session.state));
+    const due = stepFrame(this.session, this.clock, delta, shown, adWait);
     if (this.profile) this.profile.ticks += due;
     this.familiars.update(
       this.session.state.tick,
       this.clock.alpha,
       time,
-      this.clock.tickMs / this.speed,
+      this.clock.tickMs / shown,
     );
     this.stepDemo(time);
     this.ambient.update(time);

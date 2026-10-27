@@ -39,6 +39,14 @@ export interface CollectLayout {
   tray: Rect;
   /** The mosaic plus its one-cell ring. */
   boardRect: Rect;
+  /** The strip under the board where the portal sits, apart from the picture (`DOCK_CELLS` tall). */
+  dock: Rect;
+  /** Where the portal is drawn and where familiars leave and return: the middle of the dock. */
+  portal: { x: number; y: number };
+  /** Every group box (column front, waiting, working) is a square of this size, in device pixels. */
+  tile: number;
+  /** The space between tiles; a slot's tap zone is its tile plus this, so it stays a full thumb target. */
+  gap: number;
   /** Cell size in whole device pixels. */
   cell: number;
   /** Padded-grid stride (`boardWidth + 2`). */
@@ -49,14 +57,17 @@ export interface CollectLayout {
   columns: Rect[];
 }
 
+/** The dock under the board, in cells: room for the portal and a visible flight to the picture. */
+export const DOCK_CELLS = 1.3;
+
 export const CSS = {
   maxWidth: 480,
   hud: 52,
   gap: 8,
   sidePad: 12,
-  field: 46,
+  field: 56,
   tray: 30,
-  slot: 54,
+  slot: 52,
   columnsMin: 110,
   columnsMax: 172,
 } as const;
@@ -96,13 +107,22 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const colGap = input.columns > 4 ? Math.round(gap / 2) : gap;
   const columns = row(inner, input.columns, Math.round(frame.w), colGap, columnsY, columnsH);
 
-  const slotH = px(CSS.slot);
-  const slotY = columnsY - gap - slotH;
-  const slots = row(inner, input.slots, px(CSS.slot), gap, slotY, slotH);
-
-  const fieldH = px(CSS.field);
-  const fieldY = slotY - gap - fieldH;
-  const field = row(inner, input.fieldCap, px(CSS.slot) * 2, gap, fieldY, fieldH);
+  // One size for every group box, whatever it is doing (column front, waiting, working): the largest
+  // square that fits the thumb zone's columns and each row of tiles, up to 52 css px.
+  const fit = (count: number, g: number) => Math.floor((inner.w - (count - 1) * g) / count);
+  const tile = Math.max(
+    1,
+    Math.min(
+      px(CSS.slot),
+      Math.floor((columns[0]?.w ?? px(CSS.slot)) * 0.94),
+      fit(input.slots, gap),
+      fit(input.fieldCap, gap),
+    ),
+  );
+  const slotY = columnsY - gap - tile;
+  const slots = row(inner, input.slots, tile, gap, slotY, tile);
+  const fieldY = slotY - gap - tile;
+  const field = row(inner, input.fieldCap, tile, gap, fieldY, tile);
 
   const trayH = input.tray ? px(CSS.tray) : 0;
   const tray: Rect = { x: inner.x, y: hud.y + hud.h, w: inner.w, h: trayH };
@@ -110,16 +130,40 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const boardBottom = fieldY - gap;
   const ringW = input.boardWidth + 2;
   const ringH = input.boardHeight + 2;
-  const cell = Math.max(1, Math.floor(Math.min(inner.w / ringW, (boardBottom - boardTop) / ringH)));
+  const cell = Math.max(
+    1,
+    Math.floor(Math.min(inner.w / ringW, (boardBottom - boardTop) / (ringH + DOCK_CELLS))),
+  );
   const bw = ringW * cell;
   const bh = ringH * cell;
+  const dockH = Math.round(DOCK_CELLS * cell);
   const boardRect: Rect = {
     x: frame.x + Math.floor((frame.w - bw) / 2),
-    y: boardTop + Math.floor((boardBottom - boardTop - bh) / 2),
+    y: boardTop + Math.floor((boardBottom - boardTop - bh - dockH) / 2),
     w: bw,
     h: bh,
   };
-  return { dpr, frame, hud, tray, boardRect, cell, stride: ringW, field, slots, columns };
+  const dock: Rect = { x: boardRect.x, y: boardRect.y + bh, w: bw, h: dockH };
+  const portal = {
+    x: boardRect.x + (input.portalX + 1.5) * cell,
+    y: dock.y + dock.h / 2,
+  };
+  return {
+    dpr,
+    frame,
+    hud,
+    tray,
+    boardRect,
+    dock,
+    portal,
+    tile,
+    gap,
+    cell,
+    stride: ringW,
+    field,
+    slots,
+    columns,
+  };
 }
 
 /** Screen position of the centre of padded-grid cell `idx`. */

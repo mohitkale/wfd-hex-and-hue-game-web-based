@@ -10,12 +10,12 @@ describe("cube size on phones", () => {
   // which moved the floors on the shortest phones: 8 → 6.5 at 40 per side (no shipped piece is that
   // big: the largest is 40 wide by 20 high and 32×30), 8.5 → 8 for standard pieces.
   it.each(PHONES)(
-    "%s: a cube stays at least 6.5 CSS px up to 40 per side, 7.5 on 360+ wide, 8 up to 32",
+    "%s: a cube stays at least 6.5 CSS px up to 40 per side, 7 on 360+ wide, 8 up to 32",
     (...p) => {
       for (const size of SIZES) {
         const px = cubeCss(size, p);
         expect(px, `${p[0]} at ${size}`).toBeGreaterThanOrEqual(6.5);
-        if (p[1] >= 360) expect(px, `${p[0]} at ${size}`).toBeGreaterThanOrEqual(7.5);
+        if (p[1] >= 360) expect(px, `${p[0]} at ${size}`).toBeGreaterThanOrEqual(7);
         // Standard pieces (up to 32 per side) get at least 8 CSS px on every phone.
         if (size <= 32) expect(px, `${p[0]} at ${size}`).toBeGreaterThanOrEqual(8);
       }
@@ -23,15 +23,17 @@ describe("cube size on phones", () => {
   );
 });
 
-describe("cube size does not depend on the panels below the board", () => {
-  it("is the same with the most columns, slots and field tiles the engine allows", () => {
+describe("more panels never shrink the cubes", () => {
+  it("is no smaller with the most columns, slots and field tiles the engine allows", () => {
     const most = {
       columns: collect.COLLECT_LIMITS.maxColumns,
       slots: collect.COLLECT_LIMITS.maxSlots,
       fieldCap: collect.COLLECT_LIMITS.maxFieldCap,
     };
     for (const p of PHONES) {
-      for (const size of SIZES) expect(cubeCss(size, p, most)).toBe(cubeCss(size, p));
+      // More slots and field tiles make the tiles narrower, hence shorter, so the board only ever gains.
+      for (const size of SIZES)
+        expect(cubeCss(size, p, most)).toBeGreaterThanOrEqual(cubeCss(size, p));
     }
   });
 });

@@ -27,8 +27,10 @@ export function paintPanelFrames(
   l: CollectLayout,
   dpr: number,
 ): void {
+  // Only the holding slots are outlined (they are a limit the player manages); there is no outline
+  // for the field: working groups just appear, and show their state on their own box.
   g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.28);
-  for (const r of [...l.field, ...l.slots]) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.2);
+  for (const r of l.slots) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.22);
 }
 
 export class PanelsView {
@@ -39,7 +41,6 @@ export class PanelsView {
     private readonly scene: Phaser.Scene,
     private readonly layout: CollectLayout,
     private readonly palette: readonly string[],
-    private readonly atlas: string,
     private readonly dpr: number,
     private readonly colorblind = false,
     private readonly reduced = false,
@@ -47,23 +48,20 @@ export class PanelsView {
     this.drawFrames();
   }
 
-  /** The label of each row (the outlines are part of the baked static layer). */
+  /** The label of the holding row (the outlines are part of the baked static layer). */
   private drawFrames(): void {
     const l = this.layout;
-    const label = (text: string, r: { x: number; y: number }) => {
-      const t = this.scene.add
-        .text(r.x + 6 * this.dpr, r.y + 4 * this.dpr, text, {
-          fontFamily: theme.font,
-          fontSize: `${Math.round(9 * this.dpr)}px`,
-          color: theme.textDim,
-        })
-        .setOrigin(0, 0)
-        .setDepth(9)
-        .setAlpha(0.7);
-      this.extra.push(t);
-    };
-    if (l.field[0]) label("WORKING", l.field[0]);
-    if (l.slots[0]) label("WAITING", l.slots[0]);
+    if (!l.slots[0]) return;
+    const t = this.scene.add
+      .text(l.slots[0].x + 6 * this.dpr, l.slots[0].y - 12 * this.dpr, "WAITING", {
+        fontFamily: theme.font,
+        fontSize: `${Math.round(9 * this.dpr)}px`,
+        color: theme.textDim,
+      })
+      .setOrigin(0, 0)
+      .setDepth(9)
+      .setAlpha(0.7);
+    this.extra.push(t);
   }
 
   destroy(): void {
@@ -115,6 +113,7 @@ export class PanelsView {
         t.depth === target.depth
       ) {
         t.badge.setNumber(remaining);
+        t.badge.setProgress(g.delivered / g.capacity);
         continue;
       }
       const rect = badgeBox(this.layout, target.place, target.index, target.depth);
@@ -128,13 +127,16 @@ export class PanelsView {
         h: rect.h,
         colorHex: this.palette[g.color]!,
         colorIndex: g.color,
-        atlas: this.atlas,
         number: remaining,
         dpr: this.dpr,
         mini: rect.mini,
         symbol: this.colorblind,
       });
       badge.setDepth(10 + (target.place === "column" ? 2 - target.depth : 0));
+      badge.setMode(
+        g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued",
+      );
+      badge.setProgress(g.delivered / g.capacity);
       this.scene.add.existing(badge);
       if (from) {
         this.scene.tweens.add({

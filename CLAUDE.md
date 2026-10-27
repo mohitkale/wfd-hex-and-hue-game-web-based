@@ -38,10 +38,11 @@ a session without another specific request in this project, run the **continue-r
 - **Every shipped level is solver-verified.** Generation must never produce an unwinnable board.
 - **Native mobile feel:** portrait-first, full-bleed, no scroll/zoom, same-frame touch response,
   haptics, 60 fps on mid-range phones, offline PWA.
-- **2× speed:** v1 alternates free → rewarded ad (`docs/GAME_DESIGN.md` §3). **v2 rule (M14.3):**
-  1× is free; 2× unlocks for the current level only through an optional rewarded ad. No working
-  provider → no 2× offer is shown; failure never blocks play; no fake rewards; 2× changes
-  presentation speed, never outcomes.
+- **Speed:** v1 alternates free → rewarded ad (`docs/GAME_DESIGN.md` §3). **v2 rule (M14.3, changed
+  in M15.6):** 1× is free and the default; 3× unlocks for the current level only through an optional
+  rewarded ad. No working provider → no 3× offer is shown; failure never blocks play; no fake rewards.
+  The final deliveries sprint at 3× for free once no decision is left. Speed changes presentation
+  only, never outcomes.
 - **v2 gameplay:** collectors physically pick up, carry and deliver cubes; a group's number is real
   remaining capacity; poor choices can cause a genuine deadlock; levels must resist simple
   strategies (column-spam, greedy). Do not reskin the track engine.
