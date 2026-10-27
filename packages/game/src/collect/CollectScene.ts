@@ -447,6 +447,7 @@ export class CollectScene extends Phaser.Scene {
       reduced,
       this.colorblind ? level.palette : null,
       this.emitter,
+      speciesFor(level.subject?.theme),
     );
     this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
     this.familiars.onDelivered = (_color, group) => {

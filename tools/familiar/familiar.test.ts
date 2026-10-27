@@ -10,7 +10,6 @@ import {
   SS,
   badgeRect,
   contrast,
-  familiarScale,
   palette,
   parseHex,
   speciesFor,
@@ -24,6 +23,7 @@ import {
   atlasManifest,
 } from "../../packages/game/src/collect/familiarAtlas";
 import {
+  FACE_BOTTOM_PX,
   FRAME_H,
   FRAME_W,
   POSES,
@@ -257,27 +257,28 @@ describe("familiar colour", () => {
 });
 
 describe("colourblind badge anchor", () => {
-  it("sits on the belly: inside the sprite, clear of the eyes and the ears, big enough for a symbol", () => {
-    for (const name of FRAME_NAMES) {
-      const r = badgeRect(name);
-      expect(r.x).toBeGreaterThanOrEqual(0);
-      expect(r.x + r.w).toBeLessThanOrEqual(FAMILIAR_W);
-      expect(r.y + r.h).toBeLessThanOrEqual(FAMILIAR_H);
-      // Eyes sit at about unit y 7.5 and end by 8.3 (a bat's eyes: y 29 + 4.6 px, a cat's: 26 + 4.2).
-      expect(r.y, name).toBeGreaterThanOrEqual(8.3);
-      expect(r.w * r.h).toBeGreaterThanOrEqual(5);
-    }
-  });
-});
+  it.each(SPECIES)(
+    "%s: sits below the face, inside the sprite, big enough for a symbol",
+    (species) => {
+      for (const name of FRAME_NAMES) {
+        const r = badgeRect(name, species);
+        expect(r.x).toBeGreaterThanOrEqual(0);
+        expect(r.x + r.w).toBeLessThanOrEqual(FAMILIAR_W);
+        expect(r.y + r.h).toBeLessThanOrEqual(FAMILIAR_H);
+        // Below the eyes, cheeks, mouth and fangs of the standing face (a crouched frame sinks 5 px).
+        expect(r.y * SS, `${species} ${name}`).toBeGreaterThanOrEqual(FACE_BOTTOM_PX[species]);
+        expect(Math.min(r.w, r.h)).toBeGreaterThanOrEqual(2);
+      }
+    },
+  );
 
-describe("phone scale", () => {
-  it("gives about 20-28 CSS px of sprite at common densities, in device pixels per unit", () => {
-    for (const dpr of [1, 2, 2.625, 3, 3.5]) {
-      const css = (FAMILIAR_W * familiarScale(dpr)) / dpr;
-      expect(css, `dpr ${dpr}`).toBeGreaterThanOrEqual(23);
-      expect(css, `dpr ${dpr}`).toBeLessThanOrEqual(25);
-    }
-    expect(familiarScale(0.1)).toBeGreaterThanOrEqual(1);
+  it("the bat's drawn face really ends above the badge (no point of the mouth or fangs is lower)", () => {
+    // The fangs are the lowest face shapes: their points are the white triangles near the centre.
+    const { p, points } = recorder();
+    drawFrame(p, "idle0", "#4a6be2", "bat");
+    const fangs = points.filter(([x, y]) => Math.abs(x - FRAME_W / 2) < 4 && y > 33 && y < 40);
+    expect(fangs.length).toBeGreaterThan(0);
+    expect(Math.max(...fangs.map(([, y]) => y))).toBeLessThanOrEqual(FACE_BOTTOM_PX.bat);
   });
 });
 

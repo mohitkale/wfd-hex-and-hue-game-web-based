@@ -63,22 +63,23 @@ export interface TilePainter extends RectPainter {
  * rim, so the player can see which colour opens it. Painted on top of the cube, never instead of it.
  */
 export function paintSeal(
-  g: RectPainter,
+  g: TilePainter,
   x: number,
   y: number,
   size: number,
   key: CubeTones,
 ): void {
+  // Same corner radius as the cube under it, so the veil never tints the gap or the panel.
   g.fillStyle(0x140b2e, 0.5);
-  g.fillRect(x, y, size, size);
+  g.fillRoundedRect(x, y, size, size, Math.max(2, size * 0.3));
   const dot = Math.max(2, Math.round(size * 0.42));
   const o = Math.floor((size - dot) / 2);
   g.fillStyle(0xfff6d8, 0.95);
-  g.fillRect(x + o - 1, y + o - 1, dot + 2, dot + 2);
+  g.fillRoundedRect(x + o - 1, y + o - 1, dot + 2, dot + 2, (dot + 2) * 0.32);
   g.fillStyle(key.base);
-  g.fillRect(x + o, y + o, dot, dot);
-  g.fillStyle(key.light);
-  g.fillRect(x + o, y + o, Math.max(1, Math.floor(dot / 2)), 1);
+  g.fillRoundedRect(x + o, y + o, dot, dot, dot * 0.3);
+  g.fillStyle(key.light, 0.8);
+  g.fillRoundedRect(x + o + dot * 0.18, y + o + dot * 0.14, dot * 0.34, dot * 0.2, dot * 0.1);
 }
 
 /**

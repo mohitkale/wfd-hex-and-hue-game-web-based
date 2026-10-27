@@ -127,16 +127,12 @@ export interface Rect {
  * deficiency, so with colourblind mode on the renderer draws the colour's symbol here. A crouched
  * (`pickup`) frame has a shorter torso.
  */
-export function badgeRect(frame: FrameName): Rect {
+export function badgeRect(frame: FrameName, species: Species = "bat"): Rect {
+  if (species === "bat")
+    return frame === "pickup"
+      ? { x: 5.6, y: 10.8, w: 4.8, h: 2 }
+      : { x: 5.6, y: 9.6, w: 4.8, h: 2.2 };
   return frame === "pickup"
     ? { x: 5.4, y: 9.9, w: 5.2, h: 2.2 }
     : { x: 5.4, y: 8.6, w: 5.2, h: 2.6 };
-}
-
-/**
- * Device-pixel size of one sprite unit so the sprite is about `targetCss` CSS pixels wide (the
- * 20-28 px band the board is designed for).
- */
-export function familiarScale(dpr: number, targetCss = 24): number {
-  return Math.max(1, (targetCss * dpr) / FAMILIAR_W);
 }

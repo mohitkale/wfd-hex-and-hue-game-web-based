@@ -21,6 +21,9 @@ import {
  * pink cheeks and the sparkles are fixed.
  */
 
+/** Lowest point (texture px, standing) of each species' face: the colour-blind badge sits below it. */
+export const FACE_BOTTOM_PX = { bat: 38, cat: 34 } as const;
+
 export const FRAME_W = FAMILIAR_W * SS;
 export const FRAME_H = FAMILIAR_H * SS;
 
@@ -195,14 +198,14 @@ function feet(p: Painter, pose: Pose, dy: number, t: Tones): void {
   ) {
     const spread = pose.limbs === "reach" ? 9 : 5;
     for (const s of [-1, 1]) {
-      ellipse(p, CX + s * spread, 47 + dy, 4.2, 2.8);
+      ellipse(p, CX + s * spread, 48 + dy, 4.2, 2.8);
       paint(p, css(t.mid), t.outline, 1.6);
     }
     return;
   }
   const spread = pose.limbs === "apart" ? 11 : 4;
   for (const s of [-1, 1]) {
-    ellipse(p, CX + s * spread, 47 + dy, 4.2, 2.8);
+    ellipse(p, CX + s * spread, 48 + dy, 4.2, 2.8);
     paint(p, css(t.mid), t.outline, 1.6);
   }
 }
@@ -263,7 +266,7 @@ function wing(p: Painter, pose: Pose, dy: number, t: Tones): void {
 
 function drawBat(p: Painter, pose: Pose, t: Tones): void {
   const dy = pose.crouch + pose.bob * 0.8;
-  const ry = 12 - pose.crouch * 0.35;
+  const ry = 13 - pose.crouch * 0.35;
   // Wings first (behind), both sides.
   for (const side of [-1, 1]) {
     p.save();
@@ -292,27 +295,27 @@ function drawBat(p: Painter, pose: Pose, t: Tones): void {
   }
   arms(p, pose, dy, t);
   // Body: dark base, mid and a highlight, so it reads as a soft round shape.
-  ellipse(p, CX, 31 + dy, 11.5, ry);
+  ellipse(p, CX, 32 + dy, 11.5, ry);
   paint(p, css(t.mid), t.outline, 2.2);
   ellipse(p, CX - 2, 27 + dy, 7, ry * 0.55);
   paint(p, css(t.light, 0.85), null);
-  ellipse(p, CX, 38 + dy, 7, ry * 0.4);
+  ellipse(p, CX, 40 + dy, 7, ry * 0.35);
   paint(p, css(t.light, 0.45), null);
-  eyes(p, 29 + dy, 4.6, 3.9, 4.6);
-  cheeks(p, 35 + dy, 8);
+  eyes(p, 27 + dy, 4.6, 3.9, 4.6);
+  cheeks(p, 33 + dy, 8);
   // A tiny smile and two fangs.
   p.beginPath();
-  p.moveTo(CX - 3, 36 + dy);
-  p.quadraticCurveTo(CX, 39 + dy, CX + 3, 36 + dy);
+  p.moveTo(CX - 3, 34 + dy);
+  p.quadraticCurveTo(CX, 37 + dy, CX + 3, 34 + dy);
   p.strokeStyle = css(t.outline);
   p.lineWidth = 1.4;
   p.lineCap = "round";
   p.stroke();
   for (const s of [-1, 1]) {
     polygon(p, [
-      [CX + s * 1.6, 37.2 + dy],
-      [CX + s * 3.2, 37.2 + dy],
-      [CX + s * 2.4, 40 + dy],
+      [CX + s * 1.6, 35.2 + dy],
+      [CX + s * 3.2, 35.2 + dy],
+      [CX + s * 2.4, 38 + dy],
     ]);
     paint(p, "#ffffff", null);
   }

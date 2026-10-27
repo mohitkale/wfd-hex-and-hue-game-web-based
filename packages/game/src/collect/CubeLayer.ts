@@ -47,6 +47,10 @@ export class CubeLayer {
       .setOrigin(0, 0)
       .setDepth(1);
     this.ringG = scene.add.graphics().setDepth(1.1);
+    // Tile textures of other cube sizes (another level, another screen size) are no longer needed.
+    for (const key of scene.textures.getTextureKeys()) {
+      if (key.startsWith("tile:") && !key.endsWith(`:${this.size}`)) scene.textures.remove(key);
+    }
     this.paintAll(scene);
   }
 

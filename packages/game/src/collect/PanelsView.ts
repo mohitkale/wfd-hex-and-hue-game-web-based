@@ -35,7 +35,6 @@ export function paintPanelFrames(
 
 export class PanelsView {
   private readonly tracked = new Map<number, Tracked>();
-  private readonly extra: Phaser.GameObjects.GameObject[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -49,8 +48,6 @@ export class PanelsView {
   destroy(): void {
     for (const t of this.tracked.values()) t.badge.destroy();
     this.tracked.clear();
-    for (const o of this.extra) o.destroy();
-    this.extra.length = 0;
   }
 
   /** Where group `id` should be drawn now, or null if it is not drawn (finished, or too deep in a column). */

@@ -7,7 +7,15 @@ import { spriteScaleForCell } from "./collectLayout";
 import { TEX } from "../view/textures";
 import { bake } from "./bake";
 import { paintCube, type CubeTones } from "./cubePaint";
-import { FAMILIAR_H, FAMILIAR_W, FRAME_NAMES, SS, badgeRect, type FrameName } from "./familiarArt";
+import {
+  FAMILIAR_H,
+  FAMILIAR_W,
+  FRAME_NAMES,
+  SS,
+  badgeRect,
+  type FrameName,
+  type Species,
+} from "./familiarArt";
 import type { Emitter } from "./particles";
 import {
   CellSpreader,
@@ -95,6 +103,7 @@ export class FamiliarLayer {
     /** Palette hex colours when colour-blind symbols are on, otherwise null. */
     private readonly symbolPalette: readonly string[] | null = null,
     private readonly emitter: Emitter | null = null,
+    private readonly species: Species = "bat",
   ) {
     this.frameNames = tones.map((_, c) => FRAME_NAMES.map((f) => `${c}:${f}`));
     const size = Math.max(4, Math.round(layout.cell * 0.82));
@@ -330,7 +339,7 @@ export class FamiliarLayer {
   /** Colour-blind symbol on the chest, at the frame's badge anchor, following the sprite's current scale. */
   private placeChest(e: Entry, v: FamiliarVisual, frame: FrameName, x: number, y: number): void {
     if (!this.symbolPalette || !e.chest) return;
-    const r = badgeRect(frame);
+    const r = badgeRect(frame, this.species);
     const s = e.img.scaleX * SS; // not the target scale: the sprite may be mid pop-in
     const size = Math.min(r.w, r.h) * s * 0.95;
     e.chest
