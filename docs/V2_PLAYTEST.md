@@ -103,7 +103,15 @@ A second round, after the M15.6 and M15.7 build (2026-10-28):
     and at zero the tray closes before the box disappears (as in Food Hunt).
 13. Bats and cats a little smaller and monocoloured; only the eyes may contrast.
 
-Items 8 to 13 are tracked as M15.8. Items 1 to 7 are tracked as M15.6 (#151: items 2 to 5) and M15.7 (#152: items 1 and 6). Item 5's free end-game 3×
+A third round (2026-10-28):
+
+14. "You are still managing a separate tray for the PROGRESS and PENDING states": there must be **one
+    tray row** that shows progress and also holds the pending box. The play screen is three parts, top to
+    bottom: the PUZZLE, the TRAYS, the COLOURED BOXES. The boxes are a grid with the same spacing across
+    and down; early levels have three columns but levels will grow, so the grid must scale. Up to five
+    trays, with a power to add an extra tray.
+
+Items 8 to 13 are tracked as M15.8 and item 14 as M15.9. Items 1 to 7 are tracked as M15.6 (#151: items 2 to 5) and M15.7 (#152: items 1 and 6). Item 5's free end-game 3×
 changes the rule in CLAUDE.md ("1× is free; 2× only through an optional rewarded ad"): the owner
 asked for it, so the rule is updated to match (docs/V2_SPEED.md).
 

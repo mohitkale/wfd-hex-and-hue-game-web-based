@@ -12,10 +12,13 @@ export function targetRect(
   /** Where column `i` is now (columns centre as they run out); defaults to the layout's own rects. */
   columnRect: (i: number) => { x: number; y: number; w: number; h: number } | null = (i) =>
     l.columns[i] ?? null,
+  /** Where the box waiting in engine slot `i` is (its tray); defaults to the tray with that number. */
+  slotRect: (i: number) => { x: number; y: number; w: number; h: number } | null = (i) =>
+    l.trays[i] ?? null,
 ): { x: number; y: number; w: number; h: number } | null {
   if (!target) return null;
   if (target.kind === "column") return columnRect(target.index);
-  if (target.kind === "slot") return l.slots[target.index] ?? null;
+  if (target.kind === "slot") return slotRect(target.index);
   const size = Math.round(HUD_ZONE_CSS * l.dpr);
   const x = hudButtonX(l, 0, hudButtons);
   return { x: x - size / 2, y: l.hud.y + l.hud.h / 2 - size / 2, w: size, h: size };
@@ -42,6 +45,10 @@ export class TutorialLayer {
     private readonly hudButtons = 3,
     /** Where a column is now (see `targetRect`). */
     private readonly columnRect?: (
+      i: number,
+    ) => { x: number; y: number; w: number; h: number } | null,
+    /** Where the box waiting in engine slot `i` is: its tray (see `targetRect`). */
+    private readonly slotRect?: (
       i: number,
     ) => { x: number; y: number; w: number; h: number } | null,
   ) {
@@ -106,7 +113,7 @@ export class TutorialLayer {
       return;
     }
     this.caption.setText(hint.text).setVisible(true);
-    const r = targetRect(this.layout, hint.target, this.hudButtons, this.columnRect);
+    const r = targetRect(this.layout, hint.target, this.hudButtons, this.columnRect, this.slotRect);
     if (!r) return;
     const dpr = this.layout.dpr;
     const pad = 3 * dpr;

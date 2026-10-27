@@ -29,7 +29,7 @@ both. Code: `packages/core/src/collect/{boosters,hint}.ts` (what a booster does)
 
 - **Undo.** `session.undo()`: the state returns to before the last `select`/`resume` and that action
   leaves the log; works out of a loss. Nothing to undo → nothing happens, nothing charged.
-- **Extra Slot.** `addSlot`: `params.slots += 1`, an empty slot, event `slotAdded`. After a
+- **Extra Slot** (the extra tray: it adds one tray to the row, M15.9). `addSlot`: `params.slots += 1`, an empty slot, event `slotAdded`. After a
   `slotsFull` loss the stalled group parks in the new slot and the interrupted tick is finished
   (`reviveFromSlotsFull`: the same code the tick uses, the tick counter does not advance), so the
   result is exactly the state a level built with the extra slot would have reached. The session

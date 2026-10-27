@@ -513,8 +513,8 @@ export class CollectScene extends Phaser.Scene {
       g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
       g.strokeCircle(x, cy, size / 2);
     }
-    // Only the area with static content (HUD, board, active and slot rows), not the columns below.
-    const bottom = Math.max(...l.slots.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
+    // Only the area with static content (HUD, board and the row of trays), not the columns below.
+    const bottom = Math.max(...l.trays.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
     const rt = this.add
       .renderTexture(l.frame.x, l.frame.y, l.frame.w, bottom - l.frame.y)
       .setOrigin(0, 0)
@@ -602,7 +602,7 @@ export class CollectScene extends Phaser.Scene {
   /** A hint's target pulses briefly on the board. */
   private highlight(action: collect.Action): void {
     const r =
-      action.kind === "select" ? this.columnRectNow(action.column) : this.layout.slots[action.slot];
+      action.kind === "select" ? this.columnRectNow(action.column) : this.slotRectNow(action.slot);
     if (!r) return;
     const ring = this.add
       .rectangle(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
@@ -720,21 +720,43 @@ export class CollectScene extends Phaser.Scene {
   private buildInput(): void {
     this.columnZones = this.layout.columns.map((r, column) => {
       const zone = this.add
-        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
+        // A column's zone spans the gap beside it, so neighbouring columns leave no dead strip.
+        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h)
         .setDepth(25)
         .setInteractive({ useHandCursor: true });
       zone.on("pointerdown", () => this.tap({ kind: "select", column }));
       return zone;
     });
     this.placeColumns();
-    this.layout.slots.forEach((r, slot) => {
+    // Trays: a tap on one that holds a waiting box resumes it (a working or empty tray does nothing).
+    this.layout.trays.forEach((r, tray) => {
       const zone = this.add
-        // The zone spans the gap between tiles too, so a small phone still gets a 44 px target.
+        // The zone spans the gap between trays too, so a small phone still gets a 44 px target.
         .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h + this.layout.gap)
         .setDepth(25)
         .setInteractive({ useHandCursor: true });
-      zone.on("pointerdown", () => this.tap({ kind: "resume", slot }));
+      zone.on("pointerdown", () => {
+        const slot = this.slotInTray(tray);
+        if (slot !== null) this.tap({ kind: "resume", slot });
+      });
     });
+  }
+
+  /** The engine slot of the waiting box in tray `tray`, or null when the tray is empty or its box is working. */
+  private slotInTray(tray: number): number | null {
+    const s = this.session.state;
+    for (let slot = 0; slot < s.slots.length; slot++) {
+      const g = s.slots[slot];
+      if (g !== null && g !== undefined && this.panels.trayOfGroup(g) === tray) return slot;
+    }
+    return null;
+  }
+
+  /** Where the box waiting in engine slot `slot` sits now: its tray. */
+  private slotRectNow(slot: number): { x: number; y: number; w: number; h: number } | null {
+    const g = this.session.state.slots[slot];
+    const tray = g === null || g === undefined ? null : this.panels.trayOfGroup(g);
+    return tray === null ? null : (this.layout.trays[tray] ?? null);
   }
 
   /**

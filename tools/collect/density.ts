@@ -25,7 +25,7 @@ import { TICKS_PER_SECOND as TPS } from "../../packages/core/src/collect/measure
 export function cubeCss(
   size: number,
   [, w, h, dpr]: [string, number, number, number],
-  panels = { columns: 4, slots: 4, fieldCap: 4 },
+  panels = { columns: 4, slots: 2, fieldCap: 3 },
 ): number {
   const l = computeCollectLayout({
     width: Math.round(w * dpr),

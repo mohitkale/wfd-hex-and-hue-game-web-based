@@ -174,6 +174,7 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 - [x] **M15.6** Clean play screen, speed rule and portal dock — owner feedback after playing the RC (docs/V2_PLAYTEST.md): one square for every group box without a creature, no WORKING strip (state shown on the box), the portal in a dock apart from the picture, 1× default with 3× (ad) and a free end-game sprint. _Owner feedback; independent of M15.4._ (#151)
 - [x] **M15.7** New look — glossy tiles and bat / cat characters, cleaner and more colourful (owner feedback; #152).
 - [x] **M15.8** Play-area rework — owner feedback round 2 (docs/V2_PLAYTEST.md): no outer border, a three-box column grid with the rest hidden, columns centred as they run out, bordered active places with a tray that opens and closes, familiars come out of and return to their box, smaller one-colour bats and cats.
+- [x] **M15.9** One tray row — owner feedback round 3 (docs/V2_PLAYTEST.md item 14): the PUZZLE, one row of TRAYS holding both working and pending boxes (`fieldCap + slots`, Extra Slot adds one), and the COLOURED BOXES as a grid with equal spacing across and down.
 
 ## Later (post-MVP, not scheduled)
 
