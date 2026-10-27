@@ -47,7 +47,6 @@ import {
   type SpeedState,
   type SpeedView,
 } from "./speedRule";
-import { PortalView } from "./PortalView";
 import { buildEndCard } from "./EndCard";
 import { Toast } from "./Toast";
 import type { Tutorial } from "./tutorial";
@@ -65,6 +64,7 @@ import {
 import { progressOf } from "./progress";
 import {
   HUD_BUTTON_CSS,
+  activeColumnRects,
   computeCollectLayout,
   hudButtonX,
   type CollectLayout,
@@ -160,7 +160,8 @@ export class CollectScene extends Phaser.Scene {
   private sharing = false;
   /** The reveal has finished or been skipped once for this win: a relayout must not replay it. */
   private revealSeen = false;
-  private portal!: PortalView;
+  /** The tap zone of each summon column; they follow the columns as these centre (see `placeColumns`). */
+  private columnZones: Phaser.GameObjects.Zone[] = [];
   private hud!: CollectHud;
   private tray: BoosterTray | null = null;
   /** The settings panel is open over the board: play waits, and a rebuild keeps it open. */
@@ -415,7 +416,6 @@ export class CollectScene extends Phaser.Scene {
     // Whether the optional 3× ad can be offered here (once per level, never in the tutorial).
     if (!this.tutorialId) this.stats.adOffer("speed2x", getRewards(this).isAvailable("speed2x"));
     this.bakeStaticLayer();
-    this.portal = new PortalView(this, this.layout);
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
     this.model.resync(state);
     this.emitter = new Emitter(new Particles(160), this.layout.cell, reduced);
@@ -449,14 +449,15 @@ export class CollectScene extends Phaser.Scene {
       this.emitter,
       speciesFor(level.subject?.theme),
     );
+    this.familiars.anchorFor = (group) => this.panels.anchor(group);
     this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
     this.familiars.onDelivered = (_color, group) => {
-      this.portal.pulse();
       this.panels.badge(group)?.pulse();
     };
     this.panels = new PanelsView(this, this.layout, level.palette, dpr, this.colorblind, reduced);
     this.rebuildMarks(state);
     this.panels.sync(state);
+    this.placeColumns();
     this.buildHud();
     this.tray = this.tutorialId
       ? null
@@ -486,28 +487,17 @@ export class CollectScene extends Phaser.Scene {
     const l = this.layout;
     const dpr = this.dpr;
     const g = this.make.graphics({}, false);
-    // The ring (where familiars walk) is a faint path around the picture's panel.
-    g.fillStyle(theme.dusk, 0.55);
-    g.fillRoundedRect(l.boardRect.x, l.boardRect.y, l.boardRect.w, l.boardRect.h, l.cell * 0.8);
+    // Nothing is drawn around the picture: the ring is only the walkway. Just a dark backdrop behind
+    // the cubes, so the picture reads and the space is the picture's.
     g.fillStyle(theme.panel, 1);
-    g.fillRect(
-      l.boardRect.x + l.cell,
-      l.boardRect.y + l.cell,
-      l.boardRect.w - 2 * l.cell,
-      l.boardRect.h - 2 * l.cell,
-    );
-    g.lineStyle(Math.max(1, dpr), theme.mist, 0.18);
-    g.strokeRoundedRect(l.boardRect.x, l.boardRect.y, l.boardRect.w, l.boardRect.h, l.cell * 0.8);
-    paintPanelFrames(g, l, dpr);
-    // The dock under the picture: the portal sits here, clear of the cubes, so every flight shows.
-    g.fillStyle(theme.dusk, 0.5);
     g.fillRoundedRect(
-      l.dock.x + l.cell,
-      l.dock.y,
-      l.dock.w - 2 * l.cell,
-      l.dock.h * 0.92,
-      l.cell * 0.7,
+      l.boardRect.x + l.cell * 0.7,
+      l.boardRect.y + l.cell * 0.7,
+      l.boardRect.w - 1.4 * l.cell,
+      l.boardRect.h - 1.4 * l.cell,
+      l.cell * 0.5,
     );
+    paintPanelFrames(g, l, dpr);
     const cy = l.hud.y + l.hud.h / 2;
     const size = Math.round(HUD_BUTTON_CSS * dpr);
     for (let i = 0; i < this.hudButtons; i++) {
@@ -517,8 +507,8 @@ export class CollectScene extends Phaser.Scene {
       g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
       g.strokeCircle(x, cy, size / 2);
     }
-    // Only the area with static content (HUD, board, field and slot rows), not the columns below.
-    const bottom = Math.max(...l.slots.map((r) => r.y + r.h), l.dock.y + l.dock.h);
+    // Only the area with static content (HUD, board, active and slot rows), not the columns below.
+    const bottom = Math.max(...l.slots.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
     const rt = this.add
       .renderTexture(l.frame.x, l.frame.y, l.frame.w, bottom - l.frame.y)
       .setOrigin(0, 0)
@@ -724,13 +714,15 @@ export class CollectScene extends Phaser.Scene {
   }
 
   private buildInput(): void {
-    this.layout.columns.forEach((r, column) => {
+    this.columnZones = this.layout.columns.map((r, column) => {
       const zone = this.add
         .zone(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
         .setDepth(25)
         .setInteractive({ useHandCursor: true });
       zone.on("pointerdown", () => this.tap({ kind: "select", column }));
+      return zone;
     });
+    this.placeColumns();
     this.layout.slots.forEach((r, slot) => {
       const zone = this.add
         // The zone spans the gap between tiles too, so a small phone still gets a 44 px target.
@@ -738,6 +730,19 @@ export class CollectScene extends Phaser.Scene {
         .setDepth(25)
         .setInteractive({ useHandCursor: true });
       zone.on("pointerdown", () => this.tap({ kind: "resume", slot }));
+    });
+  }
+
+  /** Puts each column's tap zone where its boxes are now: columns that ran out are off, the rest centred. */
+  private placeColumns(): void {
+    const rects = activeColumnRects(
+      this.layout,
+      this.session.state.columns.map((c) => c.length > 0),
+    );
+    this.columnZones.forEach((zone, i) => {
+      const r = rects[i];
+      if (zone.input) zone.input.enabled = r !== null;
+      if (r) zone.setPosition(r.x + r.w / 2, r.y + r.h / 2);
     });
   }
 
@@ -759,6 +764,7 @@ export class CollectScene extends Phaser.Scene {
     }
     if (!fromDemo) this.stats.move();
     this.panels.sync(this.session.state);
+    this.placeColumns();
   }
 
   // -------------------------------------------------------------------------------------------
@@ -812,6 +818,7 @@ export class CollectScene extends Phaser.Scene {
     playCues(planCues(batch.events), this.sinks);
     if (marksChanged) this.cubes.setMarks(this.marks);
     this.panels.sync(this.session.state);
+    this.placeColumns();
     this.hud.setProgress(progressOf(this.session.state).fraction);
     this.refreshTutorial();
     const status = this.session.state.status;

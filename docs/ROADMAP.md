@@ -173,6 +173,7 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 - [ ] **M15.5** Production readiness and release candidate **(human gate)** — Prepare v2.0.0 and stop for explicit approval before tagging or publishing. _Needs M15.4._ PR is not merged, and the box not ticked, until the user approves (G4).
 - [x] **M15.6** Clean play screen, speed rule and portal dock — owner feedback after playing the RC (docs/V2_PLAYTEST.md): one square for every group box without a creature, no WORKING strip (state shown on the box), the portal in a dock apart from the picture, 1× default with 3× (ad) and a free end-game sprint. _Owner feedback; independent of M15.4._ (#151)
 - [x] **M15.7** New look — glossy tiles and bat / cat characters, cleaner and more colourful (owner feedback; #152).
+- [x] **M15.8** Play-area rework — owner feedback round 2 (docs/V2_PLAYTEST.md): no outer border, a three-box column grid with the rest hidden, columns centred as they run out, bordered active places with a tray that opens and closes, familiars come out of and return to their box, smaller one-colour bats and cats.
 
 ## Later (post-MVP, not scheduled)
 

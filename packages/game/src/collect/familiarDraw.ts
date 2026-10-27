@@ -3,7 +3,6 @@ import {
   FAMILIAR_W,
   FIXED,
   SS,
-  mix,
   palette,
   type FrameName,
   type Rgb,
@@ -17,12 +16,13 @@ import {
  * canvas context satisfies it), so tests can record the calls without a browser.
  *
  * Both species face the player and are left-right symmetric (the cat's tail aside), so a familiar
- * reads the same whichever way it flies or trots. The cube colour tints the body; the eyes, the
- * pink cheeks and the sparkles are fixed.
+ * reads the same whichever way it flies or trots. Each is a single colour, the cube's: body, ears,
+ * wings, limbs and tail all share it (with a deeper outline); only the eyes (white with a dark pupil)
+ * and the delivery sparkles contrast.
  */
 
-/** Lowest point (texture px, standing) of each species' face: the colour-blind badge sits below it. */
-export const FACE_BOTTOM_PX = { bat: 38, cat: 34 } as const;
+/** Lowest point (texture px, standing) of each species' eyes (the only face): the colour-blind badge sits below it. */
+export const FACE_BOTTOM_PX = { bat: 32, cat: 31 } as const;
 
 export const FRAME_W = FAMILIAR_W * SS;
 export const FRAME_H = FAMILIAR_H * SS;
@@ -221,15 +221,6 @@ function eyes(p: Painter, y: number, dx: number, rx: number, ry: number): void {
   }
 }
 
-function cheeks(p: Painter, y: number, dx: number): void {
-  for (const s of [-1, 1]) {
-    ellipse(p, CX + s * dx, y, 2.6, 1.7);
-    p.globalAlpha = 0.7;
-    paint(p, css(FIXED.cheek), null);
-    p.globalAlpha = 1;
-  }
-}
-
 // ---------------------------------------------------------------------------------------------
 // Bat
 // ---------------------------------------------------------------------------------------------
@@ -240,7 +231,6 @@ function wing(p: Painter, pose: Pose, dy: number, t: Tones): void {
   const k = (pose.flap + 1) / 2; // 0 down .. 1 up
   const tipY = pose.tuck ? 30 + dy : 38 - 24 * k + dy;
   const tipX = pose.tuck ? CX + 14 : CX + 29;
-  const membrane = mix(t.dark, FIXED.wingEdge, 0.3);
   p.beginPath();
   p.moveTo(shoulder[0], shoulder[1]);
   p.quadraticCurveTo(CX + 18, tipY - 6, tipX, tipY);
@@ -248,20 +238,7 @@ function wing(p: Painter, pose: Pose, dy: number, t: Tones): void {
   p.quadraticCurveTo(tipX - 10, tipY + 17, tipX - 13, tipY + 10);
   p.quadraticCurveTo(tipX - 17, tipY + 18, shoulder[0] + 1, shoulder[1] + 8);
   p.closePath();
-  paint(p, css(membrane, 0.96), t.outline, 2);
-  // Two light finger bones over the membrane.
-  p.strokeStyle = css(mix(membrane, [255, 255, 255], 0.35), 0.8);
-  p.lineWidth = 1.2;
-  p.lineCap = "round";
-  for (const [ex, ey] of [
-    [tipX - 6, tipY + 12],
-    [tipX - 13, tipY + 10],
-  ] as const) {
-    p.beginPath();
-    p.moveTo(shoulder[0], shoulder[1]);
-    p.quadraticCurveTo((shoulder[0] + ex) / 2, (shoulder[1] + ey) / 2 - 2, ex, ey - 1);
-    p.stroke();
-  }
+  paint(p, css(t.mid), t.outline, 2);
 }
 
 function drawBat(p: Painter, pose: Pose, t: Tones): void {
@@ -286,39 +263,12 @@ function drawBat(p: Painter, pose: Pose, t: Tones): void {
       [x(11.2), 24 + dy],
     ]);
     paint(p, css(t.mid), t.outline, 2);
-    polygon(p, [
-      [x(5.6), 21.5 + dy],
-      [x(10), 14 + dy],
-      [x(9.8), 22.5 + dy],
-    ]);
-    paint(p, css(FIXED.cheek, 0.9), null);
   }
   arms(p, pose, dy, t);
-  // Body: dark base, mid and a highlight, so it reads as a soft round shape.
+  // Body: one colour with a deeper outline.
   ellipse(p, CX, 32 + dy, 11.5, ry);
   paint(p, css(t.mid), t.outline, 2.2);
-  ellipse(p, CX - 2, 27 + dy, 7, ry * 0.55);
-  paint(p, css(t.light, 0.85), null);
-  ellipse(p, CX, 40 + dy, 7, ry * 0.35);
-  paint(p, css(t.light, 0.45), null);
   eyes(p, 27 + dy, 4.6, 3.9, 4.6);
-  cheeks(p, 33 + dy, 8);
-  // A tiny smile and two fangs.
-  p.beginPath();
-  p.moveTo(CX - 3, 34 + dy);
-  p.quadraticCurveTo(CX, 37 + dy, CX + 3, 34 + dy);
-  p.strokeStyle = css(t.outline);
-  p.lineWidth = 1.4;
-  p.lineCap = "round";
-  p.stroke();
-  for (const s of [-1, 1]) {
-    polygon(p, [
-      [CX + s * 1.6, 35.2 + dy],
-      [CX + s * 3.2, 35.2 + dy],
-      [CX + s * 2.4, 38 + dy],
-    ]);
-    paint(p, "#ffffff", null);
-  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -334,8 +284,6 @@ function drawCat(p: Painter, pose: Pose, t: Tones): void {
   // Body under the head.
   ellipse(p, CX, 41 + dy, 10, 8 - pose.crouch * 0.3);
   paint(p, css(t.mid), t.outline, 2.2);
-  ellipse(p, CX, 43 + dy, 5.5, 5);
-  paint(p, css(t.light, 0.7), null);
   arms(p, pose, dy, t);
   // Ears, then the round head.
   for (const side of [-1, 1]) {
@@ -346,45 +294,10 @@ function drawCat(p: Painter, pose: Pose, t: Tones): void {
       [x(2.5), 16 + dy],
     ]);
     paint(p, css(t.mid), t.outline, 2);
-    polygon(p, [
-      [x(8.4), 20 + dy],
-      [x(8.4), 12 + dy],
-      [x(4.6), 17 + dy],
-    ]);
-    paint(p, css(FIXED.cheek, 0.9), null);
   }
   ellipse(p, CX, 26 + dy, 12, 10.5);
   paint(p, css(t.mid), t.outline, 2.2);
-  ellipse(p, CX - 3, 21 + dy, 6.5, 4);
-  paint(p, css(t.light, 0.8), null);
   eyes(p, 26 + dy, 4.8, 3.3, 4.2);
-  cheeks(p, 31 + dy, 8.4);
-  // Nose, mouth and whiskers.
-  polygon(p, [
-    [CX - 1.8, 29.4 + dy],
-    [CX + 1.8, 29.4 + dy],
-    [CX, 31.4 + dy],
-  ]);
-  paint(p, css(FIXED.cheek), null);
-  p.strokeStyle = css(t.outline);
-  p.lineWidth = 1.2;
-  p.lineCap = "round";
-  p.beginPath();
-  p.moveTo(CX, 31.4 + dy);
-  p.quadraticCurveTo(CX - 1.5, 34 + dy, CX - 3.4, 32.8 + dy);
-  p.moveTo(CX, 31.4 + dy);
-  p.quadraticCurveTo(CX + 1.5, 34 + dy, CX + 3.4, 32.8 + dy);
-  p.stroke();
-  p.strokeStyle = css(t.light, 0.9);
-  p.lineWidth = 1;
-  for (const s of [-1, 1]) {
-    for (const k of [-1.6, 1.4]) {
-      p.beginPath();
-      p.moveTo(CX + s * 9, 30.5 + dy);
-      p.lineTo(CX + s * 16, 30.5 + dy + k * 2.2);
-      p.stroke();
-    }
-  }
 }
 
 /**

@@ -7,6 +7,8 @@ owner found too 8-bit._
 
 ## What they are
 
+(M15.8: they are now **single-coloured and smaller**: body, ears, wings, limbs and tail share the cube's colour with a deeper outline; only the eyes (white, dark pupil) and the delivery sparkles contrast. Cheeks, fangs, highlights, whiskers and the nose are gone. Drawn about 25 % smaller: `spriteScaleForCell` is 1.15 cells wide, was 1.6. They come out of the open tray of their own box and return into it.)
+
 Two smooth vector characters, both facing the player and left-right symmetric, tinted by the colour of
 the cubes they fetch (a red familiar fetches red):
 

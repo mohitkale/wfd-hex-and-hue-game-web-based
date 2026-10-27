@@ -3,6 +3,7 @@ import type Phaser from "phaser";
 import { theme } from "../theme";
 import type { CollectLayout } from "./collectLayout";
 import { badgeBox, PEEK, type Place } from "./badgeBox";
+import { activeColumnRects } from "./collectLayout";
 import { GroupBadge } from "./GroupBadge";
 import { leaveScale } from "./swarm";
 
@@ -17,8 +18,10 @@ interface Tracked {
 }
 
 /**
- * The bottom of the screen: summon columns (only the front group of each is tappable), the field
- * strip (groups with familiars out) and the holding slots (waiting groups). It places one badge per
+ * The bottom of the screen: summon columns (only the front group of each is tappable; at most three
+ * boxes of a column are drawn, as a grid, and the columns centre as a group when one runs out), the
+ * active boxes (bordered: as many as may work at once; a working box opens its tray and the
+ * familiars come out of it) and the holding slots (waiting groups). It places one badge per
  * group from the state and moves it when the group changes place. No game rules live here.
  */
 /** Paints the empty field and slot outlines into `g` (the scene bakes them into its static layer). */
@@ -27,10 +30,10 @@ export function paintPanelFrames(
   l: CollectLayout,
   dpr: number,
 ): void {
-  // Only the holding slots are outlined (they are a limit the player manages); there is no outline
-  // for the field: working groups just appear, and show their state on their own box.
-  g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.28);
-  for (const r of l.slots) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.22);
+  // Both limits are drawn as bordered places, always: how many boxes may work at once (the field) and
+  // how many may wait. A box moves into one and its state shows on the box itself.
+  g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.34);
+  for (const r of [...l.field, ...l.slots]) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.22);
 }
 
 export class PanelsView {
@@ -72,6 +75,11 @@ export class PanelsView {
   sync(state: Readonly<CollectState>): void {
     const working = state.groups.filter((g) => g.status === "working").map((g) => g.id);
     const views = collect.groupViews(state);
+    // Columns that still hold a box, centred as a group.
+    const colRects = activeColumnRects(
+      this.layout,
+      state.columns.map((c) => c.length > 0),
+    );
     for (const g of state.groups) {
       const target = this.target(state, g.id, working, views);
       const t = this.tracked.get(g.id);
@@ -93,9 +101,35 @@ export class PanelsView {
       ) {
         t.badge.setNumber(remaining);
         t.badge.setProgress(g.delivered / g.capacity);
+        // A column that ran out of boxes left, and the rest slid to the middle: follow.
+        if (target.place === "column") {
+          const at = badgeBox(
+            this.layout,
+            "column",
+            target.index,
+            target.depth,
+            colRects[target.index] ?? undefined,
+          );
+          if (Math.abs(t.badge.x - at.x) > 0.5) {
+            this.scene.tweens.killTweensOf(t.badge);
+            this.scene.tweens.add({
+              targets: t.badge,
+              x: at.x,
+              y: at.y,
+              duration: 240,
+              ease: "Cubic.easeOut",
+            });
+          }
+        }
         continue;
       }
-      const rect = badgeBox(this.layout, target.place, target.index, target.depth);
+      const rect = badgeBox(
+        this.layout,
+        target.place,
+        target.index,
+        target.depth,
+        target.place === "column" ? (colRects[target.index] ?? undefined) : undefined,
+      );
       const from = t && !t.completing ? { x: t.badge.x, y: t.badge.y } : null;
       if (t) {
         this.scene.tweens.killTweensOf(t.badge);
@@ -108,7 +142,6 @@ export class PanelsView {
         colorIndex: g.color,
         number: remaining,
         dpr: this.dpr,
-        mini: rect.mini,
         symbol: this.colorblind,
       });
       badge.setDepth(10 + (target.place === "column" ? 2 - target.depth : 0));
@@ -116,6 +149,7 @@ export class PanelsView {
         g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued",
       );
       badge.setProgress(g.delivered / g.capacity);
+      if (g.status === "working") badge.openTray();
       this.scene.add.existing(badge);
       if (from) {
         this.scene.tweens.add({
@@ -130,21 +164,30 @@ export class PanelsView {
     }
   }
 
-  /** A group left the picture: celebrate if it completed, then remove its badge. */
+  /** A group left the picture: its tray closes first, then it is removed (with a celebration if it completed). */
   private finish(id: number, t: Tracked, completed: boolean): void {
     t.completing = true;
     this.scene.tweens.killTweensOf(t.badge);
-    this.scene.tweens.add({
-      targets: t.badge,
-      scale: leaveScale(completed, this.reduced),
-      alpha: 0,
-      duration: completed ? 260 : 140,
-      ease: "Sine.easeOut",
-      onComplete: () => {
-        t.badge.destroy();
-        if (this.tracked.get(id) === t) this.tracked.delete(id);
-      },
+    t.badge.closeTray(() => {
+      this.scene.tweens.add({
+        targets: t.badge,
+        scale: leaveScale(completed, this.reduced),
+        alpha: 0,
+        duration: completed ? 260 : 140,
+        ease: "Sine.easeOut",
+        onComplete: () => {
+          t.badge.destroy();
+          if (this.tracked.get(id) === t) this.tracked.delete(id);
+        },
+      });
     });
+  }
+
+  /** Where the familiars of group `id` come out of (and return to): the open tray on its box, or null if it has none. */
+  anchor(id: number): { x: number; y: number } | null {
+    const t = this.tracked.get(id);
+    if (!t) return null;
+    return { x: t.badge.x, y: t.badge.y - this.layout.tile * 0.3 };
   }
 
   /** The badge of group `id` (for pop effects), if drawn. */

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { contrast, luminance, theme } from "../theme";
 import { badgeBox, badgeFontPx } from "./badgeBox";
-import { computeCollectLayout, hudButtonX, type CollectLayout } from "./collectLayout";
+import {
+  COLUMN_VISIBLE,
+  activeColumnRects,
+  computeCollectLayout,
+  hudButtonX,
+  type CollectLayout,
+} from "./collectLayout";
 import { endCardText } from "./endCardText";
 import { DEVICE_MATRIX as MATRIX } from "./deviceMatrix";
 import { ART_LEVELS } from "./artLevels";
@@ -105,19 +111,13 @@ describe("portrait phones and tablets: thumb-sized targets and readable numbers"
           expect(css(l, r.w + l.gap)).toBeGreaterThanOrEqual(s.slots <= 5 ? 44 : 30);
         // Group numbers: big on the front group, still legible everywhere else.
         const front = badgeBox(l, "column", 0, 0);
-        expect(css(l, badgeFontPx(front.w, front.h, false))).toBeGreaterThanOrEqual(
-          s.columns <= 4 ? 18 : 14,
+        expect(css(l, badgeFontPx(front.w, front.h))).toBeGreaterThanOrEqual(
+          s.columns <= 4 ? 17 : 14,
         );
-        const mini = badgeBox(l, "column", 0, 1);
-        expect(css(l, badgeFontPx(mini.w, mini.h, true))).toBeGreaterThanOrEqual(
-          s.columns <= 4 ? 9 : 8,
-        ); // the peeks behind a front group: six columns on a 320 px phone are the tightest
         const slot = badgeBox(l, "slot", 0, 0);
-        expect(css(l, badgeFontPx(slot.w, slot.h, false))).toBeGreaterThanOrEqual(
-          s.slots <= 5 ? 14 : 10,
-        );
+        expect(css(l, badgeFontPx(slot.w, slot.h))).toBeGreaterThanOrEqual(s.slots <= 5 ? 14 : 10);
         const field = badgeBox(l, "field", 0, 0);
-        expect(css(l, badgeFontPx(field.w, field.h, false))).toBeGreaterThanOrEqual(14);
+        expect(css(l, badgeFontPx(field.w, field.h))).toBeGreaterThanOrEqual(14);
         // The picture stays readable: cubes are not specks.
         const minCell = s.board <= 10 ? 20 : s.board <= 24 ? 10 : 6.5;
         expect(css(l, l.cell)).toBeGreaterThanOrEqual(minCell);
@@ -145,10 +145,10 @@ describe("safe areas", () => {
 
 describe("the group number's size", () => {
   it("is half the tile's height, and smaller only when three digits would not fit", () => {
-    expect(badgeFontPx(100, 100, false)).toBe(45);
-    expect(badgeFontPx(100, 50, false)).toBe(25);
-    expect(badgeFontPx(40, 40, false)).toBe(Math.round((40 * 0.86) / (3 * 0.64)));
-    expect(badgeFontPx(40, 40, false)).toBeLessThan(20);
+    expect(badgeFontPx(100, 100)).toBe(45);
+    expect(badgeFontPx(100, 50)).toBe(25);
+    expect(badgeFontPx(40, 40)).toBe(Math.round((40 * 0.86) / (3 * 0.64)));
+    expect(badgeFontPx(40, 40)).toBeLessThan(20);
   });
   it("never exceeds what fits: a 3-digit number stays inside a narrow badge", () => {
     for (const [w, h] of [
@@ -156,7 +156,7 @@ describe("the group number's size", () => {
       [88, 37],
       [140, 90],
     ] as const) {
-      const px = badgeFontPx(w, h, false);
+      const px = badgeFontPx(w, h);
       expect(px * 0.62 * 3, `${w}×${h}`).toBeLessThanOrEqual(w); // ~0.62 em per bold digit
     }
   });
@@ -255,15 +255,10 @@ describe("a three-digit number fits the tile, on the real tiles", () => {
           badgeBox(l, "slot", 0, 0),
           badgeBox(l, "column", 0, 0),
         ]) {
-          const n = numberLayout(box.w, box.h, false);
+          const n = numberLayout(box.w, box.h);
           expect(3 * DIGIT_EM * n.fontPx, "number vs the tile").toBeLessThanOrEqual(box.w);
           expect(n.x).toBe(0);
         }
-        // A queued tile's number sits inside the strip that shows.
-        const peek = badgeBox(l, "column", 0, 1);
-        const m = numberLayout(peek.w, peek.h, true);
-        expect(m.y + m.fontPx / 2).toBeLessThanOrEqual(peek.h / 2);
-        expect(m.y - m.fontPx / 2).toBeGreaterThanOrEqual(peek.h / 2 - peek.h * 0.34 - 1);
       });
 });
 
@@ -279,31 +274,59 @@ describe("every group box is the same square, wherever it is", () => {
           badgeBox(l, "column", 0, 1),
           badgeBox(l, "column", 0, 2),
         ];
+        // The three visible boxes of a column are a grid: a real gap between them, none overlapping.
+        for (let d = 1; d < 3; d++) {
+          const above = boxes[2 + d - 1]!;
+          const below = boxes[2 + d]!;
+          expect(below.y - above.y, `${d}`).toBeGreaterThanOrEqual(l.tile + l.gap - 1);
+        }
         for (const b of boxes) {
           expect(b.w).toBe(l.tile);
           expect(b.h).toBe(l.tile);
         }
         // Big enough to read and to tap.
         expect(css(l, l.tile), "tile css px").toBeGreaterThanOrEqual(30);
-        // The deck of queued tiles stays inside its column zone.
+        // The three boxes of a column stay inside its zone.
         const col = l.columns[0]!;
         const last = boxes[4]!;
         expect(last.y + last.h / 2).toBeLessThanOrEqual(col.y + col.h + 1);
       });
 });
 
-describe("the portal is apart from the picture", () => {
+describe("columns: three boxes at most, centred as a group", () => {
   for (const d of DEVICES.filter((x) => x.framed))
     for (const s of SHAPES)
       it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
         const l = layoutFor(d, s);
-        expect(l.dock.y).toBe(l.boardRect.y + l.boardRect.h);
-        expect(l.portal.y).toBeGreaterThan(l.dock.y);
-        expect(l.portal.y).toBeLessThan(l.dock.y + l.dock.h);
-        expect(l.dock.h).toBeGreaterThanOrEqual(l.cell);
-        expect(overlap(l.dock, l.field[0]!)).toBe(false);
-        expect(l.portal.x).toBeGreaterThan(l.boardRect.x);
-        expect(l.portal.x).toBeLessThan(l.boardRect.x + l.boardRect.w);
+        // Nothing is drawn around the picture, so the picture may use nearly the whole frame width.
+        expect(l.boardRect.w).toBeLessThanOrEqual(l.frame.w);
+        // All columns present: the layout's own rects. Fewer: centred, the same width, same order.
+        const all = activeColumnRects(
+          l,
+          l.columns.map(() => true),
+        );
+        all.forEach((r, i) => expect(r).toEqual(l.columns[i]));
+        for (let keep = 1; keep < l.columns.length; keep++) {
+          const active = l.columns.map((_, i) => i < keep);
+          const rects = activeColumnRects(l, active).filter((r) => r !== null);
+          expect(rects).toHaveLength(keep);
+          const left = rects[0]!.x - l.frame.x;
+          const right = l.frame.x + l.frame.w - (rects.at(-1)!.x + rects[0]!.w);
+          expect(Math.abs(left - right), `${keep} columns`).toBeLessThanOrEqual(1);
+          rects.forEach(
+            (r, i) => i > 0 && expect(r.x - rects[i - 1]!.x).toBe(l.columns[0]!.w + l.colGap),
+          );
+        }
+        // A column with nothing left has no rect (so no tap zone).
+        expect(
+          activeColumnRects(
+            l,
+            l.columns.map((_, i) => i !== 0),
+          )[0],
+        ).toBeNull();
+        // The column zone holds exactly three boxes and their gaps.
+        expect(l.columns[0]!.h).toBe(3 * l.tile + 2 * l.gap + l.gap);
+        expect(COLUMN_VISIBLE).toBe(3);
       });
 });
 
@@ -356,7 +379,7 @@ describe("the levels that ship, on the matrix", () => {
           expect(css(l, c.w), `${level.id} column`).toBeGreaterThanOrEqual(44);
         const front = badgeBox(l, "column", 0, 0);
         expect(
-          css(l, badgeFontPx(front.w, front.h, false)),
+          css(l, badgeFontPx(front.w, front.h)),
           `${level.id} front number`,
         ).toBeGreaterThanOrEqual(14);
         for (const r of l.slots)

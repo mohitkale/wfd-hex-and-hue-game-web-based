@@ -11,13 +11,18 @@ the matrix of docs/QA.md.
   the button circles even on the smallest phone. The fill is never full until the last cube is
   delivered (also on a 1,600-cube board, where one cube is under a pixel) and shows a sliver as soon as
   one is.
-- **One tile for every group (M15.6).** The column front, a waiting group and a working group are the
-  same rounded square (`layout.tile`, at most 52 css px), with a big centred number (half the tile's
-  height, smaller only when three digits would not fit) and no creature on it. Queued groups are the
-  same square stacked underneath with a third showing, their number in that strip. A working group
-  glows and a thin bar fills as it delivers; a waiting group is dimmed with "zz". There is no outline
-  or label for the field: only the holding slots are outlined. The portal sits in a dock under the
-  picture, clear of the cubes.
+- **One tile for every group (M15.6), a grid of three (M15.8).** Every group box (a column's, a waiting
+  one, a working one) is the same rounded square (`layout.tile`, at most 48 css px) with a big centred
+  number and no creature on it. A column shows its next **three** boxes as a real grid with gaps (front
+  box at the top); the rest stay hidden, so what comes later is a surprise. When a column runs out the
+  others **centre as a group** (`activeColumnRects`) and its tap zone is off. Above the columns are the
+  bordered holding slots (waiting groups) and, above them, the bordered **active** boxes: as many as may
+  work at once (`fieldCap`), always drawn. A tapped box moves into an active place and **opens its tray**
+  (a lid tips back over a dark opening); the familiars come out of that opening, fetch their cubes and
+  carry them back into it, and the number counts down; at zero the tray closes, then the box goes. A
+  working box also glows and shows a bar of how much it has delivered; a waiting box is dimmed with "zz".
+  Nothing is drawn around the picture (the ring is only the walkway), so the picture uses nearly the
+  whole frame width.
 - **`CollectScene` is split** (it was 847 lines, now about 670): `CollectHud` (title, buttons, progress),
   `Toast` (the one-line message, now wrapping to the board width), `PortalView`, `EndCard` (plain win and
   loss card) and the pure `badgeBox.ts` (where each badge sits and how big its number is) and
@@ -31,17 +36,17 @@ the matrix of docs/QA.md.
 24×24 board, five slots, four columns (the typical level), sizes in CSS px
 (`npm run layout:matrix`; since M14.4 it includes the 30 CSS px booster tray under the HUD, which costs the shortest phones up to 0.5 CSS px per cube):
 
-| Device              | Viewport @ dpr | Cube | Column     | Slot | Front number | Field number |
-| ------------------- | -------------- | ---- | ---------- | ---- | ------------ | ------------ |
-| iPhone SE (1st gen) | 320×568 @2     | 10   | 70×113.5   | 42   | 19           | 19           |
-| iPhone SE (2nd gen) | 375×667 @2     | 12   | 82×133.5   | 49.5 | 22           | 22           |
-| iPhone 15           | 393×852 @3     | 14   | 86×170.3   | 52   | 23.3         | 23.3         |
-| Pixel 7             | 412×915 @2.625 | 14.9 | 90.7×172.2 | 52.2 | 23.2         | 23.2         |
-| Galaxy S8           | 360×740 @3     | 12.7 | 78×148     | 52   | 23.3         | 23.3         |
-| iPad                | 768×1024 @2    | 17.5 | 108×172    | 52   | 23.5         | 23.5         |
-| iPad (landscape)    | 1024×768 @2    | 14.5 | 108×153.5  | 52   | 23.5         | 23.5         |
-| Desktop             | 1440×900 @1    | 17   | 108×172    | 52   | 23           | 23           |
-| Phone (landscape)   | 844×390 @3     | 6.3  | 112.3×78   | 32.3 | 14.3         | 14.3         |
+| Device              | Viewport @ dpr | Cube | Column    | Slot | Front number | Field number |
+| ------------------- | -------------- | ---- | --------- | ---- | ------------ | ------------ |
+| iPhone SE (1st gen) | 320×568 @2     | 9.5  | 70×136.5  | 39   | 17.5         | 17.5         |
+| iPhone SE (2nd gen) | 375×667 @2     | 11.5 | 82×159    | 45.5 | 20.5         | 20.5         |
+| iPhone 15           | 393×852 @3     | 14.7 | 86×168    | 48   | 21.7         | 21.7         |
+| Pixel 7             | 412×915 @2.625 | 15.2 | 90.7×168  | 48   | 21.3         | 21.3         |
+| Galaxy S8           | 360×740 @3     | 13.3 | 78×168    | 48   | 21.7         | 21.7         |
+| iPad                | 768×1024 @2    | 18   | 108×168   | 48   | 21.5         | 21.5         |
+| iPad (landscape)    | 1024×768 @2    | 14.5 | 108×168   | 48   | 21.5         | 21.5         |
+| Desktop             | 1440×900 @1    | 18   | 108×168   | 48   | 22           | 22           |
+| Phone (landscape)   | 844×390 @3     | 5.7  | 112.3×104 | 29.7 | 13.3         | 13.3         |
 
 ## What the tests guarantee (`interface.test.ts`)
 

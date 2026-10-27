@@ -271,15 +271,6 @@ describe("colourblind badge anchor", () => {
       }
     },
   );
-
-  it("the bat's drawn face really ends above the badge (no point of the mouth or fangs is lower)", () => {
-    // The fangs are the lowest face shapes: their points are the white triangles near the centre.
-    const { p, points } = recorder();
-    drawFrame(p, "idle0", "#4a6be2", "bat");
-    const fangs = points.filter(([x, y]) => Math.abs(x - FRAME_W / 2) < 4 && y > 33 && y < 40);
-    expect(fangs.length).toBeGreaterThan(0);
-    expect(Math.max(...fangs.map(([, y]) => y))).toBeLessThanOrEqual(FACE_BOTTOM_PX.bat);
-  });
 });
 
 describe("atlas", () => {

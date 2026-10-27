@@ -142,13 +142,13 @@ describe("collect layout", () => {
     ).toBeLessThanOrEqual(1);
   });
 
-  it("scales the smooth sprite continuously with the cell size, within 1..6 device px per unit", () => {
+  it("scales the smooth sprite continuously with the cell size, within 0.7..6 device px per unit", () => {
     const scales = [8, 16, 28, 40, 80].map((c) => spriteScaleForCell(c));
-    expect(scales[0]).toBe(1);
-    expect(scales[1]).toBeCloseTo(1.6);
-    expect(scales[2]).toBeCloseTo(2.8);
-    expect(scales[3]).toBeCloseTo(4);
-    expect(scales[4]).toBe(6);
+    expect(scales[0]).toBe(0.7);
+    expect(scales[1]).toBeCloseTo(1.15);
+    expect(scales[2]).toBeCloseTo(2.0125);
+    expect(scales[3]).toBeCloseTo(2.875);
+    expect(scales[4]).toBeCloseTo(5.75);
   });
 });
 

@@ -8,11 +8,12 @@ import type { Insets, Rect } from "../layout";
  *   │ tray: menu · coins · slot · hint  │  (levels with boosters)
  *   │  ┌ ring ───────────────────────┐  │
  *   │  │ mosaic (cubes)              │  │  familiars walk the ring and emptied cells
- *   │  └─────────────────────────────┘  │
- *   │           ◉ portal (dock)         │  apart from the picture: flights show
- *   │  [■] [■] [■]                      │  working groups (no outline until they exist)
+ *   │  └─────────────────────────────┘  │  (nothing is drawn around the picture)
+ *   │  [□] [□] [□] [□] [□]              │  active boxes: bordered, as many as may work at once
  *   │  [□] [□] [□] [□]                  │  holding slots (waiting groups)
- *   │   col     col     col             │  summon columns (thumb zone); every box is one square tile
+ *   │  [■] [■] [■]                      │  summon columns: the next three boxes of each, a grid
+ *   │  [■] [■] [■]                      │  with gaps; the rest stay hidden; columns centre as a
+ *   │  [■] [■] [■]                      │  group when one runs out. Every box is one square tile.
  *   └───────────────────────────────────┘
  */
 
@@ -40,14 +41,14 @@ export interface CollectLayout {
   tray: Rect;
   /** The mosaic plus its one-cell ring. */
   boardRect: Rect;
-  /** The strip under the board where the portal sits, apart from the picture (`DOCK_CELLS` tall). */
-  dock: Rect;
-  /** Where the portal is drawn and where familiars leave and return: the middle of the dock. */
+  /** The walkway cell where a familiar is drawn when it has no box to come from. */
   portal: { x: number; y: number };
   /** Every group box (column front, waiting, working) is a square of this size, in device pixels. */
   tile: number;
   /** The space between tiles; a slot's tap zone is its tile plus this, so it stays a full thumb target. */
   gap: number;
+  /** The space between columns. */
+  colGap: number;
   /** Cell size in whole device pixels. */
   cell: number;
   /** Padded-grid stride (`boardWidth + 2`). */
@@ -58,8 +59,8 @@ export interface CollectLayout {
   columns: Rect[];
 }
 
-/** The dock under the board, in cells: room for the portal and a visible flight to the picture. */
-export const DOCK_CELLS = 1.3;
+/** At most this many boxes of a column are shown (the front one and the next two); the rest stay hidden. */
+export const COLUMN_VISIBLE = 3;
 
 export const CSS = {
   maxWidth: 480,
@@ -67,9 +68,9 @@ export const CSS = {
   gap: 8,
   sidePad: 12,
   tray: 30,
-  slot: 52,
-  columnsMin: 110,
-  columnsMax: 172,
+  slot: 48,
+  /** Breathing room under the columns (the OS home bar is handled by the safe-area insets). */
+  bottomPad: 12,
 } as const;
 
 const COMPACT_BELOW = 700;
@@ -102,23 +103,24 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const inner: Rect = { x: frame.x + pad, y: frame.y, w: frame.w - 2 * pad, h: frame.h };
 
   const hud: Rect = { x: frame.x, y: frame.y, w: frame.w, h: px(CSS.hud) };
-  const columnsH = clamp(Math.round(frame.h * 0.2), px(CSS.columnsMin), px(CSS.columnsMax));
-  const columnsY = frame.y + frame.h - columnsH;
   const colGap = input.columns > 4 ? Math.round(gap / 2) : gap;
-  const columns = row(inner, input.columns, Math.round(frame.w), colGap, columnsY, columnsH);
-
-  // One size for every group box, whatever it is doing (column front, waiting, working): the largest
-  // square that fits the thumb zone's columns and each row of tiles, up to 52 css px.
+  // One size for every group box, whatever it is doing (column, waiting, working): the largest square
+  // that fits a column and each row of tiles, up to 48 css px.
   const fit = (count: number, g: number) => Math.floor((inner.w - (count - 1) * g) / count);
+  const colW = row(inner, input.columns, Math.round(frame.w), colGap, 0, 0)[0]?.w ?? px(CSS.slot);
   const tile = Math.max(
     1,
     Math.min(
       px(CSS.slot),
-      Math.floor((columns[0]?.w ?? px(CSS.slot)) * 0.94),
+      Math.floor(colW * 0.94),
       fit(input.slots, gap),
       fit(input.fieldCap, gap),
     ),
   );
+  // A column shows its next COLUMN_VISIBLE boxes as a real grid with gaps, front box at the top.
+  const columnsH = COLUMN_VISIBLE * tile + (COLUMN_VISIBLE - 1) * gap + gap;
+  const columnsY = frame.y + frame.h - columnsH - px(CSS.bottomPad);
+  const columns = row(inner, input.columns, Math.round(frame.w), colGap, columnsY, columnsH);
   const slotY = columnsY - gap - tile;
   const slots = row(inner, input.slots, tile, gap, slotY, tile);
   const fieldY = slotY - gap - tile;
@@ -130,23 +132,23 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const boardBottom = fieldY - gap;
   const ringW = input.boardWidth + 2;
   const ringH = input.boardHeight + 2;
-  const cell = Math.max(
-    1,
-    Math.floor(Math.min(inner.w / ringW, (boardBottom - boardTop) / (ringH + DOCK_CELLS))),
-  );
+  // The ring is only a walkway: nothing is drawn around the picture, so the picture may use nearly the
+  // whole width of the frame.
+  const side = Math.round(gap / 2);
+  const wide = frame.w - 2 * side;
+  const cell = Math.max(1, Math.floor(Math.min(wide / ringW, (boardBottom - boardTop) / ringH)));
   const bw = ringW * cell;
   const bh = ringH * cell;
-  const dockH = Math.round(DOCK_CELLS * cell);
   const boardRect: Rect = {
     x: frame.x + Math.floor((frame.w - bw) / 2),
-    y: boardTop + Math.floor((boardBottom - boardTop - bh - dockH) / 2),
+    y: boardTop + Math.floor((boardBottom - boardTop - bh) / 2),
     w: bw,
     h: bh,
   };
-  const dock: Rect = { x: boardRect.x, y: boardRect.y + bh, w: bw, h: dockH };
+  // Where a familiar with no box to come from (a fallback) is drawn: the walkway cell of the portal.
   const portal = {
     x: boardRect.x + (input.portalX + 1.5) * cell,
-    y: dock.y + dock.h / 2,
+    y: boardRect.y + boardRect.h - cell / 2,
   };
   return {
     dpr,
@@ -154,16 +156,35 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
     hud,
     tray,
     boardRect,
-    dock,
     portal,
     tile,
     gap,
+    colGap,
     cell,
     stride: ringW,
     field,
     slots,
     columns,
   };
+}
+
+/**
+ * The columns that still hold boxes, centred as a group (a column that has run out leaves, and the
+ * rest slide to the middle). `active[i]` says whether column `i` still has a box; the result has a rect
+ * for each active column and `null` for the others. Pure.
+ */
+export function activeColumnRects(
+  layout: CollectLayout,
+  active: readonly boolean[],
+): (Rect | null)[] {
+  const n = active.filter(Boolean).length;
+  const w = layout.columns[0]?.w ?? 0;
+  const total = n * w + Math.max(0, n - 1) * layout.colGap;
+  const x0 = layout.frame.x + Math.floor((layout.frame.w - total) / 2);
+  let k = 0;
+  return layout.columns.map((r, i) =>
+    active[i] ? { ...r, x: x0 + k++ * (w + layout.colGap) } : null,
+  );
 }
 
 /** Screen position of the centre of padded-grid cell `idx`. */
@@ -176,9 +197,9 @@ export function cellCenter(layout: CollectLayout, idx: number): { x: number; y: 
   };
 }
 
-/** Device pixels per sprite unit so a 16-unit familiar is about 1.6 cells wide (1..6; smooth art needs no whole numbers). */
+/** Device pixels per sprite unit so a 16-unit familiar is about 1.15 cells wide (0.7..6; smooth art needs no whole numbers). */
 export function spriteScaleForCell(cell: number, spriteWidth = 16): number {
-  return clamp((cell * 1.6) / spriteWidth, 1, 6);
+  return clamp((cell * 1.15) / spriteWidth, 0.7, 6);
 }
 
 /** The HUD buttons: a 36 css px circle inside a 44 css px tap target. */
