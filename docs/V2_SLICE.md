@@ -14,7 +14,7 @@ npm run dev     # then open the URL below (the port is printed, usually 4321)
 | URL                              | What you get                                                                                                                    |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `/play/?engine=v2`               | The slice level, to play yourself (a first visit starts in the tutorial, docs/V2_ONBOARDING.md; skip it, or use `&level=slice`) |
-| `/play/?engine=v2&demo=win`      | The recorded winning line, played for you (about 100 s at 1×, about 50 s with `&speed=2`)                                       |
+| `/play/?engine=v2&demo=win`      | The recorded winning line, played for you (about 100 s at 1×, about 50 s with `&speed=3`)                                       |
 | `/play/?engine=v2&demo=slots`    | A losing line: two groups park, a third runs dry with both slots full ("Out of slots")                                          |
 | `/play/?engine=v2&demo=deadlock` | The quickest loss: two taps leave nothing that can reach the cubes that are left ("Stuck")                                      |
 | add `&cb=1`                      | Colour-blind symbols                                                                                                            |

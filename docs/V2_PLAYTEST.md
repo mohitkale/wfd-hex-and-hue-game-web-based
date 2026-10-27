@@ -15,8 +15,8 @@ release candidate) stays blocked until real findings are recorded and approved h
   `art-*` pictures, `?level=daily`, `?view=spellbook`.
 - The **Menu** button under the HUD opens sound, music, vibration, colour-symbol and reduced-motion
   switches without leaving the level.
-- Boosters, coins and the optional 2× ad are described in [V2_BOOSTERS.md](V2_BOOSTERS.md) and
-  [V2_SPEED.md](V2_SPEED.md). With no ad provider configured there is no 2× button.
+- Boosters, coins and the optional 3× ad and the free end-game sprint are described in [V2_BOOSTERS.md](V2_BOOSTERS.md) and
+  [V2_SPEED.md](V2_SPEED.md). With no ad provider configured there is no 3× button.
 - Use a fresh browser profile (or clear site data) for each tester: progress lives in `localStorage`
   (`hexhue.v2.*`).
 - Known limits the tester will meet: five of the six pictures are easy for cheap play
@@ -67,7 +67,31 @@ Also note: the commit or build tested, device, browser, whether sound and haptic
 
 ## Findings
 
-_None recorded yet: awaiting humans._
+**First-time-player sessions (G3): none yet; still awaiting humans.**
+
+### Owner's own first play (2026-10-28), not a first-time player
+
+The owner played the release-candidate build on desktop (the tutorial, then the slice) and sent five
+screenshots with this feedback. It is one person who knows the game, so it counts as owner review, not
+as the G3 evidence; it is recorded here as it was said.
+
+1. **Look.** "Does not look aesthetically great", compared with Food Hunt; wants the puzzle boxes
+   "more colorful and clean", "more visually stunning" and "the latest hyper-casual fun game for the
+   witch community rather than an 8-bit game".
+2. **Group boxes.** The numbered coloured boxes are "not of consistent shape and size"; the pixel
+   character on the box is not understood and should go.
+3. **WORKING strip.** The empty WORKING holders are "totally useless". Only the pending coloured
+   boxes should exist; a working group should show its working effect on its own box.
+4. **Portal.** The hole characters return to should be separate from the coloured picture so the
+   animation can be seen.
+5. **Speed.** Default 1×; make the speed-up 3× instead of 2×; when the working group holds the final
+   cubes, switch to 3× for free to end the game faster.
+6. **Characters.** Make them look like a flying bat or a running or walking cat.
+7. **Tutorial.** Played three levels as "training levels"; no comment on the hints.
+
+Tracked as M15.6 (#151: items 2 to 5) and M15.7 (#152: items 1 and 6). Item 5's free end-game 3×
+changes the rule in CLAUDE.md ("1× is free; 2× only through an optional rewarded ad"): the owner
+asked for it, so the rule is updated to match (docs/V2_SPEED.md).
 
 When sessions are done, add one section per tester here (T1, T2, ...) with the filled rows above,
 then a summary: how many completed the tutorial and where the others got stuck, what was confusing,
@@ -92,5 +116,5 @@ go in this document. Fixes that follow become new tasks in the M15 milestone.
 - Are tutorial-grade pictures (five of the six) acceptable as the daily and first content, or do
   they need the layered redesign first ([V2_PRODUCTION.md](V2_PRODUCTION.md))?
 - Is the Undo price (one booster or 15 coins) and the starting kit felt as fair?
-- Is the 2× rewarded-ad offer understood and acceptable, and does losing the free alternating 2× matter?
+- Is the 3× rewarded-ad offer understood and acceptable, and is the free end-game sprint noticed and welcome?
 - Is the v2 game fun enough to replace v1 at M15.5?

@@ -126,7 +126,7 @@ The layout matrix ([V2_INTERFACE.md](V2_INTERFACE.md)) and the density tool
 finding from this work:** the tray was added in M14.4 without re-running them, and on the shortest
 phones it made cubes smaller than the M11.2 floors (iPhone SE 1st gen 32 per side: 8.0 px against
 8.5; Galaxy S 40 per side: 7.7 against 8). The tray was slimmed (34 → 30 px, no extra gap) and the floors
-were lowered to what the layout now achieves (6.5 / 7.5 / 8, was 7 / 8 / 8.5; no shipped piece is
+were lowered to what the layout now achieves (6.5 / 7.5 / 8, was 7 / 8 / 8.5, and 7 for 360+ wide since M15.6; no shipped piece is
 over 32 high, the widest is 40 by 20). Phones 852 px tall and up are unaffected. If readability on a
 small phone is a problem at G3, the next lever is hiding the tray on short phones.
 

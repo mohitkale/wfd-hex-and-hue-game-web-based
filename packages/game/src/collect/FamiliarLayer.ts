@@ -109,11 +109,14 @@ export class FamiliarLayer {
     return spriteScaleForCell(this.layout.cell);
   }
 
+  /** The portal is drawn in the dock under the board, not in the ring: familiars leave and return there. */
   private cx(cell: number): number {
+    if (cell === this.model.portal) return this.layout.portal.x;
     return this.layout.boardRect.x + ((cell % this.layout.stride) + 0.5) * this.layout.cell;
   }
 
   private cy(cell: number): number {
+    if (cell === this.model.portal) return this.layout.portal.y;
     return (
       this.layout.boardRect.y + (Math.floor(cell / this.layout.stride) + 0.5) * this.layout.cell
     );

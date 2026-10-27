@@ -18,7 +18,7 @@ Open one of:
 | `/play/?engine=v2&level=parking`  | The teaching board from the design doc: park, resume, or lose with one slot                                              |
 | `/play/?engine=v2&level=purple12` | Purple 12 can reach only 7 cubes: it waits showing 5 until the blue is cleared                                           |
 | add `&cb=1`                       | Colour-blind symbols on familiars, carried cubes and groups                                                              |
-| add `&speed=2`                    | Start at 2× (the 1×/2× button also toggles it; review builds only)                                                       |
+| add `&speed=3`                    | Start at 3× (the 1×/3× button also toggles it; review builds only)                                                       |
 
 A production build can include it permanently with `PUBLIC_ENGINE=v2 npm run build`.
 
@@ -57,4 +57,4 @@ A mid-range-device frame-time measurement (M15.3; desktop numbers are in `docs/V
 haptics, trails and completion effects arrived in M10.4 and have not been judged by a human yet (G1). With the maximum of 8 holding slots on a 320 px phone each slot is
 narrower than the 44 px tap guideline; real levels use 3–5. The 2× button now follows the real rule (M14.3, docs/V2_SPEED.md): 1× is free, 2× only through an
 optional rewarded ad (a labelled mock in development), and no button when there is no provider.
-`&speed=2` is a review-only override and is removed or gated at the switch (M15.5).
+`&speed=3` is a review-only override and is removed or gated at the switch (M15.5).

@@ -2,10 +2,10 @@ import type Phaser from "phaser";
 import { isReducedMotion } from "../a11y";
 import { TEX } from "../view/textures";
 import { bake } from "./bake";
-import { cellCenter, type CollectLayout } from "./collectLayout";
+import type { CollectLayout } from "./collectLayout";
 
 /**
- * The portal (a glowing gate in the bottom ring): a baked gate image under a softly pulsing glow that
+ * The portal (a glowing gate in the dock under the picture): a baked gate image under a softly pulsing glow that
  * gives a small bump when a cube lands. Decorative only; with reduced motion it stays still.
  */
 export class PortalView {
@@ -14,11 +14,10 @@ export class PortalView {
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly layout: CollectLayout,
-    portalCell: number,
   ) {
     const l = layout;
     const dpr = l.dpr;
-    const p = cellCenter(l, portalCell);
+    const p = l.portal;
     this.glow = scene.add
       .image(p.x, p.y, TEX.glow)
       .setTint(0xb48cff)

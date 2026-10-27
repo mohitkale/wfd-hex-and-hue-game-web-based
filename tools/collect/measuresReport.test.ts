@@ -69,5 +69,6 @@ describe("what the pipeline records for the generated levels", () => {
         Number.isFinite(m.planningDepth) ? m.planningDepth : null,
       );
     }
-  });
+    // Measuring every art level takes about 20 s alone: more than the 30 s default under load.
+  }, 180_000);
 });
