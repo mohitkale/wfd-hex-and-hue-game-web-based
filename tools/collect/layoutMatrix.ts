@@ -13,7 +13,7 @@ import { DEVICE_MATRIX } from "../../packages/game/src/collect/deviceMatrix";
 export function table(): string {
   const f = (n: number) => (Math.round(n * 10) / 10).toString();
   const lines = [
-    "| Device | Viewport @ dpr | Cube | Column | Slot | Front number | Field number |",
+    "| Device | Viewport @ dpr | Cube | Column | Tray | Column number | Tray number |",
     "| --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const [name, w, h, dpr] of DEVICE_MATRIX) {
@@ -24,7 +24,7 @@ export function table(): string {
       insets: { top: 0, right: 0, bottom: 0, left: 0 },
       boardWidth: 24,
       boardHeight: 24,
-      slots: 5,
+      slots: 2,
       columns: 4,
       fieldCap: 3,
       portalX: 11,
@@ -32,9 +32,9 @@ export function table(): string {
     });
     const css = (v: number) => v / dpr;
     const front = badgeBox(l, "column", 0, 0);
-    const field = badgeBox(l, "field", 0, 0);
+    const field = badgeBox(l, "tray", 0, 0);
     lines.push(
-      `| ${name} | ${w}×${h} @${dpr} | ${f(css(l.cell))} | ${f(css(l.columns[0]!.w))}×${f(css(l.columns[0]!.h))} | ${f(css(l.slots[0]!.w))} | ${f(css(badgeFontPx(front.w, front.h)))} | ${f(css(badgeFontPx(field.w, field.h)))} |`,
+      `| ${name} | ${w}×${h} @${dpr} | ${f(css(l.cell))} | ${f(css(l.columns[0]!.w))}×${f(css(l.columns[0]!.h))} | ${f(css(l.trays[0]!.w))} | ${f(css(badgeFontPx(front.w, front.h)))} | ${f(css(badgeFontPx(field.w, field.h)))} |`,
     );
   }
   return lines.join("\n");

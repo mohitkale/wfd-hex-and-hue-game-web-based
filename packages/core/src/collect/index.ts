@@ -41,6 +41,7 @@ export {
 } from "./actions";
 export { isSettled, runUntilSettled, step } from "./sim";
 export { addSlot, canAddSlot } from "./boosters";
+export { autoResume, runUntilSettledAuto } from "./autoResume";
 export { HINT_BUDGET, hintFor, type Hint } from "./hint";
 export { nearestTarget, hasAssignable, type Target } from "./targeting";
 export { computeDist, paddedIndex, topologyFor } from "./grid";

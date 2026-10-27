@@ -4,6 +4,7 @@ import { theme } from "../theme";
 import type { CollectLayout } from "./collectLayout";
 import { badgeBox, PEEK, type Place } from "./badgeBox";
 import { activeColumnRects } from "./collectLayout";
+import { assignTrays } from "./trays";
 import { GroupBadge } from "./GroupBadge";
 import { leaveScale } from "./swarm";
 
@@ -15,6 +16,8 @@ interface Tracked {
   index: number;
   depth: number;
   completing: boolean;
+  /** Working or waiting (trays), or queued (columns): what the box shows. */
+  mode: "queued" | "working" | "waiting";
 }
 
 /**
@@ -24,21 +27,25 @@ interface Tracked {
  * familiars come out of it) and the holding slots (waiting groups). It places one badge per
  * group from the state and moves it when the group changes place. No game rules live here.
  */
-/** Paints the empty field and slot outlines into `g` (the scene bakes them into its static layer). */
+/** Paints the empty tray outlines into `g` (the scene bakes them into its static layer). */
 export function paintPanelFrames(
   g: Phaser.GameObjects.Graphics,
   l: CollectLayout,
   dpr: number,
 ): void {
-  // Both limits are drawn as bordered places, always: how many boxes may work at once (the field) and
-  // how many may wait. A box moves into one and its state shows on the box itself.
+  // One row of trays, always drawn: a box moves into one when it is tapped and stays there while it
+  // works and while it waits; its state shows on the box itself.
   g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.34);
-  for (const r of [...l.field, ...l.slots]) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.22);
+  for (const r of l.trays) g.strokeRoundedRect(r.x, r.y, r.w, r.h, r.h * 0.22);
 }
 
 export class PanelsView {
   private readonly tracked = new Map<number, Tracked>();
+  /** Told after every sync which tray each box is in (the scene keeps it across a rebuild). */
+  onTrays: ((trays: ReadonlyMap<number, number>) => void) | null = null;
   private readonly anchorOut = { x: 0, y: 0 };
+  /** Which tray each working or waiting group sits in (it keeps its tray while it stalls and resumes). */
+  private trayOf: Map<number, number>;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -47,7 +54,11 @@ export class PanelsView {
     private readonly dpr: number,
     private readonly colorblind = false,
     private readonly reduced = false,
-  ) {}
+    /** Trays from before a rebuild: boxes keep their place when the screen is laid out again. */
+    initialTrays: ReadonlyMap<number, number> = new Map(),
+  ) {
+    this.trayOf = new Map(initialTrays);
+  }
 
   destroy(): void {
     for (const t of this.tracked.values()) t.badge.destroy();
@@ -58,12 +69,13 @@ export class PanelsView {
   private target(
     s: Readonly<CollectState>,
     id: number,
-    working: number[],
     views: readonly collect.GroupView[],
   ): { place: Place; index: number; depth: number } | null {
     const g = s.groups[id]!;
-    if (g.status === "working") return { place: "field", index: working.indexOf(id), depth: 0 };
-    if (g.status === "waiting") return { place: "slot", index: s.slots.indexOf(id), depth: 0 };
+    if (g.status === "working" || g.status === "waiting") {
+      const tray = this.trayOf.get(id);
+      return tray === undefined ? null : { place: "tray", index: tray, depth: 0 };
+    }
     if (g.status === "queued") {
       const view = views[id]!;
       if (view.column === null || view.depth === null || view.depth > PEEK) return null;
@@ -74,7 +86,8 @@ export class PanelsView {
 
   /** Re-places every badge for `state`. Call after each tick batch, tap, undo or resize. */
   sync(state: Readonly<CollectState>): void {
-    const working = state.groups.filter((g) => g.status === "working").map((g) => g.id);
+    this.trayOf = assignTrays(this.trayOf, state.groups, this.layout.trays.length);
+    this.onTrays?.(this.trayOf);
     const views = collect.groupViews(state);
     // Columns that still hold a box, centred as a group.
     const colRects = activeColumnRects(
@@ -82,7 +95,7 @@ export class PanelsView {
       state.columns.map((c) => c.length > 0),
     );
     for (const g of state.groups) {
-      const target = this.target(state, g.id, working, views);
+      const target = this.target(state, g.id, views);
       const t = this.tracked.get(g.id);
       const remaining = g.capacity - g.delivered;
       if (!target) {
@@ -102,6 +115,14 @@ export class PanelsView {
       ) {
         t.badge.setNumber(remaining);
         t.badge.setProgress(g.delivered / g.capacity);
+        // The same tray, a new state: a box that stalls closes its tray and sleeps; one that resumes opens it.
+        const mode =
+          g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued";
+        if (mode !== t.mode) {
+          t.mode = mode;
+          // The tray stays open while a box waits: it resumes by itself the moment it can reach a cube.
+          t.badge.setMode(mode);
+        }
         // A column that ran out of boxes left, and the rest slid to the middle: follow.
         if (target.place === "column") {
           const at = badgeBox(
@@ -152,7 +173,7 @@ export class PanelsView {
         g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued",
       );
       badge.setProgress(g.delivered / g.capacity);
-      if (g.status === "working") badge.openTray(wasOpen);
+      if (g.status === "working" || g.status === "waiting") badge.openTray(wasOpen);
       this.scene.add.existing(badge);
       if (from) {
         this.scene.tweens.add({
@@ -163,7 +184,12 @@ export class PanelsView {
           ease: "Cubic.easeOut",
         });
       }
-      this.tracked.set(g.id, { badge, ...target, completing: false });
+      this.tracked.set(g.id, {
+        badge,
+        ...target,
+        completing: false,
+        mode: g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued",
+      });
     }
   }
 
@@ -184,6 +210,11 @@ export class PanelsView {
         },
       });
     });
+  }
+
+  /** The tray group `id` sits in, or null (in a column, or finished). */
+  trayOfGroup(id: number): number | null {
+    return this.trayOf.get(id) ?? null;
   }
 
   /** Where the familiars of group `id` come out of (and return to): the open tray on its box, or null if it has none. */

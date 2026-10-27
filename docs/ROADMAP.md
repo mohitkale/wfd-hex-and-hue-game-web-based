@@ -174,6 +174,9 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 - [x] **M15.6** Clean play screen, speed rule and portal dock — owner feedback after playing the RC (docs/V2_PLAYTEST.md): one square for every group box without a creature, no WORKING strip (state shown on the box), the portal in a dock apart from the picture, 1× default with 3× (ad) and a free end-game sprint. _Owner feedback; independent of M15.4._ (#151)
 - [x] **M15.7** New look — glossy tiles and bat / cat characters, cleaner and more colourful (owner feedback; #152).
 - [x] **M15.8** Play-area rework — owner feedback round 2 (docs/V2_PLAYTEST.md): no outer border, a three-box column grid with the rest hidden, columns centred as they run out, bordered active places with a tray that opens and closes, familiars come out of and return to their box, smaller one-colour bats and cats.
+- [x] **M15.9** One tray row — owner feedback round 3 (docs/V2_PLAYTEST.md item 14): the PUZZLE, one row of TRAYS holding both working and pending boxes (`fieldCap + slots`, Extra Slot adds one), and the COLOURED BOXES as a grid with equal spacing across and down.
+- [x] **M15.10** Auto-resume and a calmer pace — owner feedback round 4 (docs/V2_PLAYTEST.md items 15-17): a pending box resumes by itself and its tray stays open (docs/V2_AUTORESUME.md), the board shows 14 ticks a second, and a boot crash from M15.9 fixed.
+- [ ] **M15.11** Re-measure under auto-resume (found in the M15.10 review; do before G3 evidence is collected): run the simulated players, `strategyReport` tiers, `minSlots` and the difficulty measures with the policy on, and re-check that art levels still resist column-spam and greedy play. See docs/V2_AUTORESUME.md.
 
 ## Later (post-MVP, not scheduled)
 

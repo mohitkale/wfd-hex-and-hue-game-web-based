@@ -4,6 +4,13 @@
  * play out identically. If the device falls behind, at most `maxPerFrame` ticks run per frame and
  * logical time simply runs slower than wall time; ticks are never skipped or merged.
  */
+/**
+ * How many ticks the board shows a second at 1× (the owner found 24 "pretty fast": the familiars ran
+ * too quickly to follow). One tick is one cell, so a 14-cell route takes about a second. The rules never
+ * read this; the speed-up multiplies it.
+ */
+export const SHOWN_TICKS_PER_SECOND = 14;
+
 export class TickClock {
   private acc = 0;
 

@@ -11,7 +11,7 @@ import {
   speedView,
   type SpeedState,
 } from "./speedRule";
-import { TickClock } from "./tickClock";
+import { SHOWN_TICKS_PER_SECOND, TickClock } from "./tickClock";
 import { stepFrame } from "./frameStep";
 import { targetRect } from "./TutorialLayer";
 import { activeColumnRects, computeCollectLayout, hudButtonX } from "./collectLayout";
@@ -131,7 +131,7 @@ describe("speed never changes the outcome", () => {
   /** Plays `line` at `speed`: frames of ~16.7 ms feed a TickClock; each action is tapped as soon as the board is settled. */
   function play(level: collect.CollectLevel, line: readonly collect.Action[], speed: number) {
     const session = new collect.CollectSession(level);
-    const clock = new TickClock();
+    const clock = new TickClock(SHOWN_TICKS_PER_SECOND);
     let next = 0;
     let frames = 0;
     for (; frames < 400_000 && session.state.status === "playing"; frames++) {
@@ -202,7 +202,7 @@ describe("the frame step the scene really runs", () => {
     const level = TUTORIAL[0]!.make();
     const session = new collect.CollectSession(level);
     session.tap({ kind: "select", column: 0 });
-    const clock = new TickClock();
+    const clock = new TickClock(SHOWN_TICKS_PER_SECOND);
     for (let i = 0; i < 600; i++) expect(stepFrame(session, clock, 16.7, 2, true)).toBe(0);
     expect(session.state.tick).toBe(0);
     // Afterwards play resumes normally, with no burst of ticks for the time that passed.
@@ -258,6 +258,28 @@ describe("the tutorial's ring follows the columns as they centre", () => {
   });
 });
 
+describe("the tutorial's ring points at the tray a waiting box sits in", () => {
+  it("uses the tray the box is in, not the engine slot number", () => {
+    const l = computeCollectLayout({
+      width: 750,
+      height: 1500,
+      dpr: 2,
+      insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      boardWidth: 10,
+      boardHeight: 10,
+      slots: 2,
+      columns: 3,
+      fieldCap: 3,
+      portalX: 4,
+    });
+    // By default slot i is tray i; a box in engine slot 0 that sits in tray 2 is pointed at there.
+    expect(targetRect(l, { kind: "slot", index: 0 })).toEqual(l.trays[0]);
+    const r = targetRect(l, { kind: "slot", index: 0 }, 3, undefined, () => l.trays[2] ?? null);
+    expect(r).toEqual(l.trays[2]);
+    expect(targetRect(l, { kind: "slot", index: 1 }, 3, undefined, () => null)).toBeNull();
+  });
+});
+
 describe("the free end-game sprint", () => {
   const state = (o: Partial<Parameters<typeof sprinting>[0]> = {}) => ({
     status: "playing",
@@ -291,7 +313,7 @@ describe("the free end-game sprint", () => {
       const line = collect.solve(level, 200_000).line!;
       const run = (speedAt: (s: collect.CollectState) => 1 | 3) => {
         const session = new collect.CollectSession(level);
-        const clock = new TickClock();
+        const clock = new TickClock(SHOWN_TICKS_PER_SECOND);
         let next = 0;
         let frames = 0;
         let sprintFrames = 0;

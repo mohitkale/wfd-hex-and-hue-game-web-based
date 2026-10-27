@@ -109,7 +109,7 @@ const blockedScript: Step[] = [
   },
 ];
 
-/** 3. Slots: a group with nothing left to reach waits, then is sent again. */
+/** 3. Slots: a group with nothing left to reach waits in its tray, and wakes by itself when it can. */
 const slots = (): collect.CollectLevel =>
   level(
     "tutorial-slots",
@@ -130,19 +130,12 @@ const slotsScript: Step[] = [
   },
   {
     id: "waits",
-    text: "It waits. Clear the blue first",
-    // Once red really waits in a slot; the blue column is what to tap.
+    text: "It waits. Blue wakes it",
+    // Once red really waits in a tray; the blue column is what to tap, and red wakes by itself.
     target: () => col(2),
     ready: (s) => firstWaiting(s) >= 0,
     // Or the player cleared the blue first and red never had to wait: the lesson moves on.
     done: ({ state }) => started(state, 0) || state.groups[0]!.status === "completed" || won(state),
-  },
-  {
-    id: "wake",
-    text: "Tap the waiting group",
-    target: (s) => ({ kind: "slot", index: Math.max(0, firstWaiting(s)) }),
-    ready: (s) => firstWaiting(s) >= 0,
-    done: ({ state }) => state.slots.every((id) => id === null),
   },
 ];
 
@@ -190,10 +183,8 @@ const undoScript: Step[] = [
   },
   {
     id: "finish",
-    text: "Wake red, then green",
+    text: "Now red, then green",
     target: (s) => {
-      const w = firstWaiting(s);
-      if (w >= 0) return { kind: "slot", index: w };
       const next = s.columns.findIndex((c) => c.length > 0);
       return next >= 0 ? col(next) : null;
     },

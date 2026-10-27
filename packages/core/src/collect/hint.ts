@@ -25,9 +25,15 @@ export type Hint =
  * `level` must be the level `state` is being played on (the extra slots it has gained are
  * accounted for).
  */
-export function hintFor(level: CollectLevel, state: CollectState, budget = HINT_BUDGET): Hint {
+export function hintFor(
+  level: CollectLevel,
+  state: CollectState,
+  budget = HINT_BUDGET,
+  /** Search the game's own policy (waiting groups resume by themselves). */
+  auto = false,
+): Hint {
   if (state.status !== "playing") return { kind: "over" };
-  const solver = new CollectSolver({ ...level, slots: state.params.slots }, budget);
+  const solver = new CollectSolver({ ...level, slots: state.params.slots }, budget, auto);
   const r = solver.solveState(state, budget);
   if (r.status === "unsolvable") return { kind: "doomed" };
   if (r.status === "unknown" || !r.line) return { kind: "unknown" };

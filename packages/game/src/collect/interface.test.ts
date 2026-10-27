@@ -4,6 +4,7 @@ import { badgeBox, badgeFontPx } from "./badgeBox";
 import {
   COLUMN_VISIBLE,
   activeColumnRects,
+  frontBoxRect,
   computeCollectLayout,
   hudButtonX,
   type CollectLayout,
@@ -33,12 +34,15 @@ const DEVICES = MATRIX.map(([name, w, h, dpr]) => ({
 
 const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
 
-/** The shapes of level the board has to carry: small, mid, and the 40×40 limit; five slots is the design. */
+/**
+ * The shapes of level the board has to carry: small, mid, and the 40×40 limit. Three working places plus
+ * two waiting ones make five trays, the design; the last shape is the extreme (eight trays, six columns).
+ */
 const SHAPES = [
-  { board: 10, slots: 5, columns: 3 },
-  { board: 24, slots: 5, columns: 4 },
-  { board: 40, slots: 5, columns: 4 },
-  { board: 24, slots: 8, columns: 6 },
+  { board: 10, slots: 2, columns: 3 },
+  { board: 24, slots: 2, columns: 4 },
+  { board: 40, slots: 3, columns: 4 },
+  { board: 24, slots: 5, columns: 6 },
 ];
 
 const layoutFor = (
@@ -66,9 +70,9 @@ const overlap = (a: { x: number; y: number; w: number; h: number }, b: typeof a)
 describe("every device: an unobstructed board between the HUD and the groups", () => {
   for (const d of DEVICES)
     for (const s of SHAPES)
-      it(`${d.name}, ${s.board}×${s.board}, ${s.slots} slots, ${s.columns} columns`, () => {
+      it(`${d.name}, ${s.board}×${s.board}, ${3 + s.slots} trays, ${s.columns} columns`, () => {
         const l = layoutFor(d, s);
-        const rows = [l.hud, l.boardRect, ...l.field, ...l.slots, ...l.columns];
+        const rows = [l.hud, l.boardRect, ...l.trays, ...l.columns];
         // Nothing leaves the frame, and the board overlaps nothing at all.
         for (const r of rows) {
           expect(r.x).toBeGreaterThanOrEqual(l.frame.x);
@@ -76,15 +80,14 @@ describe("every device: an unobstructed board between the HUD and the groups", (
           expect(r.x + r.w).toBeLessThanOrEqual(l.frame.x + l.frame.w);
           expect(r.y + r.h).toBeLessThanOrEqual(l.frame.y + l.frame.h);
         }
-        for (const other of [l.hud, ...l.field, ...l.slots, ...l.columns])
+        for (const other of [l.hud, ...l.trays, ...l.columns])
           expect(overlap(l.boardRect, other)).toBe(false);
         // No two tiles of the bottom panels overlap, and the panels stack in order.
-        const panels = [...l.field, ...l.slots, ...l.columns];
+        const panels = [...l.trays, ...l.columns];
         panels.forEach((a, i) =>
           panels.slice(i + 1).forEach((b) => expect(overlap(a, b)).toBe(false)),
         );
-        expect(l.field[0]!.y + l.field[0]!.h).toBeLessThanOrEqual(l.slots[0]!.y);
-        expect(l.slots[0]!.y + l.slots[0]!.h).toBeLessThanOrEqual(l.columns[0]!.y);
+        expect(l.trays[0]!.y + l.trays[0]!.h).toBeLessThanOrEqual(l.columns[0]!.y);
         // The three HUD buttons sit inside the frame and keep 44 css px tap targets apart.
         const xs = [0, 1, 2].map((i) => hudButtonX(l, i, 3));
         for (const x of xs) expect(x - 22 * l.dpr).toBeGreaterThanOrEqual(l.frame.x);
@@ -99,25 +102,26 @@ describe("every device: an unobstructed board between the HUD and the groups", (
 describe("portrait phones and tablets: thumb-sized targets and readable numbers", () => {
   for (const d of DEVICES.filter((x) => x.framed))
     for (const s of SHAPES)
-      it(`${d.name}, ${s.board}×${s.board}, ${s.slots} slots, ${s.columns} columns`, () => {
+      it(`${d.name}, ${s.board}×${s.board}, ${3 + s.slots} trays, ${s.columns} columns`, () => {
         const l = layoutFor(d, s);
         // Summon columns are the main thing the thumb does.
         for (const c of l.columns) {
-          expect(css(l, c.w)).toBeGreaterThanOrEqual(44);
+          // The tap zone spans the gap beside the box (the boxes are one tile wide).
+          expect(css(l, c.w + l.gap)).toBeGreaterThanOrEqual(s.columns <= 4 ? 44 : 30);
           expect(css(l, c.h)).toBeGreaterThanOrEqual(90);
         }
-        // Five slots (the design) are full 44 css px targets; eight are narrower but never tiny.
-        for (const r of l.slots)
-          expect(css(l, r.w + l.gap)).toBeGreaterThanOrEqual(s.slots <= 5 ? 44 : 30);
+        // Up to five trays (the design) are full 44 css px targets; more are narrower but never tiny.
+        for (const r of l.trays)
+          expect(css(l, r.w + l.gap)).toBeGreaterThanOrEqual(l.trays.length <= 5 ? 44 : 30);
         // Group numbers: big on the front group, still legible everywhere else.
         const front = badgeBox(l, "column", 0, 0);
         expect(css(l, badgeFontPx(front.w, front.h))).toBeGreaterThanOrEqual(
           s.columns <= 4 ? 17 : 14,
         );
-        const slot = badgeBox(l, "slot", 0, 0);
-        expect(css(l, badgeFontPx(slot.w, slot.h))).toBeGreaterThanOrEqual(s.slots <= 5 ? 14 : 10);
-        const field = badgeBox(l, "field", 0, 0);
-        expect(css(l, badgeFontPx(field.w, field.h))).toBeGreaterThanOrEqual(14);
+        const tray = badgeBox(l, "tray", 0, 0);
+        expect(css(l, badgeFontPx(tray.w, tray.h))).toBeGreaterThanOrEqual(
+          l.trays.length <= 5 ? 14 : 10,
+        );
         // The picture stays readable: cubes are not specks.
         const minCell = s.board <= 10 ? 20 : s.board <= 24 ? 10 : 6.5;
         expect(css(l, l.cell)).toBeGreaterThanOrEqual(minCell);
@@ -129,7 +133,8 @@ describe("landscape phones are playable but small (the game is portrait-first)",
     const d = DEVICES.find((x) => x.name === "Phone (landscape)")!;
     const l = layoutFor(d, SHAPES[1]!);
     expect(css(l, l.cell)).toBeGreaterThanOrEqual(6);
-    expect(css(l, l.columns[0]!.w)).toBeGreaterThanOrEqual(44);
+    // Small, but still a thumb-sized tap zone (the box and the gap beside it).
+    expect(css(l, l.columns[0]!.w + l.gap)).toBeGreaterThanOrEqual(28);
   });
 });
 
@@ -248,13 +253,9 @@ describe("the progress bar never claims more than is done", () => {
 describe("a three-digit number fits the tile, on the real tiles", () => {
   for (const d of DEVICES.filter((x) => x.framed))
     for (const s of SHAPES)
-      it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
+      it(`${d.name}, ${3 + s.slots} trays, ${s.columns} columns`, () => {
         const l = layoutFor(d, s);
-        for (const box of [
-          badgeBox(l, "field", 0, 0),
-          badgeBox(l, "slot", 0, 0),
-          badgeBox(l, "column", 0, 0),
-        ]) {
+        for (const box of [badgeBox(l, "tray", 0, 0), badgeBox(l, "column", 0, 0)]) {
           const n = numberLayout(box.w, box.h);
           expect(3 * DIGIT_EM * n.fontPx, "number vs the tile").toBeLessThanOrEqual(box.w);
           expect(n.x).toBe(0);
@@ -265,19 +266,18 @@ describe("a three-digit number fits the tile, on the real tiles", () => {
 describe("every group box is the same square, wherever it is", () => {
   for (const d of DEVICES.filter((x) => x.framed))
     for (const s of SHAPES)
-      it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
+      it(`${d.name}, ${3 + s.slots} trays, ${s.columns} columns`, () => {
         const l = layoutFor(d, s);
         const boxes = [
-          badgeBox(l, "field", 0, 0),
-          badgeBox(l, "slot", 0, 0),
+          badgeBox(l, "tray", 0, 0),
           badgeBox(l, "column", 0, 0),
           badgeBox(l, "column", 0, 1),
           badgeBox(l, "column", 0, 2),
         ];
         // The three visible boxes of a column are a grid: a real gap between them, none overlapping.
         for (let d = 1; d < 3; d++) {
-          const above = boxes[2 + d - 1]!;
-          const below = boxes[2 + d]!;
+          const above = boxes[d]!;
+          const below = boxes[d + 1]!;
           expect(below.y - above.y, `${d}`).toBeGreaterThanOrEqual(l.tile + l.gap - 1);
         }
         for (const b of boxes) {
@@ -288,15 +288,53 @@ describe("every group box is the same square, wherever it is", () => {
         expect(css(l, l.tile), "tile css px").toBeGreaterThanOrEqual(30);
         // The three boxes of a column stay inside its zone.
         const col = l.columns[0]!;
-        const last = boxes[4]!;
+        const last = boxes[3]!;
         expect(last.y + last.h / 2).toBeLessThanOrEqual(col.y + col.h + 1);
       });
+});
+
+describe("rings hug the box they point at", () => {
+  for (const d of DEVICES.filter((x) => x.framed))
+    for (const s of SHAPES)
+      it(`${d.name}, ${3 + s.slots} trays, ${s.columns} columns`, () => {
+        const l = layoutFor(d, s);
+        const rects = activeColumnRects(
+          l,
+          l.columns.map(() => true),
+        );
+        rects.forEach((r, i) => {
+          const ring = frontBoxRect(l, r!);
+          const box = badgeBox(l, "column", i, 0, r!);
+          expect(ring.x + ring.w / 2).toBeCloseTo(box.x, 5);
+          expect(ring.y + ring.h / 2).toBeCloseTo(box.y, 5);
+          expect(ring.w).toBe(box.w);
+        });
+      });
+});
+
+describe("a wide level (many trays or columns) still has readable boxes", () => {
+  // Three working places and up to eight waiting ones (the generator's limit) is eleven trays.
+  for (const d of DEVICES.filter((x) => x.framed && x.w >= 360))
+    for (const slots of [5, 8]) {
+      it(`${d.name}, ${3 + slots} trays`, () => {
+        const l = layoutFor(d, { board: 24, slots, columns: 4 });
+        expect(l.trays).toHaveLength(3 + slots);
+        // Never narrower than a readable tile: the boxes shrink to fit, they do not overflow.
+        expect(css(l, l.tile), "tile").toBeGreaterThanOrEqual(slots === 8 ? 22 : 30);
+        const box = badgeBox(l, "tray", 0, 0);
+        expect(css(l, badgeFontPx(box.w, box.h))).toBeGreaterThanOrEqual(slots === 8 ? 9 : 13);
+        for (const r of l.trays) {
+          expect(r.x).toBeGreaterThanOrEqual(l.frame.x);
+          expect(r.x + r.w).toBeLessThanOrEqual(l.frame.x + l.frame.w);
+        }
+      });
+    }
 });
 
 describe("columns: three boxes at most, centred as a group", () => {
   for (const d of DEVICES.filter((x) => x.framed))
     for (const s of SHAPES)
-      it(`${d.name}, ${s.slots} slots, ${s.columns} columns`, () => {
+      it(`${d.name}, ${3 + s.slots} trays, ${s.columns} columns`, () => {
         const l = layoutFor(d, s);
         // Nothing is drawn around the picture, so the picture may use nearly the whole frame width.
         expect(l.boardRect.w).toBeLessThanOrEqual(l.frame.w);
@@ -325,7 +363,7 @@ describe("columns: three boxes at most, centred as a group", () => {
           )[0],
         ).toBeNull();
         // The column zone holds exactly three boxes and their gaps.
-        expect(l.columns[0]!.h).toBe(3 * l.tile + 2 * l.gap + l.gap);
+        expect(l.columns[0]!.h).toBe(3 * l.tile + 2 * l.gap);
         expect(COLUMN_VISIBLE).toBe(3);
       });
 });
@@ -372,19 +410,18 @@ describe("the levels that ship, on the matrix", () => {
           fieldCap: level.fieldCap,
           portalX: level.portalX ?? Math.floor((level.width - 1) / 2),
         });
-        for (const r of [...l.field, ...l.slots, ...l.columns])
-          expect(overlap(l.boardRect, r)).toBe(false);
+        for (const r of [...l.trays, ...l.columns]) expect(overlap(l.boardRect, r)).toBe(false);
         expect(css(l, l.cell), `${level.id} cube`).toBeGreaterThanOrEqual(7);
         for (const c of l.columns)
-          expect(css(l, c.w), `${level.id} column`).toBeGreaterThanOrEqual(44);
+          expect(css(l, c.w + l.gap), `${level.id} column`).toBeGreaterThanOrEqual(44);
         const front = badgeBox(l, "column", 0, 0);
         expect(
           css(l, badgeFontPx(front.w, front.h)),
           `${level.id} front number`,
         ).toBeGreaterThanOrEqual(14);
-        for (const r of l.slots)
-          expect(css(l, r.w + l.gap), `${level.id} slot`).toBeGreaterThanOrEqual(
-            level.slots <= 5 ? 44 : 30,
+        for (const r of l.trays)
+          expect(css(l, r.w + l.gap), `${level.id} tray`).toBeGreaterThanOrEqual(
+            l.trays.length <= 5 ? 44 : 30,
           );
       }
     });

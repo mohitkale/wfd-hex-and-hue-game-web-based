@@ -110,12 +110,14 @@ export function check(entry: Entry): Row {
   };
   if (errors.length > 0) return row;
 
-  const solved = collect.solve(level);
+  // The game's own policy: a pending box resumes by itself (docs/V2_AUTORESUME.md), so a level must be
+  // winnable that way, not only with free choice.
+  const solved = collect.solve(level, undefined, true);
   if (solved.status !== "solved" || !solved.line) {
     issues.push(`unsolvable: the solver says ${solved.status}`);
   } else {
-    // The line must win when replayed in the live engine, not only in the solver's own search.
-    const session = collect.replayLine(level, solved.line);
+    // The line must win when replayed in the live session (with auto-resume), not only in the solver's search.
+    const session = collect.replayLine(level, solved.line, true);
     if (session.state.status !== "won") issues.push("unsolvable: the solver's line does not win");
     else {
       row.solved = true;

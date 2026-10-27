@@ -11,18 +11,19 @@ the matrix of docs/QA.md.
   the button circles even on the smallest phone. The fill is never full until the last cube is
   delivered (also on a 1,600-cube board, where one cube is under a pixel) and shows a sliver as soon as
   one is.
-- **One tile for every group (M15.6), a grid of three (M15.8).** Every group box (a column's, a waiting
-  one, a working one) is the same rounded square (`layout.tile`, at most 48 css px) with a big centred
-  number and no creature on it. A column shows its next **three** boxes as a real grid with gaps (front
-  box at the top); the rest stay hidden, so what comes later is a surprise. When a column runs out the
-  others **centre as a group** (`activeColumnRects`) and its tap zone is off. Above the columns are the
-  bordered holding slots (waiting groups) and, above them, the bordered **active** boxes: as many as may
-  work at once (`fieldCap`), always drawn. A tapped box moves into an active place and **opens its tray**
-  (a lid tips back over a dark opening); the familiars come out of that opening, fetch their cubes and
-  carry them back into it, and the number counts down; at zero the tray closes, then the box goes (the closing was written from the code and tests, not yet seen by eye: the browser pane throttles animation frames). A
-  working box also glows and shows a bar of how much it has delivered; a waiting box is dimmed with "zz".
-  Nothing is drawn around the picture (the ring is only the walkway), so the picture uses nearly the
-  whole frame width.
+- **Three parts, top to bottom (M15.9): the PUZZLE, the TRAYS, the COLOURED BOXES.** Every group box (in a
+  column or in a tray) is the same rounded square (`layout.tile`, at most 48 css px) with a big centred
+  number and no creature on it. There is **one row of trays** (`fieldCap + slots` of them: five for most
+  levels; the Extra Slot booster adds one; they are always drawn bordered). A tapped box moves into a
+  tray and **stays there**: while it works the tray is open (a lid tips back over a dark opening, the
+  box glows, a bar shows how much it has delivered, and the familiars come out of it, fetch their cubes
+  and carry them back into it while the number counts down); if it has nothing it can reach it
+  **waits in the same tray**, closed and dimmed with "zz" (tap the tray to resume it); at zero the tray
+  closes, then the box goes (the closing was written from the code and tests, not yet seen by eye: the
+  browser pane throttles animation frames). The coloured boxes are a grid with the **same spacing across
+  and down** (`gap`): each column shows its next three boxes (front at the top), the rest stay hidden,
+  and when a column runs out the others centre as a group. A level with many trays or columns shrinks every box to fit one row rather than overflowing (down to about 23 css px for eleven trays on a 360 px phone: a known limit; the shipped levels have four to six trays). Nothing is drawn around the picture (the ring
+  is only the walkway).
 - **`CollectScene` is split** (it was 847 lines, now about 670): `CollectHud` (title, buttons, progress),
   `Toast` (the one-line message, now wrapping to the board width), `EndCard` (plain win and
   loss card) and the pure `badgeBox.ts` (where each badge sits and how big its number is) and
@@ -36,17 +37,17 @@ the matrix of docs/QA.md.
 24×24 board, five slots, four columns (the typical level), sizes in CSS px
 (`npm run layout:matrix`; since M14.4 it includes the 30 CSS px booster tray under the HUD, which costs the shortest phones up to 0.5 CSS px per cube):
 
-| Device              | Viewport @ dpr | Cube | Column    | Slot | Front number | Field number |
-| ------------------- | -------------- | ---- | --------- | ---- | ------------ | ------------ |
-| iPhone SE (1st gen) | 320×568 @2     | 9.5  | 70×136.5  | 39   | 17.5         | 17.5         |
-| iPhone SE (2nd gen) | 375×667 @2     | 11.5 | 82×159    | 45.5 | 20.5         | 20.5         |
-| iPhone 15           | 393×852 @3     | 14.7 | 86×168    | 48   | 21.7         | 21.7         |
-| Pixel 7             | 412×915 @2.625 | 15.2 | 90.7×168  | 48   | 21.3         | 21.3         |
-| Galaxy S8           | 360×740 @3     | 13.3 | 78×168    | 48   | 21.7         | 21.7         |
-| iPad                | 768×1024 @2    | 18   | 108×168   | 48   | 21.5         | 21.5         |
-| iPad (landscape)    | 1024×768 @2    | 14.5 | 108×168   | 48   | 21.5         | 21.5         |
-| Desktop             | 1440×900 @1    | 18   | 108×168   | 48   | 22           | 22           |
-| Phone (landscape)   | 844×390 @3     | 5.7  | 112.3×104 | 29.7 | 13.3         | 13.3         |
+| Device              | Viewport @ dpr | Cube | Column     | Tray | Column number | Tray number |
+| ------------------- | -------------- | ---- | ---------- | ---- | ------------- | ----------- |
+| iPhone SE (1st gen) | 320×568 @2     | 11.5 | 39×130     | 39   | 17.5          | 17.5        |
+| iPhone SE (2nd gen) | 375×667 @2     | 13.5 | 45.5×151.5 | 45.5 | 20.5          | 20.5        |
+| iPhone 15           | 393×852 @3     | 14.7 | 48×160     | 48   | 21.7          | 21.7        |
+| Pixel 7             | 412×915 @2.625 | 15.2 | 48×160     | 48   | 21.3          | 21.3        |
+| Galaxy S8           | 360×740 @3     | 13.3 | 48×160     | 48   | 21.7          | 21.7        |
+| iPad                | 768×1024 @2    | 18   | 48×160     | 48   | 21.5          | 21.5        |
+| iPad (landscape)    | 1024×768 @2    | 17   | 48×160     | 48   | 21.5          | 21.5        |
+| Desktop             | 1440×900 @1    | 18   | 48×160     | 48   | 22            | 22          |
+| Phone (landscape)   | 844×390 @3     | 7    | 29.7×99    | 29.7 | 13.3          | 13.3        |
 
 ## What the tests guarantee (`interface.test.ts`)
 

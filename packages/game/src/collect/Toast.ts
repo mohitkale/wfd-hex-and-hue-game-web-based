@@ -20,7 +20,7 @@ export class Toast {
     const l = this.layout;
     const dpr = l.dpr;
     const t = this.scene.add
-      .text(l.frame.x + l.frame.w / 2, l.field[0]!.y - 6 * dpr, message, {
+      .text(l.frame.x + l.frame.w / 2, l.trays[0]!.y - 6 * dpr, message, {
         fontFamily: theme.font,
         fontStyle: "bold",
         fontSize: `${Math.round(13 * dpr)}px`,

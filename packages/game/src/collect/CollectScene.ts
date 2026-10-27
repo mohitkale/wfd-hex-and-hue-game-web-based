@@ -65,6 +65,7 @@ import { progressOf } from "./progress";
 import {
   HUD_BUTTON_CSS,
   activeColumnRects,
+  frontBoxRect,
   computeCollectLayout,
   hudButtonX,
   type CollectLayout,
@@ -74,7 +75,7 @@ import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { speciesFor } from "./familiarArt";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, dailyFromSearch, levelFromSearch, tutorialStart } from "./levels";
-import { TickClock } from "./tickClock";
+import { SHOWN_TICKS_PER_SECOND, TickClock } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
 import {
   dailyMoment,
@@ -132,8 +133,8 @@ export class CollectScene extends Phaser.Scene {
   /** The time of the latest frame, for effects started by events between frames. */
   private frameTime = 0;
   private atlas = "";
-  /** 24 ticks a second at 1× (one cell per tick): crossing a 20-cell board takes under a second. */
-  private readonly clock = new TickClock(24);
+  /** 14 ticks a second at 1× (one cell per tick; 24 was too fast to follow): a 14-cell route takes about a second. */
+  private readonly clock = new TickClock(SHOWN_TICKS_PER_SECOND);
   private speed: Speed = 1;
   /** The speed-up rule (M14.3, 3× since M15.6): per level, through an optional rewarded ad; kept across scene restarts. */
   private speedState: SpeedState = initialSpeedState();
@@ -162,6 +163,8 @@ export class CollectScene extends Phaser.Scene {
   private revealSeen = false;
   /** The tap zone of each summon column; they follow the columns as these centre (see `placeColumns`). */
   private columnZones: Phaser.GameObjects.Zone[] = [];
+  /** Which tray each box sits in, kept across a rebuild (resize, Extra Slot) so boxes do not jump. */
+  private trayMemory: ReadonlyMap<number, number> = new Map();
   private hud!: CollectHud;
   private tray: BoosterTray | null = null;
   /** The settings panel is open over the board: play waits, and a rebuild keeps it open. */
@@ -251,7 +254,8 @@ export class CollectScene extends Phaser.Scene {
       this.time.delayedCall(0, () => this.openSpellbook());
     }
     this.colorblind = params.get("cb") === "1";
-    this.session = new collect.CollectSession(level);
+    // The game's own policy: a pending box goes back to work by itself (docs/V2_AUTORESUME.md).
+    this.session = new collect.CollectSession(level, undefined, undefined, true);
     this.stats = new GameplayTracker(
       emitVia(this),
       level.id,
@@ -454,7 +458,16 @@ export class CollectScene extends Phaser.Scene {
     this.familiars.onDelivered = (_color, group) => {
       this.panels.badge(group)?.pulse();
     };
-    this.panels = new PanelsView(this, this.layout, level.palette, dpr, this.colorblind, reduced);
+    this.panels = new PanelsView(
+      this,
+      this.layout,
+      level.palette,
+      dpr,
+      this.colorblind,
+      reduced,
+      this.trayMemory,
+    );
+    this.panels.onTrays = (trays) => (this.trayMemory = trays);
     this.rebuildMarks(state);
     this.panels.sync(state);
     this.placeColumns();
@@ -474,6 +487,7 @@ export class CollectScene extends Phaser.Scene {
           () => this.skipTutorial(),
           this.hudButtons,
           (i) => this.columnRectNow(i),
+          (slot) => this.slotRectNow(slot),
         )
       : null;
     this.refreshTutorial();
@@ -513,8 +527,8 @@ export class CollectScene extends Phaser.Scene {
       g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
       g.strokeCircle(x, cy, size / 2);
     }
-    // Only the area with static content (HUD, board, active and slot rows), not the columns below.
-    const bottom = Math.max(...l.slots.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
+    // Only the area with static content (HUD, board and the row of trays), not the columns below.
+    const bottom = Math.max(...l.trays.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
     const rt = this.add
       .renderTexture(l.frame.x, l.frame.y, l.frame.w, bottom - l.frame.y)
       .setOrigin(0, 0)
@@ -602,7 +616,7 @@ export class CollectScene extends Phaser.Scene {
   /** A hint's target pulses briefly on the board. */
   private highlight(action: collect.Action): void {
     const r =
-      action.kind === "select" ? this.columnRectNow(action.column) : this.layout.slots[action.slot];
+      action.kind === "select" ? this.columnRectNow(action.column) : this.slotRectNow(action.slot);
     if (!r) return;
     const ring = this.add
       .rectangle(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
@@ -720,21 +734,22 @@ export class CollectScene extends Phaser.Scene {
   private buildInput(): void {
     this.columnZones = this.layout.columns.map((r, column) => {
       const zone = this.add
-        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
+        // A column's zone spans the gap beside it, so neighbouring columns leave no dead strip.
+        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h)
         .setDepth(25)
         .setInteractive({ useHandCursor: true });
       zone.on("pointerdown", () => this.tap({ kind: "select", column }));
       return zone;
     });
     this.placeColumns();
-    this.layout.slots.forEach((r, slot) => {
-      const zone = this.add
-        // The zone spans the gap between tiles too, so a small phone still gets a 44 px target.
-        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h + this.layout.gap)
-        .setDepth(25)
-        .setInteractive({ useHandCursor: true });
-      zone.on("pointerdown", () => this.tap({ kind: "resume", slot }));
-    });
+    // There is no tap on a tray: a pending box goes back to work by itself (auto-resume).
+  }
+
+  /** Where the box waiting in engine slot `slot` sits now: its tray. */
+  private slotRectNow(slot: number): { x: number; y: number; w: number; h: number } | null {
+    const g = this.session.state.slots[slot];
+    const tray = g === null || g === undefined ? null : this.panels.trayOfGroup(g);
+    return tray === null ? null : (this.layout.trays[tray] ?? null);
   }
 
   /**
@@ -747,8 +762,7 @@ export class CollectScene extends Phaser.Scene {
       this.session.state.columns.map((c) => c.length > 0),
     )[i];
     if (!r) return null;
-    const t = this.layout.tile;
-    return { x: r.x + (r.w - t) / 2, y: r.y + this.layout.gap, w: t, h: t };
+    return frontBoxRect(this.layout, r);
   }
 
   /** Puts each column's tap zone where its boxes are now: columns that ran out are off, the rest centred. */
@@ -1001,7 +1015,7 @@ export class CollectScene extends Phaser.Scene {
     if (date !== utcDate(Date.now())) return { line: practiceLine(date), shareText: null };
     const store = browserStore();
     const read = readDailyBook(store);
-    const moves = Math.max(1, this.session.log.length);
+    const moves = Math.max(1, this.session.moves);
     const result = recordDaily(read.book, date, moves, Date.now());
     // As with the Spellbook, a book that could not be read is never overwritten.
     const saved = read.ok && (!result.isNew || saveDailyBook(store, result.book));

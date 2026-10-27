@@ -19,13 +19,13 @@ to play. Reproduce the tables with `npm run density`; the checks are in `tools/c
 ## Cube size
 
 CSS pixels per cube (cell pitch, gap included) from the real portrait layout, square boards, four
-columns, four slots, four field tiles:
+columns and five trays (three working places and two waiting ones), in one row:
 
 | Device (CSS px)       | 16   | 24   | 32   | 36   | 40  |
 | --------------------- | ---- | ---- | ---- | ---- | --- |
-| iPhone SE 1st gen 320 | 14.0 | 9.5  | 7.5  | 6.5  | 6.0 |
-| Galaxy S 360×640      | 16.0 | 11.0 | 8.3  | 7.3  | 6.7 |
-| iPhone SE 2nd gen 375 | 16.5 | 11.5 | 8.5  | 8.0  | 7.0 |
+| iPhone SE 1st gen 320 | 16.5 | 11.5 | 8.5  | 7.5  | 7.0 |
+| Galaxy S 360×640      | 18.7 | 13.0 | 10.0 | 8.7  | 8.0 |
+| iPhone SE 2nd gen 375 | 19.5 | 13.5 | 10.5 | 9.0  | 8.5 |
 | iPhone 15 393         | 21.3 | 14.7 | 11.0 | 10.0 | 9.0 |
 | Pixel 7 412           | 21.3 | 14.9 | 11.0 | 9.9  | 9.1 |
 
@@ -34,9 +34,9 @@ Since M14.4 the layout includes the 30 CSS px booster tray under the HUD, so on 
 they were (M15.3).
 
 **Decision (initial, revisable after a real-phone test):** the cube _pitch_ (cell including its gap)
-is at least 6 CSS px on any supported phone and at least 6.5 px from 360 px wide; the drawn cube is a
+is at least 6.5 CSS px on any supported phone and at least 7.5 px from 360 px wide; the drawn cube is a
 device pixel smaller than the pitch (5.5 CSS px at the 320 px, 40-per-side worst case); standard pieces stay at or below 32 per side
-(at least 7.5 px everywhere); 40 is for hero pieces. (M15.8: columns show a three-box grid, so 6 / 6.5 / 7.5. Originally 7 / 8 / 8.5; lowered in M15.3 for the booster tray (docs/QA.md) and again in M15.6, 360+ wide 7.5 → 7: the uniform group tiles and the portal dock cost 4-8 % of cube size on the smallest phones.) The test suite fails if the layout ever drops
+(at least 8 px everywhere); 40 is for hero pieces. (M15.9: one row of trays gave the height back, so 6.5 / 7.5 / 8 again; M15.8: columns show a three-box grid, so 6 / 6.5 / 7.5. Originally 7 / 8 / 8.5; lowered in M15.3 for the booster tray (docs/QA.md) and again in M15.6, 360+ wide 7.5 → 7: the uniform group tiles and the portal dock cost 4-8 % of cube size on the smallest phones.) The test suite fails if the layout ever drops
 below these numbers.
 
 ## Cube counts and play time

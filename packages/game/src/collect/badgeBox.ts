@@ -5,7 +5,7 @@ import type { CollectLayout } from "./collectLayout";
  * the sizes the player actually reads are tested for every screen in the device matrix.
  */
 
-export type Place = "column" | "field" | "slot";
+export type Place = "column" | "tray";
 
 export interface BadgeBox {
   /** Centre, in device pixels. */
@@ -19,8 +19,8 @@ export interface BadgeBox {
 export const PEEK = 2;
 
 /**
- * Every group box is one square (`layout.tile`), so a column's boxes, a waiting group and a working
- * group look the same and the eye reads colour and number only. A column shows its next
+ * Every group box is one square (`layout.tile`), so a column's boxes and a box in a tray (working or
+ * pending) look the same and the eye reads colour and number only. A column shows its next
  * `COLUMN_VISIBLE` boxes as a real grid (a gap between boxes, the front box at the top); `rect` is the
  * column's current place (columns re-centre as they run out, `activeColumnRects`).
  */
@@ -33,17 +33,13 @@ export function badgeBox(
 ): BadgeBox {
   const l = layout;
   const t = l.tile;
-  if (place === "field") {
-    const r = l.field[index] ?? l.field[l.field.length - 1]!;
-    return { x: r.x + r.w / 2, y: r.y + r.h / 2, w: t, h: t };
-  }
-  if (place === "slot") {
-    const r = l.slots[index] ?? l.slots[0]!;
+  if (place === "tray") {
+    const r = l.trays[index] ?? l.trays[l.trays.length - 1]!;
     return { x: r.x + r.w / 2, y: r.y + r.h / 2, w: t, h: t };
   }
   const r = l.columns[index]!;
   const cx = rect ? rect.x + rect.w / 2 : r.x + r.w / 2;
-  return { x: cx, y: r.y + l.gap + t / 2 + depth * (t + l.gap), w: t, h: t };
+  return { x: cx, y: r.y + t / 2 + depth * (t + l.gap), w: t, h: t };
 }
 
 /** Widest a bold digit gets, in ems (a little over the usual 0.6). */

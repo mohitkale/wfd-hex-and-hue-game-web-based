@@ -53,9 +53,9 @@ export interface CollectLayout {
   cell: number;
   /** Padded-grid stride (`boardWidth + 2`). */
   stride: number;
-  field: Rect[];
-  slots: Rect[];
-  /** Full-height tap zones, one per summon column. */
+  /** The single row of trays (working and pending boxes share it): `fieldCap + slots` of them. */
+  trays: Rect[];
+  /** Tap zones, one per summon column (the column's own place before they centre). */
   columns: Rect[];
 }
 
@@ -103,33 +103,24 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const inner: Rect = { x: frame.x + pad, y: frame.y, w: frame.w - 2 * pad, h: frame.h };
 
   const hud: Rect = { x: frame.x, y: frame.y, w: frame.w, h: px(CSS.hud) };
-  const colGap = input.columns > 4 ? Math.round(gap / 2) : gap;
-  // One size for every group box, whatever it is doing (column, waiting, working): the largest square
-  // that fits a column and each row of tiles, up to 48 css px.
-  const fit = (count: number, g: number) => Math.floor((inner.w - (count - 1) * g) / count);
-  const colW = row(inner, input.columns, Math.round(frame.w), colGap, 0, 0)[0]?.w ?? px(CSS.slot);
-  const tile = Math.max(
-    1,
-    Math.min(
-      px(CSS.slot),
-      Math.floor(colW * 0.94),
-      fit(input.slots, gap),
-      fit(input.fieldCap, gap),
-    ),
-  );
-  // A column shows its next COLUMN_VISIBLE boxes as a real grid with gaps, front box at the top.
-  const columnsH = COLUMN_VISIBLE * tile + (COLUMN_VISIBLE - 1) * gap + gap;
+  // Colours boxes, trays and the boxes' grid share one spacing (`gap`), horizontally and vertically.
+  const colGap = gap;
+  const trayTotal = input.fieldCap + input.slots;
+  const fit = (count: number) => Math.floor((inner.w - (count - 1) * gap) / count);
+  // One size for every box, whatever it is doing (in a column or in a tray): the largest square that
+  // fits the widest row (the columns or the trays), up to 48 css px.
+  const tile = Math.max(1, Math.min(px(CSS.slot), fit(input.columns), fit(trayTotal)));
+  // A column shows its next COLUMN_VISIBLE boxes as a real grid, front box at the top.
+  const columnsH = COLUMN_VISIBLE * tile + (COLUMN_VISIBLE - 1) * gap;
   const columnsY = frame.y + frame.h - columnsH - px(CSS.bottomPad);
-  const columns = row(inner, input.columns, Math.round(frame.w), colGap, columnsY, columnsH);
-  const slotY = columnsY - gap - tile;
-  const slots = row(inner, input.slots, tile, gap, slotY, tile);
-  const fieldY = slotY - gap - tile;
-  const field = row(inner, input.fieldCap, tile, gap, fieldY, tile);
+  const columns = row(inner, input.columns, tile, colGap, columnsY, columnsH);
+  const trayY = columnsY - gap * 2 - tile;
+  const trays = row(inner, trayTotal, tile, gap, trayY, tile);
 
   const trayH = input.tray ? px(CSS.tray) : 0;
   const tray: Rect = { x: inner.x, y: hud.y + hud.h, w: inner.w, h: trayH };
   const boardTop = tray.y + trayH;
-  const boardBottom = fieldY - gap;
+  const boardBottom = trayY - gap;
   const ringW = input.boardWidth + 2;
   const ringH = input.boardHeight + 2;
   // The ring is only a walkway: nothing is drawn around the picture, so the picture may use nearly the
@@ -162,9 +153,18 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
     colGap,
     cell,
     stride: ringW,
-    field,
-    slots,
+    trays,
     columns,
+  };
+}
+
+/** The front box of a column drawn at `colRect` (what a ring around the column should hug). */
+export function frontBoxRect(layout: CollectLayout, colRect: Rect): Rect {
+  return {
+    x: colRect.x + (colRect.w - layout.tile) / 2,
+    y: colRect.y,
+    w: layout.tile,
+    h: layout.tile,
   };
 }
 

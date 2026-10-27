@@ -85,14 +85,13 @@ describe("collect layout", () => {
       expect(r.x + r.w).toBeLessThanOrEqual(l.frame.x + l.frame.w);
       expect(r.y + r.h).toBeLessThanOrEqual(l.frame.y + l.frame.h);
     };
-    [l.hud, l.boardRect, ...l.field, ...l.slots, ...l.columns].forEach(inside);
-    // Vertical order: hud, board, field strip, slots, columns.
+    [l.hud, l.boardRect, ...l.trays, ...l.columns].forEach(inside);
+    // Vertical order: hud, board, the row of trays, columns.
     expect(l.boardRect.y).toBeGreaterThanOrEqual(l.hud.y + l.hud.h);
-    expect(l.boardRect.y + l.boardRect.h).toBeLessThanOrEqual(l.field[0]!.y);
-    expect(l.field[0]!.y + l.field[0]!.h).toBeLessThanOrEqual(l.slots[0]!.y);
-    expect(l.slots[0]!.y + l.slots[0]!.h).toBeLessThanOrEqual(l.columns[0]!.y);
+    expect(l.boardRect.y + l.boardRect.h).toBeLessThanOrEqual(l.trays[0]!.y);
+    expect(l.trays[0]!.y + l.trays[0]!.h).toBeLessThanOrEqual(l.columns[0]!.y);
     // Tiles in a row never overlap.
-    for (const rowOfRects of [l.field, l.slots, l.columns]) {
+    for (const rowOfRects of [l.trays, l.columns]) {
       for (let i = 1; i < rowOfRects.length; i++) {
         expect(rowOfRects[i]!.x).toBeGreaterThanOrEqual(
           rowOfRects[i - 1]!.x + rowOfRects[i - 1]!.w,
@@ -368,11 +367,11 @@ describe("review-build level and demo wiring", () => {
 
   it("?demo= picks the recorded line it names, and only on the slice level", async () => {
     const { demoLineFromSearch, levelFromSearch } = await import("./levels");
-    const { LOSE_LINES, WIN_LINE } = await import("./slice");
+    const { DEMO_WIN_LINE, LOSE_LINES } = await import("./slice");
     const slice = levelFromSearch("");
-    expect(demoLineFromSearch("?demo=win", slice)).toBe(WIN_LINE);
-    expect(demoLineFromSearch("?demo=slots", slice)).toBe(LOSE_LINES.slots);
-    expect(demoLineFromSearch("?demo=lose", slice)).toBe(LOSE_LINES.slots);
+    expect(demoLineFromSearch("?demo=win", slice)).toBe(DEMO_WIN_LINE);
+    expect(demoLineFromSearch("?demo=slots", slice)).toBe(LOSE_LINES.deadlock);
+    expect(demoLineFromSearch("?demo=lose", slice)).toBe(LOSE_LINES.deadlock);
     expect(demoLineFromSearch("?demo=deadlock", slice)).toBe(LOSE_LINES.deadlock);
     expect(demoLineFromSearch("?demo=other", slice)).toBeNull();
     expect(demoLineFromSearch("", slice)).toBeNull();

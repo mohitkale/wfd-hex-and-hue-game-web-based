@@ -2,6 +2,7 @@ import { apply, legalActions, type Action } from "./actions";
 import { EMPTY } from "../level";
 import type { CollectLevel } from "./level";
 import { CollectSession } from "./session";
+import { runUntilSettledAuto } from "./autoResume";
 import { isSettled, runUntilSettled } from "./sim";
 import { cloneState, createCollectState, stateKey, type CollectState } from "./state";
 
@@ -57,6 +58,8 @@ export class CollectSolver {
   constructor(
     readonly level: CollectLevel,
     readonly defaultBudget = DEFAULT_NODE_BUDGET,
+    /** Search the game's own policy (waiting groups resume by themselves) instead of free choice. */
+    private readonly auto = false,
   ) {
     this.opening = createCollectState(level);
     this.openingParams = JSON.stringify(this.opening.params);
@@ -70,6 +73,11 @@ export class CollectSolver {
       return false;
     return state.grid.every((c, i) => c === EMPTY || c === this.opening.grid[i]);
   }
+  private settle(s: CollectState): void {
+    if (this.auto) runUntilSettledAuto(s);
+    else runUntilSettled(s);
+  }
+
   /** Cached verdicts (winnable and doomed states). */
   get size(): number {
     return this.memo.size;
@@ -91,7 +99,7 @@ export class CollectSolver {
   solveState(start: CollectState, budget = this.defaultBudget): SolveResult {
     if (!this.fromThisLevel(start)) throw new Error("state is not from this solver's level");
     const root = cloneState(start);
-    if (!isSettled(root)) runUntilSettled(root);
+    if (!isSettled(root) || this.auto) this.settle(root);
     const stats = { nodes: 0, memoHits: 0, losses: 0, exhausted: false, budget };
     if (root.status === "won") return { status: "solved", line: [], ...stats };
     if (root.status === "lost") return { status: "unsolvable", line: null, ...stats };
@@ -128,7 +136,7 @@ export class CollectSolver {
       stats.nodes++;
       const next = cloneState(state);
       apply(next, action);
-      runUntilSettled(next);
+      this.settle(next);
       if (next.status === "won") {
         this.memo.set(key, { won: true });
         return true;
@@ -172,7 +180,7 @@ export class CollectSolver {
       for (const action of legalActions(s)) {
         const next = cloneState(s);
         apply(next, action);
-        runUntilSettled(next);
+        this.settle(next);
         const matches =
           "won" in entry
             ? next.status === "won"
@@ -192,16 +200,25 @@ export class CollectSolver {
 }
 
 /** Solves a level with a fresh cache (use a `CollectSolver` to share work across queries). */
-export function solve(level: CollectLevel, budget = DEFAULT_NODE_BUDGET): SolveResult {
-  return new CollectSolver(level, budget).solve();
+export function solve(
+  level: CollectLevel,
+  budget = DEFAULT_NODE_BUDGET,
+  auto = false,
+): SolveResult {
+  return new CollectSolver(level, budget, auto).solve();
 }
 
 /**
  * Replays a solver line in the live engine, settling after each action, and returns the session:
  * the proof that a solution is a real winning play. Throws if an action is refused.
  */
-export function replayLine(level: CollectLevel, line: readonly Action[]): CollectSession {
-  const session = new CollectSession(level);
+export function replayLine(
+  level: CollectLevel,
+  line: readonly Action[],
+  /** Replay under the game's own policy (waiting groups resume by themselves). */
+  auto = false,
+): CollectSession {
+  const session = new CollectSession(level, undefined, undefined, auto);
   for (const action of line) {
     const result = session.tap(action);
     if (!result.ok)

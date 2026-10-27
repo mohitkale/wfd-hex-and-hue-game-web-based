@@ -78,6 +78,12 @@ export const WIN_LINE: readonly collect.Action[] = [
   resume(1), // gold 6 left
 ];
 
+/**
+ * The same win for the board (`?demo=win`): the game resumes a waiting group by itself, so the two
+ * `resume` taps are not made (docs/V2_AUTORESUME.md).
+ */
+export const DEMO_WIN_LINE: readonly collect.Action[] = WIN_LINE.filter((a) => a.kind !== "resume");
+
 /** Two demonstrable losses: the simplest one and the slot trap. */
 export const LOSE_LINES: Record<"deadlock" | "slots", readonly collect.Action[]> = {
   /** Tap the first thing available: gold parks with the buckle hidden, cyan is next to useless. */
