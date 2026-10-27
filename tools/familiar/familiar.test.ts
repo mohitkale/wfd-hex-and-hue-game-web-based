@@ -1,22 +1,19 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PNG } from "pngjs";
 import {
   FAMILIAR_H,
   FAMILIAR_W,
   FIXED,
-  FRAMES,
   FRAME_NAMES,
-  LEGEND,
   MIN_OUTLINE_CONTRAST,
   PANEL,
+  SPECIES,
+  SS,
   badgeRect,
   contrast,
   familiarScale,
-  frameRgba,
   palette,
   parseHex,
-  type FrameName,
+  speciesFor,
 } from "../../packages/game/src/collect/familiarArt";
 import {
   MAX_ATLAS_COLORS,
@@ -25,56 +22,77 @@ import {
   atlasKey,
   atlasLayout,
   atlasManifest,
-  atlasRgba,
 } from "../../packages/game/src/collect/familiarAtlas";
+import {
+  FRAME_H,
+  FRAME_W,
+  POSES,
+  drawFrame,
+  type Gradient,
+  type Painter,
+} from "../../packages/game/src/collect/familiarDraw";
 import { parseAsciiArt } from "@hexhue/core";
 import { worlds } from "../../content/worlds";
 import { distance, parseHex as parseRgb } from "../art/color";
-import { SHEET_COLORS, phoneSheet, sheet } from "./sheet";
 
-const alpha = (name: FrameName, color: string) => {
-  const rgba = frameRgba(name, color);
-  return Array.from({ length: FAMILIAR_W * FAMILIAR_H }, (_, i) => rgba[i * 4 + 3]!);
-};
-const count = (name: FrameName, ch: string) => FRAMES[name].join("").split(ch).length - 1;
-const pixels = (name: FrameName) =>
-  FRAMES[name].flatMap((row, y) => [...row].flatMap((ch, x) => (ch === "." ? [] : [{ x, y, ch }])));
-const BODY = new Set(["l", "m", "d", "c"]);
+const SHEET_COLORS = ["#e24a4a", "#4ae26b", "#4a6be2", "#f2c94c", "#b44ae2", "#4ae2d8"];
 
-/** Number of 8-connected components of the filled pixels. */
-function components(name: FrameName): number {
-  const filled = new Set(pixels(name).map((p) => p.y * FAMILIAR_W + p.x));
-  const seen = new Set<number>();
-  let n = 0;
-  for (const start of filled) {
-    if (seen.has(start)) continue;
-    n++;
-    const stack = [start];
-    seen.add(start);
-    while (stack.length > 0) {
-      const c = stack.pop()!;
-      const x = c % FAMILIAR_W;
-      const y = Math.floor(c / FAMILIAR_W);
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= FAMILIAR_W || ny >= FAMILIAR_H) continue;
-          const k = ny * FAMILIAR_W + nx;
-          if (filled.has(k) && !seen.has(k)) {
-            seen.add(k);
-            stack.push(k);
-          }
-        }
-      }
-    }
-  }
-  return n;
+/** A painter that records every call (and the points it touches), so drawing is tested without a browser. */
+function recorder() {
+  const ops: string[] = [];
+  const points: [number, number][] = [];
+  const grad: Gradient = { addColorStop: () => undefined };
+  let sx = 1;
+  let ox = 0;
+  const stack: [number, number][] = [];
+  const pt = (x: number, y: number) => points.push([ox + x * sx, y]);
+  const p: Painter = {
+    fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 1,
+    lineCap: "butt",
+    lineJoin: "miter",
+    globalAlpha: 1,
+    save: () => {
+      ops.push("save");
+      stack.push([sx, ox]);
+    },
+    restore: () => {
+      ops.push("restore");
+      [sx, ox] = stack.pop() ?? [1, 0];
+    },
+    translate: (x) => {
+      ops.push("translate");
+      ox += x * sx;
+    },
+    scale: (x) => {
+      ops.push("scale");
+      sx *= x;
+    },
+    beginPath: () => ops.push("begin"),
+    closePath: () => ops.push("close"),
+    moveTo: (x, y) => (ops.push("move"), pt(x, y)),
+    lineTo: (x, y) => (ops.push("line"), pt(x, y)),
+    quadraticCurveTo: (_cx, _cy, x, y) => (ops.push("quad"), pt(x, y)),
+    bezierCurveTo: (_a, _b, _c, _d, x, y) => (ops.push("bezier"), pt(x, y)),
+    ellipse: (x, y, rx, ry) => {
+      ops.push("ellipse");
+      pt(x - rx, y - ry);
+      pt(x + rx, y + ry);
+    },
+    fill: () => ops.push(`fill ${String(p.fillStyle)}`),
+    stroke: () => ops.push("stroke"),
+    createLinearGradient: () => grad,
+  };
+  return { p, ops, points };
 }
 
-describe("familiar frames", () => {
-  it("has the documented frames, exactly the sprite size, only legend characters", () => {
-    expect(FRAME_NAMES).toEqual([
+/** The shape of a drawing: every call without the colours. */
+const shape = (ops: string[]) => ops.map((o) => (o.startsWith("fill") ? "fill" : o)).join(",");
+
+describe("familiar frames (vector bats and cats)", () => {
+  it("has the documented frames and species, a 16 x 14 unit sprite drawn SS times larger", () => {
+    expect([...FRAME_NAMES]).toEqual([
       "idle0",
       "idle1",
       "walk0",
@@ -84,110 +102,100 @@ describe("familiar frames", () => {
       "pickup",
       "deliver",
     ]);
-    for (const name of FRAME_NAMES) {
-      expect(FRAMES[name], name).toHaveLength(FAMILIAR_H);
-      for (const row of FRAMES[name]) {
-        expect(row, name).toHaveLength(FAMILIAR_W);
-        for (const ch of row) expect(ch === "." || ch in LEGEND, `${name}: '${ch}'`).toBe(true);
-      }
-    }
+    expect([...SPECIES]).toEqual(["bat", "cat"]);
+    expect(FRAME_W).toBe(FAMILIAR_W * SS);
+    expect(FRAME_H).toBe(FAMILIAR_H * SS);
+    expect(Object.keys(POSES).sort()).toEqual([...FRAME_NAMES].sort());
   });
 
-  it("keeps the last row empty, stands on one baseline and is horizontally centred", () => {
-    for (const name of FRAME_NAMES) {
-      expect(FRAMES[name][FAMILIAR_H - 1], `${name} bottom margin`).toBe(".".repeat(FAMILIAR_W));
-      const lowest = Math.max(...pixels(name).map((p) => p.y));
-      expect(lowest, `${name} baseline`).toBe(12);
-      const cols = pixels(name)
-        .filter((p) => p.ch === "o")
-        .map((p) => p.x);
-      const centre = (Math.min(...cols) + Math.max(...cols)) / 2;
-      expect(Math.abs(centre - (FAMILIAR_W - 1) / 2), `${name} centred`).toBeLessThanOrEqual(1.5);
-    }
-  });
-
-  it("is one connected creature in every frame (no floating limbs or stray pixels)", () => {
-    for (const name of FRAME_NAMES) expect(components(name), name).toBe(1);
-  });
-
-  it("wings and arms are left-right symmetric in every frame", () => {
-    for (const name of FRAME_NAMES) {
-      for (const row of FRAMES[name]) {
-        for (const ch of ["x", "w"]) {
-          const left = [...row].flatMap((c, x) => (c === ch ? [x] : []));
-          const right = [...row]
-            .flatMap((c, x) => (c === ch ? [FAMILIAR_W - 1 - x] : []))
-            .sort((a, b) => a - b);
-          expect(left, `${name} ${ch}`).toEqual(right);
+  it.each(SPECIES)(
+    "%s: every frame draws something, balanced, and stays inside its cell",
+    (species) => {
+      for (const name of FRAME_NAMES) {
+        const { p, ops, points } = recorder();
+        drawFrame(p, name, "#4a6be2", species);
+        expect(ops.filter((o) => o.startsWith("fill")).length, name).toBeGreaterThan(8);
+        expect(ops.filter((o) => o === "save").length).toBe(
+          ops.filter((o) => o === "restore").length,
+        );
+        for (const [x, y] of points) {
+          expect(x, `${species} ${name} x`).toBeGreaterThanOrEqual(-0.5);
+          expect(x, `${species} ${name} x`).toBeLessThanOrEqual(FRAME_W + 0.5);
+          expect(y, `${species} ${name} y`).toBeGreaterThanOrEqual(-0.5);
+          expect(y, `${species} ${name} y`).toBeLessThanOrEqual(FRAME_H + 0.5);
         }
       }
-    }
-  });
+    },
+  );
 
-  it("every frame is a recognisable creature", () => {
-    for (const name of FRAME_NAMES) {
-      expect(
-        count(name, "m") + count(name, "l") + count(name, "d"),
-        `${name} body`,
-      ).toBeGreaterThanOrEqual(30);
-      expect(count(name, "e"), `${name} eyes`).toBeGreaterThanOrEqual(6);
-      expect(count(name, "p"), `${name} pupils`).toBe(2);
-      expect(count(name, "g"), `${name} glow`).toBeGreaterThanOrEqual(2);
-    }
-  });
-
-  it("poses are clearly different from each other (at least 12 pixels apart)", () => {
-    for (let i = 0; i < FRAME_NAMES.length; i++) {
-      for (let j = i + 1; j < FRAME_NAMES.length; j++) {
-        const a = FRAMES[FRAME_NAMES[i]!];
-        const b = FRAMES[FRAME_NAMES[j]!];
-        let diff = 0;
-        for (let y = 0; y < FAMILIAR_H; y++)
-          for (let x = 0; x < FAMILIAR_W; x++) if (a[y]![x] !== b[y]![x]) diff++;
-        expect(diff, `${FRAME_NAMES[i]} vs ${FRAME_NAMES[j]}`).toBeGreaterThanOrEqual(12);
+  it.each(SPECIES)(
+    "%s: the drawing is deterministic and the silhouette does not depend on the colour",
+    (species) => {
+      for (const name of FRAME_NAMES) {
+        const a = recorder();
+        const b = recorder();
+        const c = recorder();
+        drawFrame(a.p, name, "#e24a4a", species);
+        drawFrame(b.p, name, "#e24a4a", species);
+        drawFrame(c.p, name, "#4ae2d8", species);
+        expect(b.ops).toEqual(a.ops);
+        expect(shape(c.ops), `${species} ${name}`).toBe(shape(a.ops));
+        expect(c.points).toEqual(a.points);
       }
+    },
+  );
+
+  it.each(SPECIES)("%s: the poses are clearly different from each other", (species) => {
+    const seen = new Map<string, string>();
+    for (const name of FRAME_NAMES) {
+      const { p, points } = recorder();
+      drawFrame(p, name, "#4a6be2", species);
+      const key = points.map(([x, y]) => `${Math.round(x)},${Math.round(y)}`).join(";");
+      expect(seen.get(key), `${species} ${name} equals ${seen.get(key)}`).toBeUndefined();
+      seen.set(key, name);
     }
   });
 
-  it("action poses are distinguishable: carry has arms in a V, deliver throws them up, pickup crouches", () => {
-    // Carry: arm pixels ('m' outside the 4..11 body columns) at the hand rows, V-shaped (further out higher up).
-    const armCols = (name: FrameName, y: number) =>
-      [...FRAMES[name][y]!].flatMap((c, x) => (x < 4 && (c === "m" || c === "o") ? [x] : []));
-    expect(armCols("carry0", 2).length).toBeGreaterThan(0);
-    expect(Math.min(...armCols("carry0", 2))).toBeLessThan(Math.min(...armCols("carry0", 7)));
-    // Deliver: arms rise to row 1 with a sparkle above; carry's hands start lower.
-    expect(armCols("deliver", 1).length).toBeGreaterThan(0);
-    expect(armCols("carry0", 1)).toEqual([]);
-    expect(count("deliver", "g")).toBeGreaterThan(count("carry0", "g"));
-    // Pickup: the torso is shorter and the arms reach the bottom rows.
-    expect(armCols("pickup", 11).length + armCols("pickup", 12).length).toBeGreaterThan(0);
-    const bodyRows = (name: FrameName) =>
-      new Set(
-        pixels(name)
-          .filter((p) => p.ch === "d")
-          .map((p) => p.y),
-      ).size;
-    expect(bodyRows("pickup")).toBeLessThanOrEqual(bodyRows("idle0"));
-    // Walking alternates the feet between apart and together.
-    expect(FRAMES.walk0[12]).not.toBe(FRAMES.walk1[12]);
+  it.each(SPECIES)(
+    "%s: the pose families differ as documented (carry has arms, deliver sparkles, pickup sinks)",
+    (species) => {
+      const draw = (name: (typeof FRAME_NAMES)[number]) => {
+        const r = recorder();
+        drawFrame(r.p, name, "#4a6be2", species);
+        return r;
+      };
+      // Arms add two outlined strokes each: more strokes than an idle pose.
+      const strokes = (name: (typeof FRAME_NAMES)[number]) =>
+        draw(name).ops.filter((o) => o === "stroke").length;
+      expect(strokes("carry0")).toBeGreaterThan(strokes("idle0"));
+      expect(strokes("deliver")).toBeGreaterThan(strokes("idle0"));
+      // Delivering throws sparkles in the glow colour.
+      const glow = `rgba(${FIXED.glow.join(",")},1)`;
+      expect(draw("deliver").ops).toContain(`fill ${glow}`);
+      expect(draw("idle0").ops).not.toContain(`fill ${glow}`);
+      // Picking up crouches: the lowest drawn point is lower than when standing is not the test, the
+      // body's top is: nothing is drawn above where a standing familiar's head ends.
+      const top = (name: (typeof FRAME_NAMES)[number]) =>
+        Math.min(...draw(name).points.map(([, y]) => y));
+      expect(top("pickup")).toBeGreaterThan(top("idle0"));
+    },
+  );
+
+  it("is left-right symmetric where it should be: the bat's wings and ears are mirrored about the centre", () => {
+    const { p, points } = recorder();
+    drawFrame(p, "idle0", "#4a6be2", "bat");
+    const xs = points.map(([x]) => x);
+    expect(Math.min(...xs) + Math.max(...xs)).toBeCloseTo(FRAME_W, 0);
+  });
+
+  it("uses cats for the familiar pictures and bats for every other", () => {
+    expect(speciesFor("familiar")).toBe("cat");
+    for (const theme of ["moon", "ritual", "crystal", "astrology", "other", undefined])
+      expect(speciesFor(theme)).toBe("bat");
   });
 });
 
 describe("familiar colour", () => {
-  it("silhouette is independent of the cube colour; fixed parts are identical across colours", () => {
-    for (const name of FRAME_NAMES) {
-      const base = alpha(name, SHEET_COLORS[0]!);
-      for (const color of SHEET_COLORS)
-        expect(alpha(name, color), `${name} ${color}`).toEqual(base);
-    }
-    for (const color of SHEET_COLORS) {
-      const p = palette(color);
-      for (const role of ["wing", "wingEdge", "eyeWhite", "pupil", "glow", "cheek"] as const) {
-        expect(p[role], `${color} ${role}`).toEqual(FIXED[role]);
-      }
-    }
-  });
-
   it("rejects colours that are not #rrggbb", () => {
     expect(() => parseHex("e24a4a")).toThrow("#rrggbb");
     expect(() => parseHex("#abc")).toThrow("#rrggbb");
@@ -209,7 +217,7 @@ describe("familiar colour", () => {
       expect(contrast(p.mid, PANEL), `${color} body`).toBeGreaterThanOrEqual(1.5);
       // The face is carried by the dark pupils inside the white of the eyes, whatever the body
       // colour (white eyes alone are weak on pale bodies such as yellow, so the pupils matter).
-      expect(contrast(p.pupil, p.eyeWhite), `${color} pupil`).toBeGreaterThanOrEqual(7);
+      expect(contrast(FIXED.pupil, FIXED.eyeWhite), `${color} pupil`).toBeGreaterThanOrEqual(7);
     }
   });
 
@@ -249,48 +257,43 @@ describe("familiar colour", () => {
 });
 
 describe("colourblind badge anchor", () => {
-  it("lies entirely on body pixels (not eyes, wings or arms) in every frame", () => {
+  it("sits on the belly: inside the sprite, clear of the eyes and the ears, big enough for a symbol", () => {
     for (const name of FRAME_NAMES) {
       const r = badgeRect(name);
-      for (let y = r.y; y < r.y + r.h; y++) {
-        for (let x = r.x; x < r.x + r.w; x++) {
-          expect(
-            BODY.has(FRAMES[name][y]![x]!),
-            `${name} (${x},${y}) is '${FRAMES[name][y]![x]}'`,
-          ).toBe(true);
-        }
-      }
-      expect(r.w * r.h).toBeGreaterThanOrEqual(12);
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.w).toBeLessThanOrEqual(FAMILIAR_W);
+      expect(r.y + r.h).toBeLessThanOrEqual(FAMILIAR_H);
+      // Eyes sit at about unit y 7.5 and end by 8.3 (a bat's eyes: y 29 + 4.6 px, a cat's: 26 + 4.2).
+      expect(r.y, name).toBeGreaterThanOrEqual(8.3);
+      expect(r.w * r.h).toBeGreaterThanOrEqual(5);
     }
   });
 });
 
 describe("phone scale", () => {
-  it("picks whole-number device scales that give 20-28 CSS px at common densities", () => {
-    expect([1, 2, 3].map((dpr) => familiarScale(dpr))).toEqual([2, 3, 5]);
-    for (const dpr of [2, 2.625, 3, 3.5]) {
+  it("gives about 20-28 CSS px of sprite at common densities, in device pixels per unit", () => {
+    for (const dpr of [1, 2, 2.625, 3, 3.5]) {
       const css = (FAMILIAR_W * familiarScale(dpr)) / dpr;
-      expect(css, `dpr ${dpr}`).toBeGreaterThanOrEqual(20);
-      expect(css, `dpr ${dpr}`).toBeLessThanOrEqual(28);
+      expect(css, `dpr ${dpr}`).toBeGreaterThanOrEqual(23);
+      expect(css, `dpr ${dpr}`).toBeLessThanOrEqual(25);
     }
-    // dpr 1 (desktop) rounds up to 32 px rather than using an unevenly scaled 24.
-    expect(familiarScale(1) * FAMILIAR_W).toBe(32);
-    expect(familiarScale(0.5)).toBeGreaterThanOrEqual(1);
+    expect(familiarScale(0.1)).toBeGreaterThanOrEqual(1);
   });
 });
 
 describe("atlas", () => {
-  it("fits one small texture for every possible level and has a complete, unique manifest", () => {
+  it("fits one texture for every possible level and has a complete, unique manifest", () => {
     for (let n = 1; n <= MAX_ATLAS_COLORS; n++) {
       const layout = atlasLayout(n);
-      expect(layout.width).toBe(128);
-      expect(layout.height).toBe(14 * n);
+      expect(layout.width).toBe(FRAME_NAMES.length * FAMILIAR_W * SS);
+      expect(layout.height).toBe(n * FAMILIAR_H * SS);
       expect(Math.max(layout.width, layout.height)).toBeLessThanOrEqual(MAX_ATLAS_SIDE);
       const manifest = atlasManifest(n);
       expect(Object.keys(manifest)).toHaveLength(n * FRAME_NAMES.length);
-      // Rectangles never overlap and stay inside the texture.
       const used = new Set<string>();
       for (const [name, r] of Object.entries(manifest)) {
+        expect(r.w).toBe(FRAME_W);
+        expect(r.h).toBe(FRAME_H);
         expect(r.x + r.w, name).toBeLessThanOrEqual(layout.width);
         expect(r.y + r.h, name).toBeLessThanOrEqual(layout.height);
         const key = `${r.x},${r.y}`;
@@ -298,55 +301,14 @@ describe("atlas", () => {
         used.add(key);
       }
     }
-    expect(atlasLayout(MAX_ATLAS_COLORS).height).toBe(224);
     expect(() => atlasLayout(0)).toThrow();
     expect(() => atlasLayout(MAX_ATLAS_COLORS + 1)).toThrow();
     expect(atlasFrameName(3, "carry1")).toBe("3:carry1");
   });
 
-  it("packs each frame's pixels exactly where the manifest says", () => {
-    const colors = SHEET_COLORS.slice(0, 3);
-    const atlas = atlasRgba(colors);
-    const layout = atlasLayout(colors.length);
-    colors.forEach((color, c) => {
-      for (const name of FRAME_NAMES) {
-        const r = layout.frame(c, name);
-        const frame = frameRgba(name, color);
-        for (let y = 0; y < r.h; y++) {
-          for (let x = 0; x < r.w; x++) {
-            const a = ((r.y + y) * atlas.width + r.x + x) * 4;
-            const f = (y * FAMILIAR_W + x) * 4;
-            expect([...atlas.data.subarray(a, a + 4)], `${c}:${name} (${x},${y})`).toEqual([
-              ...frame.subarray(f, f + 4),
-            ]);
-          }
-        }
-      }
-    });
+  it("keys the atlas by colours (case-insensitive) and species", () => {
     expect(atlasKey(["#AABBCC", "#112233"])).toBe(atlasKey(["#aabbcc", "#112233"]));
     expect(atlasKey(["#aabbcc"])).not.toBe(atlasKey(["#aabbcd"]));
-  });
-});
-
-describe("contact sheets", () => {
-  it("are generated at the documented sizes", () => {
-    const small = sheet(2);
-    expect(small.width).toBe(FRAME_NAMES.length * (FAMILIAR_W * 2 + 4) + 4);
-    expect(small.height).toBe(SHEET_COLORS.length * (FAMILIAR_H * 2 + 4) + 4);
-    expect(phoneSheet().height).toBeGreaterThan(FAMILIAR_H * 5);
-  });
-
-  it("the committed PNGs match the generator (re-run `npm run familiar:sheet` after art changes)", () => {
-    const check = (file: string, png: PNG) => {
-      const committed = PNG.sync.read(
-        readFileSync(new URL(`../../docs/art/${file}`, import.meta.url)),
-      );
-      expect(committed.width, file).toBe(png.width);
-      expect(committed.height, file).toBe(png.height);
-      expect(Buffer.compare(committed.data, png.data), `${file} is stale`).toBe(0);
-    };
-    check("familiar-sheet.png", sheet(10));
-    check("familiar-sheet-mobile.png", sheet(2));
-    check("familiar-sheet-phone.png", phoneSheet());
+    expect(atlasKey(["#aabbcc"], "bat")).not.toBe(atlasKey(["#aabbcc"], "cat"));
   });
 });

@@ -151,3 +151,7 @@ small phone is a problem at G3, the next lever is hiding the tray on short phone
 3. WebGL context loss on a real device (verified only with `WEBGL_lose_context` on desktop).
 4. Real touch feel, audio unlock and haptics on iOS and Android.
 5. Offline play of v2 from an installed PWA.
+
+## M15.7 new look: cost check (2026-10-28)
+
+Glossy rounded cube tiles and vector bats and cats, measured the same way as above (`?engine=v2&level=big&profile=1`, 390x800 pane, dev server): first cube paint 14.7 ms for 1,600 cubes (a first attempt that tessellated four rounded rectangles per cube took 297 ms, so each tone is now baked once and the board is a stamp of those); render submit median 1.8 ms, p95 3.8 ms; scene update median 0.3 ms, p95 3.4 ms; 30 sprites, counts match. Unchanged within noise. Atlas: 512 x 56n px (n <= 16 colours), painted once per level. Not measured on a device.

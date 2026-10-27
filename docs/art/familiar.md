@@ -1,88 +1,54 @@
-# The Familiar ("Mothlet")
+# The familiars: a flying bat and a trotting cat (v2.0.0 look; M15.7)
 
-_Design note for M10.1. Art source: `packages/game/src/collect/familiarArt.ts`. Contact sheets (regenerate
-with `npm run familiar:sheet`; CI fails if they go stale):
-[`familiar-sheet.png`](familiar-sheet.png) 10× zoom, [`familiar-sheet-mobile.png`](familiar-sheet-mobile.png)
-2×, [`familiar-sheet-phone.png`](familiar-sheet-phone.png) at the scale the renderer picks for dpr 1, 2 and 3._
+_Source: `packages/game/src/collect/familiarDraw.ts` (the drawing), `familiarArt.ts` (frame names, colour
+maths, species), `familiarAtlas.ts` and `familiarTextures.ts` (the packed atlas). Tests:
+`tools/familiar/familiar.test.ts`. This replaces the 16 x 14 pixel-art "Mothlet" of M10.1, which the
+owner found too 8-bit._
 
-## What it is
+## What they are
 
-A small round moth-sprite: a bean-shaped body in the colour of the cube it fetches, big two-pixel
-eyes, glowing gold antenna tips, pale lavender wings and tiny feet. One design, one colour variant per
-cube colour. It is a _familiar_ (a witchy companion), not an ant and not an abstract numbered circle:
-the character is the actor on the board; the number lives on the group badge.
+Two smooth vector characters, both facing the player and left-right symmetric, tinted by the colour of
+the cubes they fetch (a red familiar fetches red):
 
-**Why this design:** a moth reads instantly as "magical night creature"; the wings give a silhouette
-that differs from the cubes (square) at phone sizes; and the body colour carries the matching rule (a
-red familiar fetches red cubes) without a label.
+- **Bat**: round body, short pointed ears, big white eyes with a highlight, pink cheeks, a small smile
+  with two fangs, scalloped wings that flap, tiny feet. Flown by the familiars of every picture except
+  the `familiar` ones.
+- **Cat**: round head with pointed ears and whiskers, a body with a lighter belly, a curled tail that
+  swishes, paws. Trots for the `familiar` pictures (`speciesFor`: today the black cat).
 
-## Frames (16 × 14 px, 8 frames, composed from layers: body, wings, arms, feet)
+The outline is a deep tint of the cube colour, lightened only as far as needed to stay at least 1.6:1
+against the board panel (the same floor as the art pipeline), so every colour reads on the dark board.
+Eyes, cheeks, the finger bones and the sparkles are fixed colours.
 
-| Frame              | Used for                                                                       |
-| ------------------ | ------------------------------------------------------------------------------ |
-| `idle0`, `idle1`   | Hovering at the portal / waiting; wings up, wings down                         |
-| `walk0`, `walk1`   | Walking to a cube: feet apart then together, wings beating between two heights |
-| `carry0`, `carry1` | Carrying: arms raised in a V under the cube (drawn above the head); wings low  |
-| `pickup`           | Crouched, wings tucked, arms reaching down for the cube                        |
-| `deliver`          | Wings wide, arms thrown up with sparkles; feet stay on the baseline            |
+## Frames (8 per colour, drawn on a 16 x 14 unit grid at 4x = 64 x 56 px)
 
-The renderer adds bob, squash, tilt, trail and the carried cube; the sprite supplies the poses.
-All frames stand on one baseline (row 12), keep the last row empty and are a single connected
-creature (checked).
+| Frame              | Used for                                                                  |
+| ------------------ | ------------------------------------------------------------------------- |
+| `idle0`, `idle1`   | Hovering at the portal / waiting; wings up and down (cat: tail swish)     |
+| `walk0`, `walk1`   | Moving to a cube: feet apart then together, a small bob                   |
+| `carry0`, `carry1` | Carrying: stubby arms raised in a V under the cube (drawn above the head) |
+| `pickup`           | Crouched, wings tucked, arms reaching down for the cube                   |
+| `deliver`          | Wings wide, arms thrown up with sparkles                                  |
 
-## Palette
+The renderer adds bob, squash, trail and the carried cube; the sprite supplies the poses.
 
-- Body ramp per variant: `mid` is the cube colour, `light` 45 % toward white, `dark` 40 % toward
-  night. The **outline is a deep tint of the colour**, lightened toward the colour only as far as
-  needed to stay at least 1.6:1 against the board panel (the same floor as the art pipeline). My
-  first draft used a near-black outline that vanished on the dark board.
-- Fixed colours (identical across variants): eye white, pupil, wing, wing edge, antenna glow, cheek.
-- Pale colours (yellow) give white eyes little contrast with the body; the dark pupils inside the
-  white carry the face, so the pupil/white contrast (≥ 7) is what is checked.
+## How it is drawn
 
-## Colour-blind players (M6.5)
+`drawFrame(painter, frame, colour, species)` issues 2D-canvas calls (paths, ellipses, fills and strokes)
+through a small `Painter` interface, so the tests can record the calls without a browser. At level
+start the atlas texture is painted once (one row per colour, 512 px wide, at most 16 colours = 896 px
+tall) with linear filtering, so the sprite stays smooth at any phone density and scale
+(`spriteScaleForCell` is now continuous).
 
-Colour alone cannot carry the matching rule. Simulating deuteranopia (Machado et al., severity 1) on
-the eight sheet colours, the closest pair falls to about 66 on the redmean scale, below the 90 the art
-requires in normal vision (red/green/orange/yellow drift together; the check is in
-`tools/familiar/familiar.test.ts`). So the sprite reserves a **badge anchor** on the chest
-(`badgeRect(frame)`: 6 × 4 native px, 6 × 3 on the crouched pickup frame), clear of the eyes and
-wings and checked to lie on body pixels in every frame. With colour-blind mode on, the renderer draws
-the colour's M6.5 symbol there (and on the carried cube). Drawing the badge is M10.2 work; the
-anchor and the test that it fits are delivered here.
+## Tested
 
-## Size on a phone
+Every frame of both species draws, stays inside its cell, is deterministic, and has the same
+silhouette for every colour; the poses differ from each other; delivering sparkles and carrying has
+arms; the colour-blind badge sits on the belly; the atlas layout is complete and fits one texture.
 
-Native 16 × 14, drawn at a whole-number device-pixel scale from `familiarScale(dpr)`: **2× at dpr 1
-(32 px wide), 3× at dpr 2 (24 px), 5× at dpr 3 (about 27 px)**, in the 20–28 CSS px band except at dpr 1,
-where it rounds up to 32 rather than using an unevenly scaled 1.5×. Integer scales keep
-nearest-neighbour pixels even. The coloured body is the 8 × 9 centre of the sprite (about 12 px wide
-at 24 CSS px); the wings are the largest, lightest part of the silhouette, so identity at small
-sizes rests on that body area, which is why the colour-blind badge matters.
+## Limits
 
-## Texture budget
-
-One packed atlas per level (`familiarAtlas.ts`): colours down, frames across, **128 × 14·n px for
-n ≤ 16 colours (at most 128 × 224)**, one texture, one draw batch, frames registered as
-`"<colourIndex>:<frame>"` with a full manifest (`atlasManifest`). Tests assert the size limits, that
-rectangles do not overlap, and that the packed pixels equal the per-frame pixels. Changing level
-replaces the atlas (`ensureFamiliarAtlas` removes other `familiars:` textures). Sprites of different
-colours share the texture, so a mixed swarm does not break batching.
-
-## Source and licence
-
-Original pixel art, authored as text in this repository for Hex & Hue (M10.1). No third-party assets,
-no image models or generated bitmaps, no reference sprites, and nothing from Food Hunt.
-**The repository has no licence file yet; the licence for this art follows whatever the owner chooses
-for the project (decision pending).**
-
-## Known limits
-
-- Judged on contact sheets only so far. Whether it feels charming and readable moving and carrying a
-  cube on a real phone is confirmed in M10.2/M10.3 and at gate G1.
-- Wings are the lightest, largest element; on small screens the coloured body is the part that
-  identifies the cube colour.
-- Pupils sit inner-bottom (a slightly cross-eyed, cute look): a design choice open to feedback.
-- No sleeping or hurt poses; not needed for the slice.
-- One body shape. If gate G1 wants a different creature, only this file and its tests change; the
-  rest of the pipeline uses frame names.
+- Judged by eye in the browser pane only (the contact-sheet PNGs of the pixel version were removed;
+  there is no node canvas to regenerate them). The owner's verdict is the test that matters.
+- The bat's wings are two wing shapes mirrored; the flap is two or three poses, not a full cycle.
+- Species is chosen per picture, not per world; a world-wide choice is a content decision.

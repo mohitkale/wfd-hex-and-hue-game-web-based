@@ -1,5 +1,6 @@
 import type Phaser from "phaser";
 import type { CollectLayout } from "./collectLayout";
+import { bake } from "./bake";
 import { paintCube, paintSeal, tonesFor, type CubeTones } from "./cubePaint";
 
 /**
@@ -35,7 +36,8 @@ export class CubeLayer {
   ) {
     this.tones = palette.map((hex) => tonesFor(hex));
     const { cell, boardRect, stride } = layout;
-    this.gap = Math.max(1, Math.floor(cell / 12));
+    // A clear gap between rounded tiles (the picture still reads as one image).
+    this.gap = Math.max(1, Math.floor(cell / 8));
     this.size = cell - this.gap;
     // The texture covers the mosaic only (the ring is never filled with cubes).
     const mosaicW = (stride - 2) * cell;
@@ -51,18 +53,29 @@ export class CubeLayer {
   private paintAll(scene: Phaser.Scene): void {
     const started = performance.now();
     const { cell, stride } = this.layout;
-    const g = scene.make.graphics({}, false);
+    // Each distinct tone is drawn once into a small texture; the board is then a stamp of those, which
+    // is far cheaper than tessellating four rounded rectangles for each of up to 1,600 cubes.
+    const stamps: Phaser.GameObjects.Image[] = [];
+    const keyFor = (t: CubeTones): string =>
+      bake(scene, `tile:${t.base}:${t.light}:${t.dark}:${this.size}`, this.size, this.size, (g) =>
+        paintCube(g, 0, 0, this.size, t),
+      );
     for (let i = 0; i < this.grid.length; i++) {
       const color = this.grid[i]!;
       if (color < 0) continue;
       // Mosaic-local pixel position (the ring cell at index 0 of each padded row/column is skipped).
       const x = ((i % stride) - 1) * cell + Math.floor(this.gap / 2);
       const y = (Math.floor(i / stride) - 1) * cell + Math.floor(this.gap / 2);
-      paintCube(g, x, y, this.size, this.lookTones?.[i] ?? this.tones[color]!);
+      stamps.push(
+        scene.make
+          .image({ x, y }, false)
+          .setTexture(keyFor(this.lookTones?.[i] ?? this.tones[color]!))
+          .setOrigin(0, 0),
+      );
     }
-    this.rt.draw(g, 0, 0);
+    this.rt.draw(stamps);
     this.rt.render();
-    g.destroy();
+    for (const img of stamps) img.destroy();
     this.stats.fullPaints++;
     this.stats.paintMs += performance.now() - started;
   }

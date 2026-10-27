@@ -1,29 +1,29 @@
 /**
- * The Hex & Hue familiar ("Mothlet"): a small round moth-sprite that fetches cubes. Original pixel
- * art, authored here as ASCII layers that are composed into frames. Body pixels use a ramp tinted per
- * cube colour (outline included, as a deep tint, so the silhouette reads on the dark board); eyes,
- * wings and the antenna glow are fixed, so one design serves every colour. See docs/art/familiar.md.
+ * The Hex & Hue familiars (v2.0.0 look): a flying bat and a cat, drawn as smooth vector shapes
+ * (`familiarDraw.ts`) into an atlas with one row per cube colour. This module holds what both species
+ * share: the frame names and size, and the colour maths (a deep tint for the outline that always
+ * reads on the dark board, and the tones used for fills). The sprite is laid out on a 16 x 14 unit
+ * grid (the units the board's offsets and the colour-blind badge anchor are written in) and drawn
+ * `SS` times larger so it stays crisp at any phone density.
  */
 
 import { theme } from "../theme";
 
 export const FAMILIAR_W = 16;
 export const FAMILIAR_H = 14;
+/** Supersampling: each unit is `SS` texture pixels in each direction. */
+export const SS = 4;
 
-/** Legend: which role each character plays. `.` is transparent. */
-export const LEGEND = {
-  o: "outline",
-  l: "light",
-  m: "mid",
-  d: "dark",
-  c: "cheek",
-  e: "eyeWhite",
-  p: "pupil",
-  w: "wing",
-  x: "wingEdge",
-  g: "glow",
-} as const;
-export type Role = (typeof LEGEND)[keyof typeof LEGEND];
+/** The two species: bats fly for most worlds, cats trot for the `familiar` pictures. */
+export const SPECIES = ["bat", "cat"] as const;
+export type Species = (typeof SPECIES)[number];
+
+/** Cats trot for the `familiar` pictures (and the world that is about familiars); every other picture is flown by bats. */
+export const speciesFor = (theme: string | undefined): Species =>
+  theme === "familiar" ? "cat" : "bat";
+
+/** Role names of the tones a species is filled with. */
+export type Role = "outline" | "light" | "mid" | "dark";
 
 export const FRAME_NAMES = [
   "idle0",
@@ -36,161 +36,6 @@ export const FRAME_NAMES = [
   "deliver",
 ] as const;
 export type FrameName = (typeof FRAME_NAMES)[number];
-
-// ---------------------------------------------------------------------------------------------
-// Layers (16 × 14). Wings and arms are written as the left half (8 columns) and mirrored.
-// ---------------------------------------------------------------------------------------------
-
-const blank = (): string[] => Array.from({ length: FAMILIAR_H }, () => ".".repeat(FAMILIAR_W));
-
-/** Body: head and torso, antennae, standing feet. Columns 4..11 are the 8-wide body. */
-const BODY: readonly string[] = [
-  "...g........g...",
-  "....o......o....",
-  ".....o....o.....",
-  ".....oooooo.....",
-  "....ollllmmo....",
-  "....oeemmeeo....",
-  "....oepmmpeo....",
-  "....ocmmmmco....",
-  "....olmmmmdo....",
-  "....ommmmmdo....",
-  "....oddmmddo....",
-  ".....oooooo.....",
-  ".....oo..oo.....",
-  "................",
-];
-
-const mirror = (half: string): string => half + [...half].reverse().join("");
-
-const halves = (rows: Record<number, string>): string[] =>
-  blank().map((_, y) => (rows[y] ? mirror(rows[y]!) : ".".repeat(FAMILIAR_W)));
-
-const WINGS_UP = halves({
-  1: "x.......",
-  2: "xw......",
-  3: "xww.....",
-  4: "xwww....",
-  5: ".xwww...",
-  6: "..xwww..",
-  7: "...xwww.",
-  8: "....xww.",
-});
-
-const WINGS_MID = halves({
-  4: "x.......",
-  5: "xww.....",
-  6: "xwwww...",
-  7: "xwwwww..",
-  8: ".xwwww..",
-  9: "..xxx...",
-});
-
-/** Wings half open and one step lower: the second beat of the walk's flap. */
-const WINGS_MID_LOW = halves({
-  6: "x.......",
-  7: "xww.....",
-  8: "xwwww...",
-  9: "xwwwww..",
-  10: ".xwwww..",
-  11: "..xxx...",
-});
-
-const WINGS_DOWN = halves({
-  5: "...xwww.",
-  6: "..xwwww.",
-  7: ".xwwww..",
-  8: "xwwww...",
-  9: "xwww....",
-  10: "xww.....",
-  11: "xw......",
-  12: "x.......",
-});
-
-/** Wings folded back behind the body (crouching to pick something up). */
-const WINGS_TUCK = halves({
-  4: "...x....",
-  5: "..xwx...",
-  6: "..xww...",
-  7: "..xww...",
-  8: "...xw...",
-});
-
-/**
- * Arms raised in a V, holding the cube above the head. Drawn behind the body so the body outline
- * stays intact; the hands (rows 2-3) sit beside the antennae, outside the cube's footprint.
- */
-const ARMS_V = halves({
-  2: ".om.....",
-  3: ".om.....",
-  4: ".om.....",
-  5: "..om....",
-  6: "..om....",
-  7: "...om...",
-  8: "...om...",
-});
-
-/** Arms thrown straight up (delivery toss), with a sparkle at each hand. */
-const ARMS_TOSS = halves({
-  0: "g.......",
-  1: "om......",
-  2: "om......",
-  3: "om......",
-  4: "om......",
-  5: "om......",
-  6: ".om.....",
-  7: "..om....",
-  8: "..om....",
-});
-
-/** Arms reaching out and down for a cube on the ground. */
-const ARMS_REACH = halves({
-  9: "..om....",
-  10: ".omm....",
-  11: "omm.....",
-  12: "om......",
-});
-
-const FEET_APART = "....oo....oo....";
-const FEET_TOGETHER = "......oooo......";
-
-/** Draws `top` over `base` where `top` is not transparent. */
-function overlay(base: readonly string[], top: readonly string[]): string[] {
-  return base.map((row, y) =>
-    [...row].map((ch, x) => (top[y]![x] !== "." ? top[y]![x]! : ch)).join(""),
-  );
-}
-
-/** Replaces row `y` of `rows`. */
-const withRow = (rows: readonly string[], y: number, row: string): string[] =>
-  rows.map((r, i) => (i === y ? row : r));
-
-/** Crouched: a row of the torso is removed and everything above it moves down. */
-function squash(rows: readonly string[]): string[] {
-  const out = [...rows.slice(0, 9), ...rows.slice(10)];
-  return ["................", ...out];
-}
-
-const stack = (...layers: (readonly string[])[]): string[] =>
-  layers.reduce<string[]>((acc, layer) => overlay(acc, layer), blank());
-
-/** The body with its feet row replaced. */
-const bodyWithFeet = (feet: string): string[] => withRow(BODY, 12, feet);
-
-export const FRAMES: Record<FrameName, readonly string[]> = {
-  idle0: stack(WINGS_UP, BODY),
-  idle1: stack(WINGS_DOWN, BODY),
-  // Walking: feet wide apart, then together; the wings beat between two half-open positions.
-  walk0: stack(WINGS_MID, bodyWithFeet(FEET_APART)),
-  walk1: stack(WINGS_MID_LOW, bodyWithFeet(FEET_TOGETHER)),
-  // Carrying: arms in a V under the cube; wings flap low so they never hide the arms.
-  carry0: stack(WINGS_MID, ARMS_V, BODY),
-  carry1: stack(WINGS_DOWN, ARMS_V, BODY),
-  // Picking up: crouched, wings tucked, arms reaching down.
-  pickup: stack(squash(WINGS_TUCK), squash(ARMS_REACH), squash(BODY)),
-  // Delivering: wings wide, arms thrown up with sparkles. The feet stay on the baseline.
-  deliver: stack(WINGS_UP, ARMS_TOSS, BODY),
-};
 
 // ---------------------------------------------------------------------------------------------
 // Colour
@@ -258,7 +103,6 @@ function outlineFor(base: Rgb): Rgb {
 export function palette(colorHex: string): Record<Role, Rgb> {
   const base = parseHex(colorHex);
   return {
-    ...FIXED,
     mid: base,
     light: mix(base, [255, 255, 255], 0.45),
     dark: mix(base, NIGHT, 0.4),
@@ -278,39 +122,21 @@ export interface Rect {
 }
 
 /**
- * Where the M6.5 colourblind symbol is drawn on the familiar, in native sprite pixels: the chest,
+ * Where the M6.5 colourblind symbol is drawn on the familiar, in sprite units: the belly,
  * clear of the eyes and wings. The sprite colour alone cannot carry the matching rule for colour-vision
  * deficiency, so with colourblind mode on the renderer draws the colour's symbol here. A crouched
  * (`pickup`) frame has a shorter torso.
  */
 export function badgeRect(frame: FrameName): Rect {
-  return frame === "pickup" ? { x: 5, y: 8, w: 6, h: 3 } : { x: 5, y: 7, w: 6, h: 4 };
+  return frame === "pickup"
+    ? { x: 5.4, y: 9.9, w: 5.2, h: 2.2 }
+    : { x: 5.4, y: 8.6, w: 5.2, h: 2.6 };
 }
 
 /**
- * Whole-number device-pixel scale for the sprite so it is about `targetCss` CSS pixels wide (the
- * 20-28 px band the board is designed for): 2× at dpr 1 (32 px), 3× at dpr 2 (24 px), 5× at dpr 3
- * (27 px). Integer scales keep nearest-neighbour pixels even.
+ * Device-pixel size of one sprite unit so the sprite is about `targetCss` CSS pixels wide (the
+ * 20-28 px band the board is designed for).
  */
 export function familiarScale(dpr: number, targetCss = 24): number {
-  return Math.max(1, Math.round((targetCss * dpr) / FAMILIAR_W));
-}
-
-/** One frame as RGBA bytes (row-major; transparent pixels have alpha 0). */
-export function frameRgba(name: FrameName, colorHex: string): Uint8ClampedArray {
-  const pal = palette(colorHex);
-  const out = new Uint8ClampedArray(FAMILIAR_W * FAMILIAR_H * 4);
-  FRAMES[name].forEach((row, y) => {
-    for (let x = 0; x < FAMILIAR_W; x++) {
-      const ch = row[x]!;
-      if (ch === ".") continue;
-      const [r, g, b] = pal[LEGEND[ch as keyof typeof LEGEND]];
-      const i = (y * FAMILIAR_W + x) * 4;
-      out[i] = r;
-      out[i + 1] = g;
-      out[i + 2] = b;
-      out[i + 3] = 255;
-    }
-  });
-  return out;
+  return Math.max(1, (targetCss * dpr) / FAMILIAR_W);
 }
