@@ -737,14 +737,18 @@ export class CollectScene extends Phaser.Scene {
     });
   }
 
-  /** Where column `i` is drawn now: columns that ran out are gone and the rest are centred. */
+  /**
+   * What a ring around column `i` should hug: its front box, where the column is drawn now (columns that
+   * ran out are gone and the rest are centred). The tap zone is the whole column; the ring is the box.
+   */
   private columnRectNow(i: number): { x: number; y: number; w: number; h: number } | null {
-    return (
-      activeColumnRects(
-        this.layout,
-        this.session.state.columns.map((c) => c.length > 0),
-      )[i] ?? null
-    );
+    const r = activeColumnRects(
+      this.layout,
+      this.session.state.columns.map((c) => c.length > 0),
+    )[i];
+    if (!r) return null;
+    const t = this.layout.tile;
+    return { x: r.x + (r.w - t) / 2, y: r.y + this.layout.gap, w: t, h: t };
   }
 
   /** Puts each column's tap zone where its boxes are now: columns that ran out are off, the rest centred. */
