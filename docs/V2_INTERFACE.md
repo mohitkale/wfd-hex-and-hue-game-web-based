@@ -22,7 +22,7 @@ the matrix of docs/QA.md.
   closes, then the box goes (the closing was written from the code and tests, not yet seen by eye: the
   browser pane throttles animation frames). The coloured boxes are a grid with the **same spacing across
   and down** (`gap`): each column shows its next three boxes (front at the top), the rest stay hidden,
-  and when a column runs out the others centre as a group. Nothing is drawn around the picture (the ring
+  and when a column runs out the others centre as a group. A level with many trays or columns shrinks every box to fit one row rather than overflowing (down to about 23 css px for eleven trays on a 360 px phone: a known limit; the shipped levels have four to six trays). Nothing is drawn around the picture (the ring
   is only the walkway).
 - **`CollectScene` is split** (it was 847 lines, now about 670): `CollectHud` (title, buttons, progress),
   `Toast` (the one-line message, now wrapping to the board width), `EndCard` (plain win and

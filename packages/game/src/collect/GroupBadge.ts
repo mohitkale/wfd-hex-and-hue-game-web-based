@@ -36,6 +36,7 @@ export class GroupBadge extends Phaser.GameObjects.Container {
   private readonly opening: Phaser.GameObjects.Graphics;
   private readonly lid: Phaser.GameObjects.Graphics;
   private open = false;
+  private readonly glowScale: number;
   private mode: BadgeState = "queued";
   private shown: number;
 
@@ -64,6 +65,7 @@ export class GroupBadge extends Phaser.GameObjects.Container {
       .setTint(tones.light)
       .setDisplaySize(w * 1.7, h * 1.7)
       .setAlpha(0);
+    this.glowScale = this.glow.scale;
     this.bg = scene.add.image(0, 0, key).setOrigin(0.5);
     this.bar = scene.add.graphics();
     // The tray: a dark opening on top of the box and a lid hinged along the box's top edge.
@@ -126,6 +128,8 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     if (state === this.mode) return;
     this.mode = state;
     this.scene.tweens.killTweensOf(this.glow);
+    // A box that stalls and resumes must not multiply the glow's size each time.
+    this.glow.setScale(this.glowScale);
     const reduced = isReducedMotion(this.scene);
     if (state === "working") {
       this.glow.setAlpha(0.55);
@@ -133,7 +137,7 @@ export class GroupBadge extends Phaser.GameObjects.Container {
         this.scene.tweens.add({
           targets: this.glow,
           alpha: 0.2,
-          scale: this.glow.scale * 1.08,
+          scale: this.glowScale * 1.08,
           duration: 520,
           yoyo: true,
           repeat: -1,

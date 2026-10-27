@@ -258,6 +258,28 @@ describe("the tutorial's ring follows the columns as they centre", () => {
   });
 });
 
+describe("the tutorial's ring points at the tray a waiting box sits in", () => {
+  it("uses the tray the box is in, not the engine slot number", () => {
+    const l = computeCollectLayout({
+      width: 750,
+      height: 1500,
+      dpr: 2,
+      insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      boardWidth: 10,
+      boardHeight: 10,
+      slots: 2,
+      columns: 3,
+      fieldCap: 3,
+      portalX: 4,
+    });
+    // By default slot i is tray i; a box in engine slot 0 that sits in tray 2 is pointed at there.
+    expect(targetRect(l, { kind: "slot", index: 0 })).toEqual(l.trays[0]);
+    const r = targetRect(l, { kind: "slot", index: 0 }, 3, undefined, () => l.trays[2] ?? null);
+    expect(r).toEqual(l.trays[2]);
+    expect(targetRect(l, { kind: "slot", index: 1 }, 3, undefined, () => null)).toBeNull();
+  });
+});
+
 describe("the free end-game sprint", () => {
   const state = (o: Partial<Parameters<typeof sprinting>[0]> = {}) => ({
     status: "playing",

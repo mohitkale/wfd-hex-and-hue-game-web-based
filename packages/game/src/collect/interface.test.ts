@@ -4,6 +4,7 @@ import { badgeBox, badgeFontPx } from "./badgeBox";
 import {
   COLUMN_VISIBLE,
   activeColumnRects,
+  frontBoxRect,
   computeCollectLayout,
   hudButtonX,
   type CollectLayout,
@@ -290,6 +291,44 @@ describe("every group box is the same square, wherever it is", () => {
         const last = boxes[3]!;
         expect(last.y + last.h / 2).toBeLessThanOrEqual(col.y + col.h + 1);
       });
+});
+
+describe("rings hug the box they point at", () => {
+  for (const d of DEVICES.filter((x) => x.framed))
+    for (const s of SHAPES)
+      it(`${d.name}, ${3 + s.slots} trays, ${s.columns} columns`, () => {
+        const l = layoutFor(d, s);
+        const rects = activeColumnRects(
+          l,
+          l.columns.map(() => true),
+        );
+        rects.forEach((r, i) => {
+          const ring = frontBoxRect(l, r!);
+          const box = badgeBox(l, "column", i, 0, r!);
+          expect(ring.x + ring.w / 2).toBeCloseTo(box.x, 5);
+          expect(ring.y + ring.h / 2).toBeCloseTo(box.y, 5);
+          expect(ring.w).toBe(box.w);
+        });
+      });
+});
+
+describe("a wide level (many trays or columns) still has readable boxes", () => {
+  // Three working places and up to eight waiting ones (the generator's limit) is eleven trays.
+  for (const d of DEVICES.filter((x) => x.framed && x.w >= 360))
+    for (const slots of [5, 8]) {
+      it(`${d.name}, ${3 + slots} trays`, () => {
+        const l = layoutFor(d, { board: 24, slots, columns: 4 });
+        expect(l.trays).toHaveLength(3 + slots);
+        // Never narrower than a readable tile: the boxes shrink to fit, they do not overflow.
+        expect(css(l, l.tile), "tile").toBeGreaterThanOrEqual(slots === 8 ? 22 : 30);
+        const box = badgeBox(l, "tray", 0, 0);
+        expect(css(l, badgeFontPx(box.w, box.h))).toBeGreaterThanOrEqual(slots === 8 ? 9 : 13);
+        for (const r of l.trays) {
+          expect(r.x).toBeGreaterThanOrEqual(l.frame.x);
+          expect(r.x + r.w).toBeLessThanOrEqual(l.frame.x + l.frame.w);
+        }
+      });
+    }
 });
 
 describe("columns: three boxes at most, centred as a group", () => {

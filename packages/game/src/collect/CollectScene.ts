@@ -65,6 +65,7 @@ import { progressOf } from "./progress";
 import {
   HUD_BUTTON_CSS,
   activeColumnRects,
+  frontBoxRect,
   computeCollectLayout,
   hudButtonX,
   type CollectLayout,
@@ -162,6 +163,8 @@ export class CollectScene extends Phaser.Scene {
   private revealSeen = false;
   /** The tap zone of each summon column; they follow the columns as these centre (see `placeColumns`). */
   private columnZones: Phaser.GameObjects.Zone[] = [];
+  /** Which tray each box sits in, kept across a rebuild (resize, Extra Slot) so boxes do not jump. */
+  private trayMemory = new Map<number, number>();
   private hud!: CollectHud;
   private tray: BoosterTray | null = null;
   /** The settings panel is open over the board: play waits, and a rebuild keeps it open. */
@@ -450,11 +453,20 @@ export class CollectScene extends Phaser.Scene {
       speciesFor(level.subject?.theme),
     );
     this.familiars.anchorFor = (group) => this.panels.anchor(group);
+    this.panels.onTrays = (trays) => (this.trayMemory = new Map(trays));
     this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
     this.familiars.onDelivered = (_color, group) => {
       this.panels.badge(group)?.pulse();
     };
-    this.panels = new PanelsView(this, this.layout, level.palette, dpr, this.colorblind, reduced);
+    this.panels = new PanelsView(
+      this,
+      this.layout,
+      level.palette,
+      dpr,
+      this.colorblind,
+      reduced,
+      this.trayMemory,
+    );
     this.rebuildMarks(state);
     this.panels.sync(state);
     this.placeColumns();
@@ -474,6 +486,7 @@ export class CollectScene extends Phaser.Scene {
           () => this.skipTutorial(),
           this.hudButtons,
           (i) => this.columnRectNow(i),
+          (slot) => this.slotRectNow(slot),
         )
       : null;
     this.refreshTutorial();
@@ -769,8 +782,7 @@ export class CollectScene extends Phaser.Scene {
       this.session.state.columns.map((c) => c.length > 0),
     )[i];
     if (!r) return null;
-    const t = this.layout.tile;
-    return { x: r.x + (r.w - t) / 2, y: r.y + this.layout.gap, w: t, h: t };
+    return frontBoxRect(this.layout, r);
   }
 
   /** Puts each column's tap zone where its boxes are now: columns that ran out are off, the rest centred. */

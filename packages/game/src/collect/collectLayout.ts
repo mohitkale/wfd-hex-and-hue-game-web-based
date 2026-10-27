@@ -158,6 +158,16 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   };
 }
 
+/** The front box of a column drawn at `colRect` (what a ring around the column should hug). */
+export function frontBoxRect(layout: CollectLayout, colRect: Rect): Rect {
+  return {
+    x: colRect.x + (colRect.w - layout.tile) / 2,
+    y: colRect.y,
+    w: layout.tile,
+    h: layout.tile,
+  };
+}
+
 /**
  * The columns that still hold boxes, centred as a group (a column that has run out leaves, and the
  * rest slide to the middle). `active[i]` says whether column `i` still has a box; the result has a rect

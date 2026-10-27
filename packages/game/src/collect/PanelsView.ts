@@ -41,9 +41,11 @@ export function paintPanelFrames(
 
 export class PanelsView {
   private readonly tracked = new Map<number, Tracked>();
+  /** Told after every sync which tray each box is in (the scene keeps it across a rebuild). */
+  onTrays: ((trays: ReadonlyMap<number, number>) => void) | null = null;
   private readonly anchorOut = { x: 0, y: 0 };
   /** Which tray each working or waiting group sits in (it keeps its tray while it stalls and resumes). */
-  private trayOf = new Map<number, number>();
+  private trayOf: Map<number, number>;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -52,7 +54,11 @@ export class PanelsView {
     private readonly dpr: number,
     private readonly colorblind = false,
     private readonly reduced = false,
-  ) {}
+    /** Trays from before a rebuild: boxes keep their place when the screen is laid out again. */
+    initialTrays: ReadonlyMap<number, number> = new Map(),
+  ) {
+    this.trayOf = new Map(initialTrays);
+  }
 
   destroy(): void {
     for (const t of this.tracked.values()) t.badge.destroy();
@@ -81,6 +87,7 @@ export class PanelsView {
   /** Re-places every badge for `state`. Call after each tick batch, tap, undo or resize. */
   sync(state: Readonly<CollectState>): void {
     this.trayOf = assignTrays(this.trayOf, state.groups, this.layout.trays.length);
+    this.onTrays?.(this.trayOf);
     const views = collect.groupViews(state);
     // Columns that still hold a box, centred as a group.
     const colRects = activeColumnRects(

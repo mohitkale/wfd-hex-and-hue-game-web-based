@@ -19,7 +19,7 @@ to play. Reproduce the tables with `npm run density`; the checks are in `tools/c
 ## Cube size
 
 CSS pixels per cube (cell pitch, gap included) from the real portrait layout, square boards, four
-columns, four slots, four field tiles:
+columns and five trays (three working places and two waiting ones), in one row:
 
 | Device (CSS px)       | 16   | 24   | 32   | 36   | 40  |
 | --------------------- | ---- | ---- | ---- | ---- | --- |
