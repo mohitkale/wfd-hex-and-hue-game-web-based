@@ -164,7 +164,7 @@ export class CollectScene extends Phaser.Scene {
   /** The tap zone of each summon column; they follow the columns as these centre (see `placeColumns`). */
   private columnZones: Phaser.GameObjects.Zone[] = [];
   /** Which tray each box sits in, kept across a rebuild (resize, Extra Slot) so boxes do not jump. */
-  private trayMemory = new Map<number, number>();
+  private trayMemory: ReadonlyMap<number, number> = new Map();
   private hud!: CollectHud;
   private tray: BoosterTray | null = null;
   /** The settings panel is open over the board: play waits, and a rebuild keeps it open. */
@@ -467,7 +467,7 @@ export class CollectScene extends Phaser.Scene {
       reduced,
       this.trayMemory,
     );
-    this.panels.onTrays = (trays) => (this.trayMemory = new Map(trays));
+    this.panels.onTrays = (trays) => (this.trayMemory = trays);
     this.rebuildMarks(state);
     this.panels.sync(state);
     this.placeColumns();

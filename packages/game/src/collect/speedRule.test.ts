@@ -11,7 +11,7 @@ import {
   speedView,
   type SpeedState,
 } from "./speedRule";
-import { TickClock } from "./tickClock";
+import { SHOWN_TICKS_PER_SECOND, TickClock } from "./tickClock";
 import { stepFrame } from "./frameStep";
 import { targetRect } from "./TutorialLayer";
 import { activeColumnRects, computeCollectLayout, hudButtonX } from "./collectLayout";
@@ -131,7 +131,7 @@ describe("speed never changes the outcome", () => {
   /** Plays `line` at `speed`: frames of ~16.7 ms feed a TickClock; each action is tapped as soon as the board is settled. */
   function play(level: collect.CollectLevel, line: readonly collect.Action[], speed: number) {
     const session = new collect.CollectSession(level);
-    const clock = new TickClock();
+    const clock = new TickClock(SHOWN_TICKS_PER_SECOND);
     let next = 0;
     let frames = 0;
     for (; frames < 400_000 && session.state.status === "playing"; frames++) {
@@ -202,7 +202,7 @@ describe("the frame step the scene really runs", () => {
     const level = TUTORIAL[0]!.make();
     const session = new collect.CollectSession(level);
     session.tap({ kind: "select", column: 0 });
-    const clock = new TickClock();
+    const clock = new TickClock(SHOWN_TICKS_PER_SECOND);
     for (let i = 0; i < 600; i++) expect(stepFrame(session, clock, 16.7, 2, true)).toBe(0);
     expect(session.state.tick).toBe(0);
     // Afterwards play resumes normally, with no burst of ticks for the time that passed.
@@ -313,7 +313,7 @@ describe("the free end-game sprint", () => {
       const line = collect.solve(level, 200_000).line!;
       const run = (speedAt: (s: collect.CollectState) => 1 | 3) => {
         const session = new collect.CollectSession(level);
-        const clock = new TickClock();
+        const clock = new TickClock(SHOWN_TICKS_PER_SECOND);
         let next = 0;
         let frames = 0;
         let sprintFrames = 0;

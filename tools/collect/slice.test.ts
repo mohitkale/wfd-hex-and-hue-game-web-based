@@ -2,7 +2,12 @@ import * as collect from "@hexhue/core/collect";
 import { createRng } from "@hexhue/core";
 import { describe, expect, it } from "vitest";
 import { bruteSolve, playLine } from "../../packages/core/src/collect/testing";
-import { LOSE_LINES, WIN_LINE, moonlitHat } from "../../packages/game/src/collect/slice";
+import {
+  DEMO_WIN_LINE,
+  LOSE_LINES,
+  WIN_LINE,
+  moonlitHat,
+} from "../../packages/game/src/collect/slice";
 
 /** The M10.5 vertical-slice level: valid, solvable, strategic, and with a demonstrable loss. */
 
@@ -48,6 +53,22 @@ describe("Moonlit Hat (the vertical slice)", () => {
     expect(session.state.status).toBe("won");
     expect(session.state.deliveredTotal).toBe(session.state.cubesTotal);
     expect(session.state.slots).toEqual([null, null]);
+  });
+
+  it("the board's demo win has no resume taps and still wins under auto-resume", () => {
+    expect(DEMO_WIN_LINE.some((a) => a.kind === "resume")).toBe(false);
+    const s = new collect.CollectSession(level, undefined, undefined, true);
+    for (const a of DEMO_WIN_LINE) {
+      expect(s.tap(a).ok).toBe(true);
+      for (let i = 0; i < 50_000 && s.tick() !== null; i++);
+    }
+    expect(s.state.status).toBe("won");
+    const d = new collect.CollectSession(level, undefined, undefined, true);
+    for (const a of LOSE_LINES.deadlock) {
+      d.tap(a);
+      for (let i = 0; i < 50_000 && d.tick() !== null; i++);
+    }
+    expect(d.state.lossReason).toBe("deadlock");
   });
 
   it("the recorded losing lines lose, for the reasons they are shown for", () => {

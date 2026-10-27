@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { apply, legalActions, type Action } from "./actions";
 import { autoResume, runUntilSettledAuto } from "./autoResume";
-import { board, fixtureB, randomLevel } from "./fixtures";
+import { fixtureB, randomLevel } from "./fixtures";
 import { hintFor } from "./hint";
 import { CollectSession, replay } from "./session";
 import { runUntilSettled } from "./sim";
@@ -134,19 +134,35 @@ describe("solving the game's own policy", () => {
     expect(hint.kind).toBe("move");
   });
 
-  it("a board where free choice wins only by resuming late can be lost under auto-resume", () => {
-    // Documented effect, not a bug: this is why levels are re-verified under the policy.
-    const level = board(["RRBB", "BBRR"], [[["R", 2]], [["B", 2]], [["R", 2]], [["B", 2]]], {
-      colors: "RB",
-      slots: 1,
-      fieldCap: 1,
-      squad: 1,
-      spawnGap: 1,
-    });
-    const free = solve(level, 5_000).status;
-    const auto = solve(level, 5_000, true).status;
-    expect(["solved", "unsolvable"]).toContain(free);
-    expect(["solved", "unsolvable"]).toContain(auto);
-    if (auto === "solved") expect(free).toBe("solved");
+  it("tick() reports a batch when only an automatic resume happened (the tick did not advance)", () => {
+    const s = new CollectSession({ ...fixtureB(), slots: 2 }, undefined, undefined, true);
+    s.tap(select(0));
+    settle(s);
+    s.tap(select(2));
+    // Run only until the resume appears in the log; the batch that carries it must be returned.
+    let batch = null;
+    for (let i = 0; i < 20_000 && !s.log.some((e) => e.auto); i++) batch = s.tick();
+    expect(s.log.some((e) => e.auto)).toBe(true);
+    expect(batch).not.toBeNull();
+    expect(batch!.events.length).toBeGreaterThan(0);
+  });
+
+  it("undo drops the tap and the automatic resumes after it, keeps earlier ones, and replays to the live state", () => {
+    const level = { ...fixtureB(), slots: 2 };
+    const s = new CollectSession(level, undefined, undefined, true);
+    s.tap(select(0));
+    settle(s);
+    s.tap(select(2)); // the blue clears; red resumes by itself
+    settle(s);
+    const autos = s.log.filter((e) => e.auto).length;
+    expect(autos).toBeGreaterThan(0);
+    expect(s.moves).toBe(2);
+    s.tap(select(1));
+    settle(s);
+    expect(s.undo()).toBe(true);
+    // The last tap and whatever followed it are gone; the earlier tap and its auto entries stay.
+    expect(s.log.filter((e) => e.auto).length).toBe(autos);
+    expect(s.moves).toBe(2);
+    expect(hashState(replay(level, s.log).state)).toBe(hashState(s.state));
   });
 });

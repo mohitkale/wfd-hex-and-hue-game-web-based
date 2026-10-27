@@ -367,11 +367,11 @@ describe("review-build level and demo wiring", () => {
 
   it("?demo= picks the recorded line it names, and only on the slice level", async () => {
     const { demoLineFromSearch, levelFromSearch } = await import("./levels");
-    const { LOSE_LINES, WIN_LINE } = await import("./slice");
+    const { DEMO_WIN_LINE, LOSE_LINES } = await import("./slice");
     const slice = levelFromSearch("");
-    expect(demoLineFromSearch("?demo=win", slice)).toBe(WIN_LINE);
-    expect(demoLineFromSearch("?demo=slots", slice)).toBe(LOSE_LINES.slots);
-    expect(demoLineFromSearch("?demo=lose", slice)).toBe(LOSE_LINES.slots);
+    expect(demoLineFromSearch("?demo=win", slice)).toBe(DEMO_WIN_LINE);
+    expect(demoLineFromSearch("?demo=slots", slice)).toBe(LOSE_LINES.deadlock);
+    expect(demoLineFromSearch("?demo=lose", slice)).toBe(LOSE_LINES.deadlock);
     expect(demoLineFromSearch("?demo=deadlock", slice)).toBe(LOSE_LINES.deadlock);
     expect(demoLineFromSearch("?demo=other", slice)).toBeNull();
     expect(demoLineFromSearch("", slice)).toBeNull();

@@ -5,7 +5,7 @@ import { dailyLevelId, dayNumber, utcDate } from "./daily";
 import { TUTORIAL, TUTORIAL_IDS } from "./tutorialLevels";
 import { nextTutorial, shouldOfferTutorial, type TutorialBook } from "./tutorialBook";
 import { layeredOrb } from "./denseBoard";
-import { LOSE_LINES, SLICE_ID, WIN_LINE, moonlitHat } from "./slice";
+import { DEMO_WIN_LINE, LOSE_LINES, SLICE_ID, moonlitHat } from "./slice";
 
 /**
  * Levels for the `?engine=v2` review build. The vertical-slice level (M10.5) replaces `demo` as the
@@ -263,8 +263,9 @@ export function demoLineFromSearch(
 ): readonly collect.Action[] | null {
   if (level.id !== SLICE_ID) return null;
   const demo = new URLSearchParams(search).get("demo");
-  if (demo === "win") return WIN_LINE;
-  if (demo === "lose" || demo === "slots") return LOSE_LINES.slots;
-  if (demo === "deadlock") return LOSE_LINES.deadlock;
+  if (demo === "win") return DEMO_WIN_LINE;
+  // Boxes that wait resume by themselves, so the slot trap cannot be sprung on the board: every
+  // losing demo is the deadlock (the engine's slotsFull line is still tested under free choice).
+  if (demo === "lose" || demo === "slots" || demo === "deadlock") return LOSE_LINES.deadlock;
   return null;
 }
