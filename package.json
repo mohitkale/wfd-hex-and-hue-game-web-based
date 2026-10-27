@@ -37,7 +37,6 @@
     "production:report": "tsx tools/collect/production.ts --write",
     "production:check": "tsx tools/collect/production.ts --check",
     "audit:v1": "tsx tools/audit/run.ts",
-    "familiar:sheet": "tsx tools/familiar/sheet.ts",
     "icons": "tsx tools/icons/build.ts",
     "budget": "tsx tools/perf/check.ts",
     "perf:engine": "tsx tools/perf/engineTicks.ts",

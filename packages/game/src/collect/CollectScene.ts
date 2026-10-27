@@ -71,6 +71,7 @@ import {
 } from "./collectLayout";
 import { RingStats } from "./profile";
 import { shadeTonesGrid, tonesFor } from "./cubePaint";
+import { speciesFor } from "./familiarArt";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, dailyFromSearch, levelFromSearch, tutorialStart } from "./levels";
 import { TickClock } from "./tickClock";
@@ -404,7 +405,8 @@ export class CollectScene extends Phaser.Scene {
       tray: this.tutorialId === null,
     });
     this.toaster = new Toast(this, this.layout);
-    this.atlas = ensureFamiliarAtlas(this, level.palette);
+    // Cats trot for the `familiar` pictures; everything else is flown by bats.
+    this.atlas = ensureFamiliarAtlas(this, level.palette, speciesFor(level.subject?.theme));
     const reduced = isReducedMotion(this);
     const tones = level.palette.map(tonesFor);
 
@@ -445,6 +447,7 @@ export class CollectScene extends Phaser.Scene {
       reduced,
       this.colorblind ? level.palette : null,
       this.emitter,
+      speciesFor(level.subject?.theme),
     );
     this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
     this.familiars.onDelivered = (_color, group) => {

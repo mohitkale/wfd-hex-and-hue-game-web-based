@@ -38,21 +38,49 @@ describe("shadeTonesGrid", () => {
 });
 
 describe("paintCube", () => {
-  it("fills the cube then its four edges", () => {
+  const record = () => {
     const calls: string[] = [];
-    paintCube(
-      {
-        fillStyle: (c) => calls.push(`fill ${c}`),
-        fillRect: (x, y, w, h) => calls.push(`rect ${x},${y},${w},${h}`),
+    return {
+      calls,
+      g: {
+        fillStyle: (c: number, a?: number) =>
+          calls.push(`fill ${c}${a === undefined ? "" : ` @${a}`}`),
+        fillRect: (x: number, y: number, w: number, h: number) =>
+          calls.push(`rect ${x},${y},${w},${h}`),
+        fillRoundedRect: (x: number, y: number, w: number, h: number, r: number) =>
+          calls.push(`round ${x},${y},${w},${h} r${r}`),
       },
-      10,
-      20,
-      12,
-      { base: 1, light: 2, dark: 3 },
-    );
-    expect(calls[0]).toBe("fill 1");
-    expect(calls).toContain("fill 2");
-    expect(calls).toContain("fill 3");
-    expect(calls.filter((c) => c.startsWith("rect"))).toHaveLength(5);
+    };
+  };
+
+  it("is a rounded tile: a dark lip, the colour, then a soft highlight and a bright dot", () => {
+    const { calls, g } = record();
+    paintCube(g, 10, 20, 20, { base: 1, light: 2, dark: 3 });
+    expect(calls[0]).toBe("fill 3");
+    expect(calls[2]).toBe("fill 1");
+    expect(calls).toContain("fill 2 @0.5");
+    expect(calls).toContain("fill 16777215 @0.55");
+    expect(calls.filter((c) => c.startsWith("round"))).toHaveLength(4);
+    // Rounded, never a hard square.
+    expect(calls.filter((c) => c.startsWith("rect"))).toHaveLength(0);
+  });
+
+  it("stays inside its square, even tiny", () => {
+    for (const size of [4, 7, 13, 40]) {
+      const { calls, g } = record();
+      paintCube(g, 100, 100, size, { base: 1, light: 2, dark: 3 });
+      for (const c of calls.filter((x) => x.startsWith("round"))) {
+        const [x, y, w, h] = c.slice(6).split(" ")[0]!.split(",").map(Number) as [
+          number,
+          number,
+          number,
+          number,
+        ];
+        expect(x).toBeGreaterThanOrEqual(100);
+        expect(y).toBeGreaterThanOrEqual(100);
+        expect(x + w).toBeLessThanOrEqual(100 + size + 1e-9);
+        expect(y + h).toBeLessThanOrEqual(100 + size + 1e-9);
+      }
+    }
   });
 });

@@ -176,9 +176,9 @@ export function cellCenter(layout: CollectLayout, idx: number): { x: number; y: 
   };
 }
 
-/** Whole-number sprite scale so a 16 px familiar is about 1.6 cells wide (2..6). */
+/** Device pixels per sprite unit so a 16-unit familiar is about 1.6 cells wide (1..6; smooth art needs no whole numbers). */
 export function spriteScaleForCell(cell: number, spriteWidth = 16): number {
-  return clamp(Math.round((cell * 1.6) / spriteWidth), 1, 6);
+  return clamp((cell * 1.6) / spriteWidth, 1, 6);
 }
 
 /** The HUD buttons: a 36 css px circle inside a 44 css px tap target. */

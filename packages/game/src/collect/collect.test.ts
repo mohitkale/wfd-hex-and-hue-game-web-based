@@ -142,8 +142,13 @@ describe("collect layout", () => {
     ).toBeLessThanOrEqual(1);
   });
 
-  it("scales the sprite in whole numbers with the cell size", () => {
-    expect([8, 16, 28, 40, 80].map((c) => spriteScaleForCell(c))).toEqual([1, 2, 3, 4, 6]);
+  it("scales the smooth sprite continuously with the cell size, within 1..6 device px per unit", () => {
+    const scales = [8, 16, 28, 40, 80].map((c) => spriteScaleForCell(c));
+    expect(scales[0]).toBe(1);
+    expect(scales[1]).toBeCloseTo(1.6);
+    expect(scales[2]).toBeCloseTo(2.8);
+    expect(scales[3]).toBeCloseTo(4);
+    expect(scales[4]).toBe(6);
   });
 });
 

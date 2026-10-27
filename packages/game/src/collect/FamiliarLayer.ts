@@ -7,7 +7,15 @@ import { spriteScaleForCell } from "./collectLayout";
 import { TEX } from "../view/textures";
 import { bake } from "./bake";
 import { paintCube, type CubeTones } from "./cubePaint";
-import { FAMILIAR_H, FAMILIAR_W, FRAME_NAMES, badgeRect, type FrameName } from "./familiarArt";
+import {
+  FAMILIAR_H,
+  FAMILIAR_W,
+  FRAME_NAMES,
+  SS,
+  badgeRect,
+  type FrameName,
+  type Species,
+} from "./familiarArt";
 import type { Emitter } from "./particles";
 import {
   CellSpreader,
@@ -95,6 +103,7 @@ export class FamiliarLayer {
     /** Palette hex colours when colour-blind symbols are on, otherwise null. */
     private readonly symbolPalette: readonly string[] | null = null,
     private readonly emitter: Emitter | null = null,
+    private readonly species: Species = "bat",
   ) {
     this.frameNames = tones.map((_, c) => FRAME_NAMES.map((f) => `${c}:${f}`));
     const size = Math.max(4, Math.round(layout.cell * 0.82));
@@ -271,9 +280,9 @@ export class FamiliarLayer {
         // Pickup squash: flatten a little and spring back over a couple of ticks (never delays play).
         if (timeMs < e.squashUntil) {
           const b = bump(1 - (e.squashUntil - timeMs) / (this.tickMs * SQUASH_TICKS));
-          e.img.setScale(squashX(s, b), squashY(s, b));
+          e.img.setScale(squashX(s, b) / SS, squashY(s, b) / SS);
         } else {
-          e.img.setScale(s);
+          e.img.setScale(s / SS);
         }
       }
       e.shadow.setPosition(x, y + s * 2.2);
@@ -330,8 +339,8 @@ export class FamiliarLayer {
   /** Colour-blind symbol on the chest, at the frame's badge anchor, following the sprite's current scale. */
   private placeChest(e: Entry, v: FamiliarVisual, frame: FrameName, x: number, y: number): void {
     if (!this.symbolPalette || !e.chest) return;
-    const r = badgeRect(frame);
-    const s = e.img.scaleX; // not the target scale: the sprite may be mid pop-in
+    const r = badgeRect(frame, this.species);
+    const s = e.img.scaleX * SS; // not the target scale: the sprite may be mid pop-in
     const size = Math.min(r.w, r.h) * s * 0.95;
     e.chest
       .setTexture(symbolTexture(this.scene, v.colorIndex))
@@ -356,11 +365,11 @@ export class FamiliarLayer {
 
   private popIn(e: Entry, s: number, ms: number): void {
     e.popping = true;
-    e.img.setScale(s * 0.2);
+    e.img.setScale((s * 0.2) / SS);
     e.shadow.setDisplaySize(s * 2, s).setAlpha(0);
     this.scene.tweens.add({
       targets: e.img,
-      scale: s,
+      scale: s / SS,
       duration: ms,
       ease: "Back.easeOut",
       onComplete: () => {
@@ -385,7 +394,7 @@ export class FamiliarLayer {
       targets: e.img,
       x: this.cx(this.model.portal),
       y: this.cy(this.model.portal),
-      scale: this.scale * 0.15,
+      scale: (this.scale * 0.15) / SS,
       alpha: 0,
       duration: 170,
       ease: "Sine.easeIn",

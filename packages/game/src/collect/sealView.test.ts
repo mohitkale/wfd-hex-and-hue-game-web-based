@@ -1,6 +1,6 @@
 import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
-import { paintSeal, tonesFor, type RectPainter } from "./cubePaint";
+import { paintSeal, tonesFor, type TilePainter } from "./cubePaint";
 import { DEV_LEVELS, levelFromSearch, sealsIntro } from "./levels";
 import { sealMap } from "./sealView";
 
@@ -44,9 +44,10 @@ describe("drawing seals", () => {
 
   it("paints a veil, a pale rim and the key colour's square inside the cube, never outside it", () => {
     const calls: [string, ...number[]][] = [];
-    const painter: RectPainter = {
+    const painter: TilePainter = {
       fillStyle: (c, a) => calls.push(["fill", c, a ?? 1]),
       fillRect: (x, y, w, h) => calls.push(["rect", x, y, w, h]),
+      fillRoundedRect: (x, y, w, h) => calls.push(["rect", x, y, w, h]),
     };
     for (const size of [5, 8, 20]) {
       calls.length = 0;

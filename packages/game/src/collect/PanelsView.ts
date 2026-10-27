@@ -35,7 +35,6 @@ export function paintPanelFrames(
 
 export class PanelsView {
   private readonly tracked = new Map<number, Tracked>();
-  private readonly extra: Phaser.GameObjects.GameObject[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -44,31 +43,11 @@ export class PanelsView {
     private readonly dpr: number,
     private readonly colorblind = false,
     private readonly reduced = false,
-  ) {
-    this.drawFrames();
-  }
-
-  /** The label of the holding row (the outlines are part of the baked static layer). */
-  private drawFrames(): void {
-    const l = this.layout;
-    if (!l.slots[0]) return;
-    const t = this.scene.add
-      .text(l.slots[0].x + 5 * this.dpr, l.slots[0].y + 3 * this.dpr, "WAITING", {
-        fontFamily: theme.font,
-        fontSize: `${Math.round(9 * this.dpr)}px`,
-        color: theme.textDim,
-      })
-      .setOrigin(0, 0)
-      .setDepth(9)
-      .setAlpha(0.7);
-    this.extra.push(t);
-  }
+  ) {}
 
   destroy(): void {
     for (const t of this.tracked.values()) t.badge.destroy();
     this.tracked.clear();
-    for (const o of this.extra) o.destroy();
-    this.extra.length = 0;
   }
 
   /** Where group `id` should be drawn now, or null if it is not drawn (finished, or too deep in a column). */
