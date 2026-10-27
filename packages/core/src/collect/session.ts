@@ -1,6 +1,7 @@
 import { apply, explain, IllegalActionError, type Action, type ActionCheck } from "./actions";
 import type { CollectEvent, TickBatch } from "./events";
 import { validateCollectLevel, type CollectLevel } from "./level";
+import { autoResume } from "./autoResume";
 import { addSlot, canAddSlot } from "./boosters";
 import { isSettled, step } from "./sim";
 import { cloneState, createCollectState, type CollectState } from "./state";
@@ -9,6 +10,8 @@ import { cloneState, createCollectState, type CollectState } from "./state";
 export interface LogEntry {
   tick: number;
   action: Action;
+  /** Applied by the game itself (auto-resume), not tapped by the player. */
+  auto?: boolean;
 }
 
 /** A replay failed at `index`: an illegal action, or a tick the game could not reach. */
@@ -124,6 +127,8 @@ export class CollectSession {
     private readonly onListenerError: (error: unknown) => void = (e) => {
       void Promise.reject(e);
     },
+    /** The game's own policy: waiting groups go back to work by themselves (docs/V2_AUTORESUME.md). */
+    private readonly autoResumeOn = false,
   ) {
     const errors = validateCollectLevel(level);
     if (errors.length > 0) throw new Error(`Invalid level: ${errors.join("; ")}`);
@@ -141,6 +146,16 @@ export class CollectSession {
    */
   get log(): readonly LogEntry[] {
     return this.entries.slice();
+  }
+
+  /** Whether this session plays the game's own policy (waiting groups resume by themselves). */
+  get autoResume(): boolean {
+    return this.autoResumeOn;
+  }
+
+  /** How many moves the player made (taps), not counting the ones the game applied by itself. */
+  get moves(): number {
+    return this.entries.filter((e) => !e.auto).length;
   }
 
   get canUndo(): boolean {
@@ -182,7 +197,14 @@ export class CollectSession {
   tick(): TickBatch | null {
     const before = this.current.tick;
     const events = step(this.current);
-    if (this.current.tick === before) return null;
+    if (this.autoResumeOn) {
+      // Between ticks: a waiting group with a cube it can reach goes back to work at once.
+      for (const r of autoResume(this.current)) {
+        this.entries.push({ tick: this.current.tick, action: { ...r.action }, auto: true });
+        events.push(...r.events);
+      }
+    }
+    if (this.current.tick === before && events.length === 0) return null;
     const batch = { tick: this.current.tick, events };
     this.emit(batch);
     return batch;

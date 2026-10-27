@@ -94,7 +94,7 @@ export function useHint(pouch: Pouch, session: collect.CollectSession, free: boo
   if (session.state.status !== "playing") return nothing(pouch, "The game is over");
   const short = affordable(pouch, "hint", free);
   if (short) return nothing(pouch, short);
-  const hint = collect.hintFor(session.level, session.state);
+  const hint = collect.hintFor(session.level, session.state, undefined, session.autoResume);
   switch (hint.kind) {
     case "move": {
       const a = hint.action;

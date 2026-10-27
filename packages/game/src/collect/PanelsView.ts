@@ -120,9 +120,8 @@ export class PanelsView {
           g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued";
         if (mode !== t.mode) {
           t.mode = mode;
-          if (mode === "waiting") t.badge.closeTray(() => undefined);
+          // The tray stays open while a box waits: it resumes by itself the moment it can reach a cube.
           t.badge.setMode(mode);
-          if (mode === "working") t.badge.openTray();
         }
         // A column that ran out of boxes left, and the rest slid to the middle: follow.
         if (target.place === "column") {
@@ -174,7 +173,7 @@ export class PanelsView {
         g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued",
       );
       badge.setProgress(g.delivered / g.capacity);
-      if (g.status === "working") badge.openTray(wasOpen);
+      if (g.status === "working" || g.status === "waiting") badge.openTray(wasOpen);
       this.scene.add.existing(badge);
       if (from) {
         this.scene.tweens.add({

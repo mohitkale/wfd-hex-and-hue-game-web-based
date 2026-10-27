@@ -49,7 +49,7 @@ function hintProblem(hint: Hint, state: collect.CollectState): string | null {
 /** Plays a tutorial level by doing exactly what each hint points at; returns the hints it showed. */
 function followHints(id: string): { won: boolean; hints: Hint[] } {
   const t = tutorialById(id)!;
-  const session = new collect.CollectSession(t.make());
+  const session = new collect.CollectSession(t.make(), undefined, undefined, true);
   const tutorial = new Tutorial(t.script());
   const hints: Hint[] = [];
   const look = (): Hint | null => {
@@ -170,7 +170,7 @@ describe("the four tutorial levels", () => {
     (id) => {
       const { won, hints } = followHints(id);
       expect(won).toBe(true);
-      expect(hints.length).toBeGreaterThanOrEqual(3);
+      expect(hints.length).toBeGreaterThanOrEqual(2);
     },
   );
 
@@ -185,11 +185,7 @@ describe("the four tutorial levels", () => {
       "clear-blue",
       "red-free",
     ]);
-    expect(followHints("tutorial-slots").hints.map((h) => h.id)).toEqual([
-      "send-red",
-      "waits",
-      "wake",
-    ]);
+    expect(followHints("tutorial-slots").hints.map((h) => h.id)).toEqual(["send-red", "waits"]);
     expect(followHints("tutorial-undo").hints.map((h) => h.id)).toEqual([
       "red",
       "green",
@@ -201,7 +197,7 @@ describe("the four tutorial levels", () => {
 
   it("the undo level really does lose on the pointed-at mistake, and Undo really does recover", () => {
     const t = tutorialById("tutorial-undo")!;
-    const session = new collect.CollectSession(t.make());
+    const session = new collect.CollectSession(t.make(), undefined, undefined, true);
     session.tap({ kind: "select", column: 0 });
     settle(session);
     session.tap({ kind: "select", column: 1 });
@@ -212,7 +208,12 @@ describe("the four tutorial levels", () => {
   });
 
   it("a refused tap on the buried colour is what teaches it (and costs nothing)", () => {
-    const session = new collect.CollectSession(tutorialById("tutorial-blocked")!.make());
+    const session = new collect.CollectSession(
+      tutorialById("tutorial-blocked")!.make(),
+      undefined,
+      undefined,
+      true,
+    );
     const before = JSON.stringify(session.state);
     const r = session.tap({ kind: "select", column: 0 });
     expect(r.ok).toBe(false);
@@ -225,7 +226,7 @@ describe("the tutorial never gets in the way", () => {
     for (const t of TUTORIAL) {
       for (let seed = 1; seed <= 12; seed++) {
         const rng = createRng(seed);
-        const session = new collect.CollectSession(t.make());
+        const session = new collect.CollectSession(t.make(), undefined, undefined, true);
         const tutorial = new Tutorial(t.script());
         let last = 0;
         for (let move = 0; move < 60 && session.state.status === "playing"; move++) {
@@ -245,7 +246,7 @@ describe("the tutorial never gets in the way", () => {
   it("a hint is only a picture: it has no way to stop a tap", () => {
     // The machine takes the state read-only and returns data; taps go straight to the session.
     const t = tutorialById("tutorial-summon")!;
-    const session = new collect.CollectSession(t.make());
+    const session = new collect.CollectSession(t.make(), undefined, undefined, true);
     const tutorial = new Tutorial(t.script());
     expect(tutorial.update(session.state)?.target).toEqual({ kind: "column", index: 0 });
     // Tapping the *other* column is just as legal.
@@ -314,7 +315,7 @@ describe("explaining why", () => {
   it("says why a group went to wait, only when it still has cubes to deliver", async () => {
     const { eventNote } = await import("./notes");
     const level = tutorialById("tutorial-slots")!.make();
-    const session = new collect.CollectSession(level);
+    const session = new collect.CollectSession(level, undefined, undefined, true);
     let note: string | null = null;
     session.subscribe((b) => {
       for (const e of b.events) note = eventNote(e) ?? note;
@@ -370,7 +371,7 @@ describe("other roads: the hint stays true when the player does things in anothe
   /** Taps these actions in order (skipping any that is refused), checking every hint on every tick. */
   const play = (id: string, actions: collect.Action[]) => {
     const t = tutorialById(id)!;
-    const session = new collect.CollectSession(t.make());
+    const session = new collect.CollectSession(t.make(), undefined, undefined, true);
     const tutorial = new Tutorial(t.script());
     const seenHints: string[] = [];
     const look = () => {
@@ -390,7 +391,6 @@ describe("other roads: the hint stays true when the player does things in anothe
     return { session, tutorial, seenHints };
   };
   const sel = (column: number): collect.Action => ({ kind: "select", column });
-  const res = (slot: number): collect.Action => ({ kind: "resume", slot });
 
   it("slots: blue first means red never waits, and 'it waits' is never said", () => {
     const { session, seenHints } = play("tutorial-slots", [sel(2), sel(0), sel(1)]);
@@ -398,16 +398,17 @@ describe("other roads: the hint stays true when the player does things in anothe
     expect(seenHints).not.toContain("waits");
   });
 
-  it("slots: the hint points at the slot only once something is in it", () => {
-    const { seenHints } = play("tutorial-slots", [sel(0), sel(2), res(0), sel(1)]);
+  it("slots: red waits, the blue wakes it by itself (no tap on the waiting box), and 'it waits' is said", () => {
+    const { seenHints, session } = play("tutorial-slots", [sel(0), sel(2), sel(1)]);
     expect(seenHints).toContain("waits");
+    expect(session.state.status).toBe("won");
+    expect(session.log.some((e) => e.auto)).toBe(true);
   });
 
   it("undo: another road never shows the Undo hint when nothing was lost", () => {
     for (const order of [
-      [sel(0), sel(2), res(0), sel(1)],
+      [sel(0), sel(2), sel(1)],
       [sel(2), sel(0), sel(1)],
-      [sel(0), sel(2), sel(1), res(0)],
     ]) {
       const { seenHints } = play("tutorial-undo", order);
       expect(seenHints, JSON.stringify(order)).not.toContain("undo");
@@ -460,7 +461,12 @@ describe("Skip lasts the whole visit", () => {
   it("a machine made after a skip (a retry, or Next) shows nothing", () => {
     for (const id of TUTORIAL_IDS) {
       const t = createTutorial(id, true)!;
-      const session = new collect.CollectSession(tutorialById(id)!.make());
+      const session = new collect.CollectSession(
+        tutorialById(id)!.make(),
+        undefined,
+        undefined,
+        true,
+      );
       expect(t.update(session.state)).toBeNull();
       expect(t.finished).toBe(true);
       expect(createTutorial(id, false)!.update(session.state)).not.toBeNull();

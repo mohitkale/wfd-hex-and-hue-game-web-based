@@ -75,7 +75,7 @@ import { shadeTonesGrid, tonesFor } from "./cubePaint";
 import { speciesFor } from "./familiarArt";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, dailyFromSearch, levelFromSearch, tutorialStart } from "./levels";
-import { TickClock } from "./tickClock";
+import { SHOWN_TICKS_PER_SECOND, TickClock } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
 import {
   dailyMoment,
@@ -133,8 +133,8 @@ export class CollectScene extends Phaser.Scene {
   /** The time of the latest frame, for effects started by events between frames. */
   private frameTime = 0;
   private atlas = "";
-  /** 24 ticks a second at 1× (one cell per tick): crossing a 20-cell board takes under a second. */
-  private readonly clock = new TickClock(24);
+  /** 14 ticks a second at 1× (one cell per tick; 24 was too fast to follow): a 14-cell route takes about a second. */
+  private readonly clock = new TickClock(SHOWN_TICKS_PER_SECOND);
   private speed: Speed = 1;
   /** The speed-up rule (M14.3, 3× since M15.6): per level, through an optional rewarded ad; kept across scene restarts. */
   private speedState: SpeedState = initialSpeedState();
@@ -254,7 +254,8 @@ export class CollectScene extends Phaser.Scene {
       this.time.delayedCall(0, () => this.openSpellbook());
     }
     this.colorblind = params.get("cb") === "1";
-    this.session = new collect.CollectSession(level);
+    // The game's own policy: a pending box goes back to work by itself (docs/V2_AUTORESUME.md).
+    this.session = new collect.CollectSession(level, undefined, undefined, true);
     this.stats = new GameplayTracker(
       emitVia(this),
       level.id,
@@ -453,7 +454,6 @@ export class CollectScene extends Phaser.Scene {
       speciesFor(level.subject?.theme),
     );
     this.familiars.anchorFor = (group) => this.panels.anchor(group);
-    this.panels.onTrays = (trays) => (this.trayMemory = new Map(trays));
     this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
     this.familiars.onDelivered = (_color, group) => {
       this.panels.badge(group)?.pulse();
@@ -467,6 +467,7 @@ export class CollectScene extends Phaser.Scene {
       reduced,
       this.trayMemory,
     );
+    this.panels.onTrays = (trays) => (this.trayMemory = new Map(trays));
     this.rebuildMarks(state);
     this.panels.sync(state);
     this.placeColumns();
@@ -741,28 +742,7 @@ export class CollectScene extends Phaser.Scene {
       return zone;
     });
     this.placeColumns();
-    // Trays: a tap on one that holds a waiting box resumes it (a working or empty tray does nothing).
-    this.layout.trays.forEach((r, tray) => {
-      const zone = this.add
-        // The zone spans the gap between trays too, so a small phone still gets a 44 px target.
-        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h + this.layout.gap)
-        .setDepth(25)
-        .setInteractive({ useHandCursor: true });
-      zone.on("pointerdown", () => {
-        const slot = this.slotInTray(tray);
-        if (slot !== null) this.tap({ kind: "resume", slot });
-      });
-    });
-  }
-
-  /** The engine slot of the waiting box in tray `tray`, or null when the tray is empty or its box is working. */
-  private slotInTray(tray: number): number | null {
-    const s = this.session.state;
-    for (let slot = 0; slot < s.slots.length; slot++) {
-      const g = s.slots[slot];
-      if (g !== null && g !== undefined && this.panels.trayOfGroup(g) === tray) return slot;
-    }
-    return null;
+    // There is no tap on a tray: a pending box goes back to work by itself (auto-resume).
   }
 
   /** Where the box waiting in engine slot `slot` sits now: its tray. */
@@ -1035,7 +1015,7 @@ export class CollectScene extends Phaser.Scene {
     if (date !== utcDate(Date.now())) return { line: practiceLine(date), shareText: null };
     const store = browserStore();
     const read = readDailyBook(store);
-    const moves = Math.max(1, this.session.log.length);
+    const moves = Math.max(1, this.session.moves);
     const result = recordDaily(read.book, date, moves, Date.now());
     // As with the Spellbook, a book that could not be read is never overwritten.
     const saved = read.ok && (!result.isNew || saveDailyBook(store, result.book));

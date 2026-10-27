@@ -276,7 +276,9 @@ There is no timer. Actions happen between ticks.
    has at least one assignable cube. The group leaves its column (the next group becomes the front)
    and becomes `working`; `nextSpawn = tick + 1`.
 2. **Resume** a `waiting` group (tap it in its slot). Legal under the same two conditions. It leaves
-   its slot (freeing it) and becomes `working`; `nextSpawn = tick + 1`.
+   its slot (freeing it) and becomes `working`; `nextSpawn = tick + 1`. **In the shipped game this is
+   automatic** (docs/V2_AUTORESUME.md): a waiting group resumes by itself between ticks as soon as it is
+   legal, so the player never taps it; the rule itself is unchanged and the engine still offers it.
 3. **Boosters** (Undo, Extra Slot, Hint; docs/V2_BOOSTERS.md): Undo restores the state before the last
    select/resume; Extra Slot adds a holding slot for the level (and revives a `slotsFull` loss); Hint
    names a move that keeps the level winnable. They are not game actions: they change no rule and
