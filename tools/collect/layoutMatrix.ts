@@ -34,7 +34,7 @@ export function table(): string {
     const front = badgeBox(l, "column", 0, 0);
     const field = badgeBox(l, "field", 0, 0);
     lines.push(
-      `| ${name} | ${w}×${h} @${dpr} | ${f(css(l.cell))} | ${f(css(l.columns[0]!.w))}×${f(css(l.columns[0]!.h))} | ${f(css(l.slots[0]!.w))} | ${f(css(badgeFontPx(front.w, front.h, false)))} | ${f(css(badgeFontPx(field.w, field.h, false)))} |`,
+      `| ${name} | ${w}×${h} @${dpr} | ${f(css(l.cell))} | ${f(css(l.columns[0]!.w))}×${f(css(l.columns[0]!.h))} | ${f(css(l.slots[0]!.w))} | ${f(css(badgeFontPx(front.w, front.h)))} | ${f(css(badgeFontPx(field.w, field.h)))} |`,
     );
   }
   return lines.join("\n");

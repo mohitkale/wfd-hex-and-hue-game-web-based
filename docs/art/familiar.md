@@ -7,18 +7,18 @@ owner found too 8-bit._
 
 ## What they are
 
-Two smooth vector characters, both facing the player and left-right symmetric, tinted by the colour of
-the cubes they fetch (a red familiar fetches red):
+Two smooth vector characters, both facing the player and left-right symmetric, **single-coloured** (the
+colour of the cubes they fetch: a red familiar fetches red) with a deeper outline; only the eyes (white
+with a dark pupil and a highlight) and the delivery sparkles contrast. They are small (about 1.15 cells
+wide) and come out of the open tray of their own box and return into it.
 
-- **Bat**: round body, short pointed ears, big white eyes with a highlight, pink cheeks, a small smile
-  with two fangs, scalloped wings that flap, tiny feet. Flown by the familiars of every picture except
-  the `familiar` ones.
-- **Cat**: round head with pointed ears and whiskers, a body with a lighter belly, a curled tail that
-  swishes, paws. Trots for the `familiar` pictures (`speciesFor`: today the black cat).
+- **Bat**: round body, short pointed ears, big eyes, scalloped wings that flap, tiny feet. Flown by the
+  familiars of every picture except the `familiar` ones.
+- **Cat**: round head with pointed ears, a round body, a curled tail that swishes, paws. Trots for the
+  `familiar` pictures (`speciesFor`: today the black cat).
 
 The outline is a deep tint of the cube colour, lightened only as far as needed to stay at least 1.6:1
 against the board panel (the same floor as the art pipeline), so every colour reads on the dark board.
-Eyes, cheeks, the finger bones and the sparkles are fixed colours.
 
 ## Frames (8 per colour, drawn on a 16 x 14 unit grid at 4x = 64 x 56 px)
 

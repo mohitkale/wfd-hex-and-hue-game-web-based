@@ -13,8 +13,6 @@ export interface BadgeOptions {
   colorIndex: number;
   number: number;
   dpr: number;
-  /** A queued group behind the front one: only its strip shows, with the number in it. */
-  mini?: boolean;
   /** Colour-blind mode: draw the colour's symbol in the corner. */
   symbol?: boolean;
 }
@@ -24,8 +22,10 @@ export type BadgeState = "queued" | "working" | "waiting";
 
 /**
  * A summon group: one coloured square with the number of cubes it can still deliver. The number is
- * real remaining capacity (it changes only when a cube is delivered). A working group glows and
- * breathes, a waiting group is dimmed with "zz", and a thin bar along the bottom fills as it delivers.
+ * real remaining capacity (it changes only when a cube is delivered). A working group opens its tray
+ * (a lid tips back over a dark opening, and the familiars come out of it), glows and breathes, and
+ * closes the tray again when it is done; a waiting group is dimmed with "zz"; a thin bar along the
+ * bottom fills as it delivers.
  */
 export class GroupBadge extends Phaser.GameObjects.Container {
   private readonly label: Phaser.GameObjects.Text;
@@ -33,6 +33,9 @@ export class GroupBadge extends Phaser.GameObjects.Container {
   private readonly bar: Phaser.GameObjects.Graphics;
   private readonly sleep: Phaser.GameObjects.Text;
   private readonly bg: Phaser.GameObjects.Image;
+  private readonly opening: Phaser.GameObjects.Graphics;
+  private readonly lid: Phaser.GameObjects.Graphics;
+  private open = false;
   private mode: BadgeState = "queued";
   private shown: number;
 
@@ -63,9 +66,21 @@ export class GroupBadge extends Phaser.GameObjects.Container {
       .setAlpha(0);
     this.bg = scene.add.image(0, 0, key).setOrigin(0.5);
     this.bar = scene.add.graphics();
-    this.add([this.glow, this.bg, this.bar]);
+    // The tray: a dark opening on top of the box and a lid hinged along the box's top edge.
+    this.opening = scene.add.graphics();
+    this.opening.fillStyle(0x140b2e, 0.92);
+    this.opening.fillRoundedRect(-w * 0.4, -h * 0.5 + h * 0.03, w * 0.8, h * 0.2, h * 0.08);
+    this.opening.setAlpha(0);
+    this.lid = scene.add.graphics();
+    this.lid.setPosition(0, -h / 2);
+    this.lid.fillStyle(tones.light, 0.55);
+    this.lid.fillRoundedRect(-w / 2 + lw, lw, w - 2 * lw, h * 0.26, radius * 0.7);
+    this.lid.lineStyle(lw, tones.light, 0.9);
+    this.lid.strokeRoundedRect(-w / 2 + lw, lw, w - 2 * lw, h * 0.26, radius * 0.7);
+    this.lid.setAlpha(0);
+    this.add([this.glow, this.bg, this.bar, this.opening, this.lid]);
 
-    const numberAt = numberLayout(w, h, opts.mini === true);
+    const numberAt = numberLayout(w, h);
     const fontPx = numberAt.fontPx;
     this.label = scene.add
       .text(numberAt.x, numberAt.y, String(opts.number), {
@@ -89,7 +104,7 @@ export class GroupBadge extends Phaser.GameObjects.Container {
       .setAlpha(0);
     this.add(this.sleep);
     if (opts.symbol) {
-      const size = Math.min(w, h) * (opts.mini ? 0.5 : 0.3);
+      const size = Math.min(w, h) * 0.3;
       const mark = scene.add
         .image(-w / 2 + size * 0.75, -h / 2 + size * 0.75, symbolTexture(scene, opts.colorIndex))
         .setTint(hexToNumber(inkFor(opts.colorHex)))
@@ -102,7 +117,7 @@ export class GroupBadge extends Phaser.GameObjects.Container {
 
   /** Stops the glow's endless breathing tween with the badge (a tween on a destroyed child would run on). */
   override destroy(fromScene?: boolean): void {
-    this.scene?.tweens.killTweensOf([this.glow, this.label, this]);
+    this.scene?.tweens.killTweensOf([this.glow, this.label, this, this.lid, this.opening]);
     super.destroy(fromScene);
   }
 
@@ -130,9 +145,65 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.sleep.setAlpha(state === "waiting" ? 0.9 : 0);
   }
 
+  /** Whether the tray is open (or opening). */
+  get isOpen(): boolean {
+    return this.open;
+  }
+
+  /**
+   * Opens the tray: the lid tips back and the dark opening shows, so the familiars can come out.
+   * `instant` shows it already open (a box that moved to another place keeps its tray open).
+   */
+  openTray(instant = false): void {
+    if (this.open) return;
+    this.open = true;
+    this.scene.tweens.killTweensOf([this.lid, this.opening]);
+    this.lid.setAlpha(1).setScale(1, 1);
+    const reduced = isReducedMotion(this.scene);
+    if (reduced || instant) {
+      this.lid.setScale(1, 0.12);
+      this.opening.setAlpha(1);
+      return;
+    }
+    this.scene.tweens.add({
+      targets: this.lid,
+      scaleY: 0.12,
+      duration: 200,
+      ease: "Cubic.easeOut",
+    });
+    this.scene.tweens.add({ targets: this.opening, alpha: 1, duration: 200 });
+  }
+
+  /** Closes the tray (the lid comes down), then calls `done`; with reduced motion, at once. */
+  closeTray(done: () => void): void {
+    if (!this.open) {
+      done();
+      return;
+    }
+    this.open = false;
+    this.scene.tweens.killTweensOf([this.lid, this.opening]);
+    if (isReducedMotion(this.scene)) {
+      this.lid.setAlpha(0);
+      this.opening.setAlpha(0);
+      done();
+      return;
+    }
+    this.scene.tweens.add({
+      targets: this.lid,
+      scaleY: 1,
+      duration: 180,
+      ease: "Cubic.easeIn",
+      onComplete: () => {
+        this.lid.setAlpha(0);
+        this.opening.setAlpha(0);
+        done();
+      },
+    });
+    this.scene.tweens.add({ targets: this.opening, alpha: 0, duration: 180 });
+  }
+
   /** How much of the group is delivered (0..1): a thin bar along the bottom of a whole box. */
   setProgress(fraction: number): void {
-    if (this.opts.mini) return;
     const { w, h } = this.opts;
     const f = Math.max(0, Math.min(1, fraction));
     this.bar.clear();

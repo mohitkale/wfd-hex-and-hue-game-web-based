@@ -54,11 +54,7 @@ export const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
 export const FIXED = {
   eyeWhite: [255, 255, 255] as Rgb,
   pupil: [26, 15, 51] as Rgb,
-  wing: [226, 214, 255] as Rgb,
-  wingEdge: [150, 130, 220] as Rgb,
   glow: [246, 217, 122] as Rgb,
-  /** A warm pink that reads on every body colour (a derived cheek turned grey on green). */
-  cheek: [255, 172, 205] as Rgb,
 } as const;
 
 const NIGHT: Rgb = [26, 15, 51];

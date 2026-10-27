@@ -61,7 +61,8 @@ interface Entry {
   trailAt: number;
 }
 
-const D = { shadow: 4, sprite: 5, cube: 6, effect: 8 } as const;
+// Above the group boxes (depth 10 to 12), so familiars fly out of and into their open tray in front of them.
+const D = { shadow: 13, sprite: 14, cube: 15, effect: 16 } as const;
 const SHADOW_ALPHA = 0.35;
 /** The pickup squash lasts this many ticks (so it is twice as quick in wall time at 2×). */
 const SQUASH_TICKS = 2;
@@ -118,14 +119,24 @@ export class FamiliarLayer {
     return spriteScaleForCell(this.layout.cell);
   }
 
-  /** The portal is drawn in the dock under the board, not in the ring: familiars leave and return there. */
-  private cx(cell: number): number {
-    if (cell === this.model.portal) return this.layout.portal.x;
+  /** Where a group's familiars come out of and return to: its box's open tray (set by the scene). */
+  anchorFor: (group: number) => { x: number; y: number } | null = () => null;
+
+  /**
+   * The portal cell is where a familiar's route starts and ends; it is drawn at the tray of its own
+   * group's box instead (or, with no box, at the walkway cell), so the familiars visibly leave the box.
+   */
+  private cx(cell: number, group?: number): number {
+    if (cell === this.model.portal) {
+      return (group === undefined ? null : this.anchorFor(group))?.x ?? this.layout.portal.x;
+    }
     return this.layout.boardRect.x + ((cell % this.layout.stride) + 0.5) * this.layout.cell;
   }
 
-  private cy(cell: number): number {
-    if (cell === this.model.portal) return this.layout.portal.y;
+  private cy(cell: number, group?: number): number {
+    if (cell === this.model.portal) {
+      return (group === undefined ? null : this.anchorFor(group))?.y ?? this.layout.portal.y;
+    }
     return (
       this.layout.boardRect.y + (Math.floor(cell / this.layout.stride) + 0.5) * this.layout.cell
     );
@@ -255,17 +266,17 @@ export class FamiliarLayer {
       // keeps its own drift off the centre and glides to its share of a crowded cell (cosmetic
       // only; reduced motion keeps it, as it is placement, not motion).
       const moving = v.mode === "walk" || v.mode === "carry";
-      const toX = this.cx(v.to);
-      const toY = this.cy(v.to);
+      const toX = this.cx(v.to, v.group);
+      const toY = this.cy(v.to, v.group);
       e.spread = ease(e.spread, spreader.offset(v.id));
       const x = drawnCoord(
-        moving ? interpolate(this.cx(v.from), toX, alpha) : toX,
+        moving ? interpolate(this.cx(v.from, v.group), toX, alpha) : toX,
         e.drift.x,
         e.spread,
         cell,
       );
       const y = drawnCoord(
-        moving ? interpolate(this.cy(v.from), toY, alpha) : toY,
+        moving ? interpolate(this.cy(v.from, v.group), toY, alpha) : toY,
         e.drift.y,
         0,
         cell,
@@ -341,7 +352,8 @@ export class FamiliarLayer {
     if (!this.symbolPalette || !e.chest) return;
     const r = badgeRect(frame, this.species);
     const s = e.img.scaleX * SS; // not the target scale: the sprite may be mid pop-in
-    const size = Math.min(r.w, r.h) * s * 0.95;
+    // Never smaller than 7 css px: the symbol is the colour cue in colour-blind mode.
+    const size = Math.max(Math.min(r.w, r.h) * s * 0.95, 7 * this.layout.dpr);
     e.chest
       .setTexture(symbolTexture(this.scene, v.colorIndex))
       .setTint(hexToNumber(inkFor(this.symbolPalette[v.colorIndex]!)))
@@ -386,14 +398,15 @@ export class FamiliarLayer {
 
   private retire(id: number, e: Entry): void {
     e.retiring = true;
+    const group = this.model.familiars.get(id)?.group;
     if (this.reduced) {
       this.finishRetire(id);
       return;
     }
     this.scene.tweens.add({
       targets: e.img,
-      x: this.cx(this.model.portal),
-      y: this.cy(this.model.portal),
+      x: this.cx(this.model.portal, group),
+      y: this.cy(this.model.portal, group),
       scale: (this.scale * 0.15) / SS,
       alpha: 0,
       duration: 170,
@@ -412,15 +425,15 @@ export class FamiliarLayer {
     }
   }
 
-  /** The cube arcs from above the portal into it, with a small burst where it lands. */
+  /** The cube arcs from above the group's box into its open tray, with a small burst where it lands. */
   private flyCubeIntoPortal(colorIndex: number, group: number): void {
     const tone = this.tones[colorIndex];
     if (!tone || this.reduced) {
       this.onDelivered(colorIndex, group);
       return;
     }
-    const px = this.cx(this.model.portal);
-    const py = this.cy(this.model.portal);
+    const px = this.cx(this.model.portal, group);
+    const py = this.cy(this.model.portal, group);
     const g = this.scene.add
       .image(px, py - FAMILIAR_H * this.scale * 0.78, this.cubeKeys[colorIndex]!)
       .setDepth(D.effect);

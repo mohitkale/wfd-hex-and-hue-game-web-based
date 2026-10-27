@@ -41,11 +41,17 @@ const SHEET_COLORS = ["#e24a4a", "#4ae26b", "#4a6be2", "#f2c94c", "#b44ae2", "#4
 function recorder() {
   const ops: string[] = [];
   const points: [number, number][] = [];
+  /** The points of each filled shape, with its fill colour. */
+  const shapes: { style: string; pts: [number, number][] }[] = [];
+  let current: [number, number][] = [];
   const grad: Gradient = { addColorStop: () => undefined };
   let sx = 1;
   let ox = 0;
   const stack: [number, number][] = [];
-  const pt = (x: number, y: number) => points.push([ox + x * sx, y]);
+  const pt = (x: number, y: number) => {
+    points.push([ox + x * sx, y]);
+    current.push([ox + x * sx, y]);
+  };
   const p: Painter = {
     fillStyle: "",
     strokeStyle: "",
@@ -69,7 +75,7 @@ function recorder() {
       ops.push("scale");
       sx *= x;
     },
-    beginPath: () => ops.push("begin"),
+    beginPath: () => (ops.push("begin"), (current = [])),
     closePath: () => ops.push("close"),
     moveTo: (x, y) => (ops.push("move"), pt(x, y)),
     lineTo: (x, y) => (ops.push("line"), pt(x, y)),
@@ -80,11 +86,14 @@ function recorder() {
       pt(x - rx, y - ry);
       pt(x + rx, y + ry);
     },
-    fill: () => ops.push(`fill ${String(p.fillStyle)}`),
+    fill: () => {
+      ops.push(`fill ${String(p.fillStyle)}`);
+      shapes.push({ style: String(p.fillStyle), pts: [...current] });
+    },
     stroke: () => ops.push("stroke"),
     createLinearGradient: () => grad,
   };
-  return { p, ops, points };
+  return { p, ops, points, shapes };
 }
 
 /** The shape of a drawing: every call without the colours. */
@@ -265,21 +274,25 @@ describe("colourblind badge anchor", () => {
         expect(r.x).toBeGreaterThanOrEqual(0);
         expect(r.x + r.w).toBeLessThanOrEqual(FAMILIAR_W);
         expect(r.y + r.h).toBeLessThanOrEqual(FAMILIAR_H);
-        // Below the eyes, cheeks, mouth and fangs of the standing face (a crouched frame sinks 5 px).
+        // Below the eyes (the only face) of the standing figure (a crouched frame sinks 5 px).
         expect(r.y * SS, `${species} ${name}`).toBeGreaterThanOrEqual(FACE_BOTTOM_PX[species]);
         expect(Math.min(r.w, r.h)).toBeGreaterThanOrEqual(2);
       }
     },
   );
 
-  it("the bat's drawn face really ends above the badge (no point of the mouth or fangs is lower)", () => {
-    // The fangs are the lowest face shapes: their points are the white triangles near the centre.
-    const { p, points } = recorder();
-    drawFrame(p, "idle0", "#4a6be2", "bat");
-    const fangs = points.filter(([x, y]) => Math.abs(x - FRAME_W / 2) < 4 && y > 33 && y < 40);
-    expect(fangs.length).toBeGreaterThan(0);
-    expect(Math.max(...fangs.map(([, y]) => y))).toBeLessThanOrEqual(FACE_BOTTOM_PX.bat);
-  });
+  it.each(SPECIES)(
+    "%s: the eyes (white shapes) end above FACE_BOTTOM_PX, which the badge clears",
+    (species) => {
+      const { p, shapes } = recorder();
+      drawFrame(p, "idle0", "#4a6be2", species);
+      const eyes = shapes.filter((x) => x.style === "rgba(255,255,255,1)" && x.pts.length === 2);
+      expect(eyes.length).toBeGreaterThanOrEqual(2);
+      const lowest = Math.max(...eyes.flatMap((e) => e.pts.map(([, y]) => y)));
+      expect(lowest).toBeLessThanOrEqual(FACE_BOTTOM_PX[species] + 0.5);
+      expect(lowest).toBeGreaterThan(FACE_BOTTOM_PX[species] - 3);
+    },
+  );
 });
 
 describe("atlas", () => {

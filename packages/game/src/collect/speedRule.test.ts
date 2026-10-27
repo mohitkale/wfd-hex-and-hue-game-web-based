@@ -14,7 +14,7 @@ import {
 import { TickClock } from "./tickClock";
 import { stepFrame } from "./frameStep";
 import { targetRect } from "./TutorialLayer";
-import { computeCollectLayout, hudButtonX } from "./collectLayout";
+import { activeColumnRects, computeCollectLayout, hudButtonX } from "./collectLayout";
 import { ART_LEVELS } from "./artLevels";
 import { TUTORIAL } from "./tutorialLevels";
 import { moonlitHat } from "./slice";
@@ -228,6 +228,33 @@ describe("the Undo ring on the HUD", () => {
     const r = targetRect(l, { kind: "undo" })!;
     const slot0 = hudButtonX(l, 0, 3);
     expect(r.x + r.w / 2).toBeCloseTo(slot0);
+  });
+});
+
+describe("the tutorial's ring follows the columns as they centre", () => {
+  it("points at where a column is now, not where it started", () => {
+    const l = computeCollectLayout({
+      width: 750,
+      height: 1500,
+      dpr: 2,
+      insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      boardWidth: 10,
+      boardHeight: 10,
+      slots: 3,
+      columns: 2,
+      fieldCap: 3,
+      portalX: 4,
+    });
+    // By default the ring is on the column's own rect.
+    expect(targetRect(l, { kind: "column", index: 1 })).toEqual(l.columns[1]);
+    // Column 0 ran out: column 1 slides to the middle, and the ring goes with it.
+    const now = activeColumnRects(l, [false, true]);
+    const r = targetRect(l, { kind: "column", index: 1 }, 3, (i) => now[i] ?? null)!;
+    expect(r.x).toBe(now[1]!.x);
+    expect(r.x).not.toBe(l.columns[1]!.x);
+    expect(Math.abs(r.x + r.w / 2 - (l.frame.x + l.frame.w / 2))).toBeLessThanOrEqual(1);
+    // A column with nothing left is pointed at by nothing.
+    expect(targetRect(l, { kind: "column", index: 0 }, 3, (i) => now[i] ?? null)).toBeNull();
   });
 });
 
