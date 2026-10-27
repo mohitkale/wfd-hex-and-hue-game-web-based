@@ -120,7 +120,7 @@ function polygon(p: Painter, pts: readonly [number, number][]): void {
   p.closePath();
 }
 
-/** One thick line with rounded ends (an arm, a tail, a whisker), outlined by a wider dark one. */
+/** One thick line with rounded ends (an arm, a tail), outlined by a wider dark one. */
 function limb(
   p: Painter,
   from: [number, number],

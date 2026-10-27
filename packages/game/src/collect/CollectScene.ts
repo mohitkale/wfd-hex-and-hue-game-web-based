@@ -468,7 +468,13 @@ export class CollectScene extends Phaser.Scene {
         });
     this.syncPouch();
     this.tutorialLayer = this.tutorial
-      ? new TutorialLayer(this, this.layout, () => this.skipTutorial())
+      ? new TutorialLayer(
+          this,
+          this.layout,
+          () => this.skipTutorial(),
+          this.hudButtons,
+          (i) => this.columnRectNow(i),
+        )
       : null;
     this.refreshTutorial();
     this.buildInput();
@@ -596,9 +602,7 @@ export class CollectScene extends Phaser.Scene {
   /** A hint's target pulses briefly on the board. */
   private highlight(action: collect.Action): void {
     const r =
-      action.kind === "select"
-        ? this.layout.columns[action.column]
-        : this.layout.slots[action.slot];
+      action.kind === "select" ? this.columnRectNow(action.column) : this.layout.slots[action.slot];
     if (!r) return;
     const ring = this.add
       .rectangle(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h)
@@ -731,6 +735,16 @@ export class CollectScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       zone.on("pointerdown", () => this.tap({ kind: "resume", slot }));
     });
+  }
+
+  /** Where column `i` is drawn now: columns that ran out are gone and the rest are centred. */
+  private columnRectNow(i: number): { x: number; y: number; w: number; h: number } | null {
+    return (
+      activeColumnRects(
+        this.layout,
+        this.session.state.columns.map((c) => c.length > 0),
+      )[i] ?? null
+    );
   }
 
   /** Puts each column's tap zone where its boxes are now: columns that ran out are off, the rest centred. */

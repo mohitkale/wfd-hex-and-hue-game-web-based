@@ -145,14 +145,22 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.sleep.setAlpha(state === "waiting" ? 0.9 : 0);
   }
 
-  /** Opens the tray: the lid tips back and the dark opening shows, so the familiars can come out. */
-  openTray(): void {
+  /** Whether the tray is open (or opening). */
+  get isOpen(): boolean {
+    return this.open;
+  }
+
+  /**
+   * Opens the tray: the lid tips back and the dark opening shows, so the familiars can come out.
+   * `instant` shows it already open (a box that moved to another place keeps its tray open).
+   */
+  openTray(instant = false): void {
     if (this.open) return;
     this.open = true;
     this.scene.tweens.killTweensOf([this.lid, this.opening]);
     this.lid.setAlpha(1).setScale(1, 1);
     const reduced = isReducedMotion(this.scene);
-    if (reduced) {
+    if (reduced || instant) {
       this.lid.setScale(1, 0.12);
       this.opening.setAlpha(1);
       return;

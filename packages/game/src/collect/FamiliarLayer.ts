@@ -61,7 +61,8 @@ interface Entry {
   trailAt: number;
 }
 
-const D = { shadow: 4, sprite: 5, cube: 6, effect: 8 } as const;
+// Above the group boxes (depth 10 to 12), so familiars fly out of and into their open tray in front of them.
+const D = { shadow: 13, sprite: 14, cube: 15, effect: 16 } as const;
 const SHADOW_ALPHA = 0.35;
 /** The pickup squash lasts this many ticks (so it is twice as quick in wall time at 2×). */
 const SQUASH_TICKS = 2;
@@ -351,7 +352,8 @@ export class FamiliarLayer {
     if (!this.symbolPalette || !e.chest) return;
     const r = badgeRect(frame, this.species);
     const s = e.img.scaleX * SS; // not the target scale: the sprite may be mid pop-in
-    const size = Math.min(r.w, r.h) * s * 0.95;
+    // Never smaller than 7 css px: the symbol is the colour cue in colour-blind mode.
+    const size = Math.max(Math.min(r.w, r.h) * s * 0.95, 7 * this.layout.dpr);
     e.chest
       .setTexture(symbolTexture(this.scene, v.colorIndex))
       .setTint(hexToNumber(inkFor(this.symbolPalette[v.colorIndex]!)))

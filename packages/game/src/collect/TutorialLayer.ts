@@ -9,9 +9,12 @@ export function targetRect(
   l: CollectLayout,
   target: Target,
   hudButtons = 3,
+  /** Where column `i` is now (columns centre as they run out); defaults to the layout's own rects. */
+  columnRect: (i: number) => { x: number; y: number; w: number; h: number } | null = (i) =>
+    l.columns[i] ?? null,
 ): { x: number; y: number; w: number; h: number } | null {
   if (!target) return null;
-  if (target.kind === "column") return l.columns[target.index] ?? null;
+  if (target.kind === "column") return columnRect(target.index);
   if (target.kind === "slot") return l.slots[target.index] ?? null;
   const size = Math.round(HUD_ZONE_CSS * l.dpr);
   const x = hudButtonX(l, 0, hudButtons);
@@ -37,6 +40,10 @@ export class TutorialLayer {
     onSkip: () => void,
     /** How many HUD buttons there are (the Undo ring follows the first). */
     private readonly hudButtons = 3,
+    /** Where a column is now (see `targetRect`). */
+    private readonly columnRect?: (
+      i: number,
+    ) => { x: number; y: number; w: number; h: number } | null,
   ) {
     const l = layout;
     const dpr = l.dpr;
@@ -99,7 +106,7 @@ export class TutorialLayer {
       return;
     }
     this.caption.setText(hint.text).setVisible(true);
-    const r = targetRect(this.layout, hint.target, this.hudButtons);
+    const r = targetRect(this.layout, hint.target, this.hudButtons, this.columnRect);
     if (!r) return;
     const dpr = this.layout.dpr;
     const pad = 3 * dpr;

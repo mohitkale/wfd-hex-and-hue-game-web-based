@@ -38,6 +38,7 @@ export function paintPanelFrames(
 
 export class PanelsView {
   private readonly tracked = new Map<number, Tracked>();
+  private readonly anchorOut = { x: 0, y: 0 };
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -131,6 +132,8 @@ export class PanelsView {
         target.place === "column" ? (colRects[target.index] ?? undefined) : undefined,
       );
       const from = t && !t.completing ? { x: t.badge.x, y: t.badge.y } : null;
+      // A working box that merely moves to another active place keeps its tray open.
+      const wasOpen = t !== undefined && !t.completing && t.badge.isOpen;
       if (t) {
         this.scene.tweens.killTweensOf(t.badge);
         t.badge.destroy();
@@ -149,7 +152,7 @@ export class PanelsView {
         g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued",
       );
       badge.setProgress(g.delivered / g.capacity);
-      if (g.status === "working") badge.openTray();
+      if (g.status === "working") badge.openTray(wasOpen);
       this.scene.add.existing(badge);
       if (from) {
         this.scene.tweens.add({
@@ -187,7 +190,10 @@ export class PanelsView {
   anchor(id: number): { x: number; y: number } | null {
     const t = this.tracked.get(id);
     if (!t) return null;
-    return { x: t.badge.x, y: t.badge.y - this.layout.tile * 0.3 };
+    // One shared object (read it at once): the renderer asks every frame, so nothing is allocated.
+    this.anchorOut.x = t.badge.x;
+    this.anchorOut.y = t.badge.y - this.layout.tile * 0.3;
+    return this.anchorOut;
   }
 
   /** The badge of group `id` (for pop effects), if drawn. */

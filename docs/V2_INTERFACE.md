@@ -19,12 +19,12 @@ the matrix of docs/QA.md.
   bordered holding slots (waiting groups) and, above them, the bordered **active** boxes: as many as may
   work at once (`fieldCap`), always drawn. A tapped box moves into an active place and **opens its tray**
   (a lid tips back over a dark opening); the familiars come out of that opening, fetch their cubes and
-  carry them back into it, and the number counts down; at zero the tray closes, then the box goes. A
+  carry them back into it, and the number counts down; at zero the tray closes, then the box goes (the closing was written from the code and tests, not yet seen by eye: the browser pane throttles animation frames). A
   working box also glows and shows a bar of how much it has delivered; a waiting box is dimmed with "zz".
   Nothing is drawn around the picture (the ring is only the walkway), so the picture uses nearly the
   whole frame width.
 - **`CollectScene` is split** (it was 847 lines, now about 670): `CollectHud` (title, buttons, progress),
-  `Toast` (the one-line message, now wrapping to the board width), `PortalView`, `EndCard` (plain win and
+  `Toast` (the one-line message, now wrapping to the board width), `EndCard` (plain win and
   loss card) and the pure `badgeBox.ts` (where each badge sits and how big its number is) and
   `endCardText.ts`. No behaviour moved except the above, and that the end card's one-line reason now
   wraps to 86% of the frame width, so it fits a 320 px phone.
@@ -68,7 +68,7 @@ columns:
   sit near 3.7:1, below 4.5:1, so the smaller slot numbers rely on their dark outline.
 - Every shipped level (the slice and the six art pieces) on every framed device: nothing overlaps the
   board, cubes at least 7 css px, columns at least 44 css px, front numbers at least 14.
-- Every group box is the same square; a three-digit number fits the tile; the deck of queued tiles stays inside its column; the dock is apart from the board and holds the portal.
+- Every group box is the same square; a three-digit number fits the tile; the three boxes of a column stays inside its column; columns hold three boxes, centred as a group.
 - The HUD buttons are 36 css px circles in 44 css px tap targets (shared constants), 44 apart.
 - The device table here equals what `npm run layout:matrix` prints (`tools/collect/layoutMatrix.test.ts`).
 - The progress numbers: never 100% early, survive no cubes, negative or too many delivered, and the bar
