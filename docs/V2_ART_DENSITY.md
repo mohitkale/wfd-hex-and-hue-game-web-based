@@ -23,9 +23,9 @@ columns, four slots, four field tiles:
 
 | Device (CSS px)       | 16   | 24   | 32   | 36  | 40  |
 | --------------------- | ---- | ---- | ---- | --- | --- |
-| iPhone SE 1st gen 320 | 15.5 | 11.0 | 8.0  | 7.5 | 6.5 |
-| Galaxy S 360×640      | 17.7 | 12.3 | 9.3  | 8.3 | 7.7 |
-| iPhone SE 2nd gen 375 | 18.5 | 12.5 | 9.5  | 8.5 | 8.0 |
+| iPhone SE 1st gen 320 | 14.5 | 10.0 | 8.0  | 7.0 | 6.5 |
+| Galaxy S 360×640      | 16.3 | 11.7 | 9.0  | 8.0 | 7.3 |
+| iPhone SE 2nd gen 375 | 17.0 | 12.0 | 9.0  | 8.0 | 7.5 |
 | iPhone 15 393         | 20.3 | 14.0 | 10.7 | 9.7 | 8.7 |
 | Pixel 7 412           | 21.3 | 14.9 | 11.0 | 9.9 | 9.1 |
 
@@ -34,9 +34,9 @@ Since M14.4 the layout includes the 30 CSS px booster tray under the HUD, so on 
 they were (M15.3).
 
 **Decision (initial, revisable after a real-phone test):** the cube _pitch_ (cell including its gap)
-is at least 6.5 CSS px on any supported phone and at least 7.5 px from 360 px wide; the drawn cube is a
+is at least 6.5 CSS px on any supported phone and at least 7 px from 360 px wide; the drawn cube is a
 device pixel smaller than the pitch (5.5 CSS px at the 320 px, 40-per-side worst case); standard pieces stay at or below 32 per side
-(at least 8 px everywhere); 40 is for hero pieces. (Originally 7 / 8 / 8.5; lowered in M15.3 for the booster tray, see docs/QA.md.) The test suite fails if the layout ever drops
+(at least 8 px everywhere); 40 is for hero pieces. (Originally 7 / 8 / 8.5; lowered in M15.3 for the booster tray (docs/QA.md) and again in M15.6, 360+ wide 7.5 → 7: the uniform group tiles and the portal dock cost 4-8 % of cube size on the smallest phones.) The test suite fails if the layout ever drops
 below these numbers.
 
 ## Cube counts and play time

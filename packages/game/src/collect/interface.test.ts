@@ -256,7 +256,7 @@ describe("a three-digit number fits the tile, on the real tiles", () => {
           badgeBox(l, "column", 0, 0),
         ]) {
           const n = numberLayout(box.w, box.h, false);
-          expect((3 * DIGIT_EM * n.fontPx) / 1, "number vs the tile").toBeLessThanOrEqual(box.w);
+          expect(3 * DIGIT_EM * n.fontPx, "number vs the tile").toBeLessThanOrEqual(box.w);
           expect(n.x).toBe(0);
         }
         // A queued tile's number sits inside the strip that shows.

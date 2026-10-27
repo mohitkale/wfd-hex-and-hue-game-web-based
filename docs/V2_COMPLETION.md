@@ -9,7 +9,7 @@ npm run dev
 ```
 
 Open `/play/?engine=v2&level=art-black-cat` (or `art-crescent-moon`, `art-triple-moon`,
-`art-witchs-cauldron`, `art-amethyst-cluster`, `art-libra-scales`; add `&speed=2` to hurry). These
+`art-witchs-cauldron`, `art-amethyst-cluster`, `art-libra-scales`; add `&speed=3` to hurry). These
 are **preview levels**: each art piece's groups are dealt by a seeded search until a simple bot can
 win (`npm run art:levels`), nothing more. Real level design, solving and difficulty are M12.
 `/play/?engine=v2&view=spellbook` opens the Spellbook directly.
@@ -87,7 +87,7 @@ the v2 chunk stays at 26 of 40 KB). Core gained an optional display-only `subjec
 
 ## Verified, and not
 
-Verified in the browser pane (a bot played the preview levels at `&speed=2`): `art-witchs-cauldron`
+Verified in the browser pane (a bot played the preview levels at `&speed=3`): `art-witchs-cauldron`
 (390×800) and `art-triple-moon` (375×667, a short phone). The reveal and end card appeared with the
 lore; **Spellbook** showed the grid with the cards fitted above the button; **Back to the board**
 returned to a live board (a review found that, before a fix, the board stayed dead after this path,

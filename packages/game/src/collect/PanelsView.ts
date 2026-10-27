@@ -53,7 +53,7 @@ export class PanelsView {
     const l = this.layout;
     if (!l.slots[0]) return;
     const t = this.scene.add
-      .text(l.slots[0].x + 6 * this.dpr, l.slots[0].y - 12 * this.dpr, "WAITING", {
+      .text(l.slots[0].x + 5 * this.dpr, l.slots[0].y + 3 * this.dpr, "WAITING", {
         fontFamily: theme.font,
         fontSize: `${Math.round(9 * this.dpr)}px`,
         color: theme.textDim,

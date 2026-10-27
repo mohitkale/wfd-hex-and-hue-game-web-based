@@ -1,4 +1,4 @@
-# The speed rule (M14.3, changed in M15.6: 3× became 3×, plus a free end-game sprint)
+# The speed rule (M14.3, changed in M15.6: 2× became 3×, plus a free end-game sprint)
 
 1× is always free and is the default. 3× unlocks for the **current level only**, through an **optional** rewarded ad (the ad placement id is still `speed2x`, so providers need no change). **Free end-game sprint:** once no decision is left, the rest of the level plays at 3× without an ad.
 This replaces the shipped game's alternating free / ad policy for the v2 board (`rewards/speed.ts`,

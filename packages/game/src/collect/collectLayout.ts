@@ -5,13 +5,14 @@ import type { Insets, Rect } from "../layout";
  * for every screen shape):
  *
  *   ┌ HUD: title · undo · retry · speed ┐
- *   │ tray: coins · extra slot · hint   │  (levels with boosters)
+ *   │ tray: menu · coins · slot · hint  │  (levels with boosters)
  *   │  ┌ ring ───────────────────────┐  │
  *   │  │ mosaic (cubes)              │  │  familiars walk the ring and emptied cells
- *   │  └──────────── ◉ portal ───────┘  │
- *   │  [working] [working] [working]    │  field strip (groups with familiars out)
- *   │  [slot] [slot] [slot] [slot]      │  holding slots (waiting groups)
- *   │   col     col     col             │  summon columns (thumb zone)
+ *   │  └─────────────────────────────┘  │
+ *   │           ◉ portal (dock)         │  apart from the picture: flights show
+ *   │  [■] [■] [■]                      │  working groups (no outline until they exist)
+ *   │  [□] [□] [□] [□]                  │  holding slots (waiting groups)
+ *   │   col     col     col             │  summon columns (thumb zone); every box is one square tile
  *   └───────────────────────────────────┘
  */
 
@@ -65,7 +66,6 @@ export const CSS = {
   hud: 52,
   gap: 8,
   sidePad: 12,
-  field: 56,
   tray: 30,
   slot: 52,
   columnsMin: 110,

@@ -100,6 +100,12 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.setSize(w, h);
   }
 
+  /** Stops the glow's endless breathing tween with the badge (a tween on a destroyed child would run on). */
+  override destroy(fromScene?: boolean): void {
+    this.scene?.tweens.killTweensOf([this.glow, this.label, this]);
+    super.destroy(fromScene);
+  }
+
   /** Shows what the group is doing on the box itself: a breathing glow, or dimmed and asleep. */
   setMode(state: BadgeState): void {
     if (state === this.mode) return;

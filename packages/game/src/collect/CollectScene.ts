@@ -105,7 +105,7 @@ const REASON_TEXT: Record<Exclude<collect.ActionCheck, "ok">, string> = {
 /**
  * The v2 board (`?engine=v2`): summon familiars from a column, watch them fetch, carry and deliver
  * cubes. The scene only draws and routes input; every rule lives in `@hexhue/core`'s collect engine,
- * and the renderer drives time (see TickClock), so 1× and 2× play out identically.
+ * and the renderer drives time (see TickClock), so 1× and 3× play out identically.
  */
 export class CollectScene extends Phaser.Scene {
   private session!: collect.CollectSession;
@@ -134,7 +134,7 @@ export class CollectScene extends Phaser.Scene {
   /** 24 ticks a second at 1× (one cell per tick): crossing a 20-cell board takes under a second. */
   private readonly clock = new TickClock(24);
   private speed: Speed = 1;
-  /** The 2× rule (M14.3): per level, through an optional rewarded ad; kept across scene restarts. */
+  /** The speed-up rule (M14.3, 3× since M15.6): per level, through an optional rewarded ad; kept across scene restarts. */
   private speedState: SpeedState = initialSpeedState();
   /** Which wait for an ad is the current one, and how to end it early (the button, Retry, Undo). */
   private adToken = 0;
@@ -229,7 +229,7 @@ export class CollectScene extends Phaser.Scene {
     this.tutorialSaved = false;
     const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     const params = new URLSearchParams(search);
-    // 2× is unlocked for this level only (a retry keeps it, another level starts at 1×). `?speed=3` is
+    // 3× is unlocked for this level only (a retry keeps it, another level starts at 1×). `?speed=3` is
     // a review override and exists in development builds only: it is not an ad reward.
     const restored = restoreSpeed(
       this.registry.get("v2.speedState") as SpeedState | undefined,
@@ -408,9 +408,9 @@ export class CollectScene extends Phaser.Scene {
     const reduced = isReducedMotion(this);
     const tones = level.palette.map(tonesFor);
 
-    // Two HUD buttons, or three when there is a 2× offer (or an unlocked switch) to show.
+    // Two HUD buttons, or three when there is a 3× offer (or an unlocked switch) to show.
     this.hudButtons = this.speedView().show ? 3 : 2;
-    // Whether the optional 2× ad can be offered here (once per level, never in the tutorial).
+    // Whether the optional 3× ad can be offered here (once per level, never in the tutorial).
     if (!this.tutorialId) this.stats.adOffer("speed2x", getRewards(this).isAvailable("speed2x"));
     this.bakeStaticLayer();
     this.portal = new PortalView(this, this.layout);

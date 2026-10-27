@@ -11,10 +11,13 @@ the matrix of docs/QA.md.
   the button circles even on the smallest phone. The fill is never full until the last cube is
   delivered (also on a 1,600-cube board, where one cube is under a pixel) and shows a sliver as soon as
   one is.
-- **Bigger numbers in the field strip.** The "working" tiles are wide, with the creature on the left, so
-  their number now uses the height (about 19 to 23 css px instead of 13 to 17), sized so even a
-  three-digit number clears the creature and the tile's edge. Front groups are 22 to 35
-  css px, slots about 15, peeks behind a front group 9 or more.
+- **One tile for every group (M15.6).** The column front, a waiting group and a working group are the
+  same rounded square (`layout.tile`, at most 52 css px), with a big centred number (half the tile's
+  height, smaller only when three digits would not fit) and no creature on it. Queued groups are the
+  same square stacked underneath with a third showing, their number in that strip. A working group
+  glows and a thin bar fills as it delivers; a waiting group is dimmed with "zz". There is no outline
+  or label for the field: only the holding slots are outlined. The portal sits in a dock under the
+  picture, clear of the cubes.
 - **`CollectScene` is split** (it was 847 lines, now about 670): `CollectHud` (title, buttons, progress),
   `Toast` (the one-line message, now wrapping to the board width), `PortalView`, `EndCard` (plain win and
   loss card) and the pure `badgeBox.ts` (where each badge sits and how big its number is) and
@@ -60,7 +63,7 @@ columns:
   sit near 3.7:1, below 4.5:1, so the smaller slot numbers rely on their dark outline.
 - Every shipped level (the slice and the six art pieces) on every framed device: nothing overlaps the
   board, cubes at least 7 css px, columns at least 44 css px, front numbers at least 14.
-- A three-digit number clears the creature and the tile's edge on the real field, slot and column tiles.
+- Every group box is the same square; a three-digit number fits the tile; the deck of queued tiles stays inside its column; the dock is apart from the board and holds the portal.
 - The HUD buttons are 36 css px circles in 44 css px tap targets (shared constants), 44 apart.
 - The device table here equals what `npm run layout:matrix` prints (`tools/collect/layoutMatrix.test.ts`).
 - The progress numbers: never 100% early, survive no cubes, negative or too many delivered, and the bar
