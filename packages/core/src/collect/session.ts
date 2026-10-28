@@ -1,9 +1,9 @@
-import { apply, explain, IllegalActionError, type Action, type ActionCheck } from "./actions";
+import { applyTap, explainTap, IllegalActionError, type Action, type ActionCheck } from "./actions";
 import type { CollectEvent, TickBatch } from "./events";
 import { validateCollectLevel, type CollectLevel } from "./level";
 import { autoResume } from "./autoResume";
 import { addSlot, canAddSlot } from "./boosters";
-import { isSettled, step } from "./sim";
+import { isSettled, reassess, step } from "./sim";
 import { cloneState, createCollectState, type CollectState } from "./state";
 
 /** An applied action: `tick` is `state.tick` at the moment it was applied (between ticks). */
@@ -61,7 +61,7 @@ export function replay(
   };
   const stepOnce = () => {
     const before = state.tick;
-    push(before + 1, step(state));
+    push(before + 1, step(state, true));
   };
 
   for (const [index, entry] of log.entries()) {
@@ -82,7 +82,7 @@ export function replay(
       stepOnce();
     }
     try {
-      push(state.tick, apply(state, { ...entry.action }));
+      push(state.tick, [...applyTap(state, { ...entry.action }), ...reassess(state)]);
     } catch (e) {
       if (e instanceof IllegalActionError) throw new ReplayError(index, e.message, { cause: e });
       throw e;
@@ -175,16 +175,16 @@ export class CollectSession {
 
   /** Why an action would or would not work right now (for the tap feedback). */
   check(action: Action): ActionCheck {
-    return explain(this.current, action);
+    return explainTap(this.current, action);
   }
 
   /** Applies a player action between ticks. An illegal action changes nothing and costs nothing. */
   tap(action: Action): { ok: boolean; reason: ActionCheck; events: CollectEvent[] } {
-    const reason = explain(this.current, action);
+    const reason = explainTap(this.current, action);
     if (reason !== "ok") return { ok: false, reason, events: [] };
     this.history.push({ state: cloneState(this.current), logLength: this.entries.length });
     if (this.history.length > this.maxUndo) this.history.shift();
-    const events = apply(this.current, action);
+    const events = [...applyTap(this.current, action), ...reassess(this.current)];
     this.entries.push({ tick: this.current.tick, action: { ...action } });
     this.emit({ tick: this.current.tick, events });
     return { ok: true, reason, events };
@@ -196,7 +196,7 @@ export class CollectSession {
    */
   tick(): TickBatch | null {
     const before = this.current.tick;
-    const events = step(this.current);
+    const events = step(this.current, true);
     if (this.autoResumeOn) {
       // Between ticks: a waiting group with a cube it can reach goes back to work at once.
       for (const r of autoResume(this.current)) {

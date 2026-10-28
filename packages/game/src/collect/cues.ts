@@ -33,10 +33,12 @@ export function planCues(events: readonly CollectEvent[]): Cue[] {
   let deliveryLeft = Infinity;
   let completion: Cue | null = null;
   let won = false;
+  // A box queued straight into a tray did not start: the park cue says so, the tap cue would not.
+  const queued = new Set(events.flatMap((e) => (e.type === "groupParked" ? [e.group] : [])));
   for (const e of events) {
     switch (e.type) {
       case "groupSelected":
-        cues.push({ sound: "tap", haptic: "tap" });
+        if (!queued.has(e.group)) cues.push({ sound: "tap", haptic: "tap" });
         break;
       case "groupResumed":
         cues.push({ sound: "launch", haptic: "tap" });

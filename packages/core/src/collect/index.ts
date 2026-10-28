@@ -33,7 +33,9 @@ export {
 } from "./state";
 export {
   apply,
+  applyTap,
   explain,
+  explainTap,
   IllegalActionError,
   legalActions,
   type Action,

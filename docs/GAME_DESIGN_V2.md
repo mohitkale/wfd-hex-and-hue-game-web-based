@@ -279,6 +279,12 @@ There is no timer. Actions happen between ticks.
    its slot (freeing it) and becomes `working`; `nextSpawn = tick + 1`. **In the shipped game this is
    automatic** (docs/V2_AUTORESUME.md): a waiting group resumes by itself between ticks as soon as it is
    legal, so the player never taps it; the rule itself is unchanged and the engine still offers it.
+   **Queueing (M15.11):** a tap on a column front that cannot work yet (the working limit is reached,
+   no reachable cube, or only sealed ones) is not refused while a holding slot is free: the group goes
+   straight into the lowest free slot as `waiting` and resumes by itself when it can work. With no free
+   slot the tap fails with the usual reason. This is a player-side convenience on top of the strict
+   rules; `legalActions` still lists only what can work now. A board is not a deadlock for the player while
+   queueing could still expose a box that can work (docs/V2_AUTORESUME.md).
 3. **Boosters** (Undo, Extra Slot, Hint; docs/V2_BOOSTERS.md): Undo restores the state before the last
    select/resume; Extra Slot adds a holding slot for the level (and revives a `slotsFull` loss); Hint
    names a move that keeps the level winnable. They are not game actions: they change no rule and

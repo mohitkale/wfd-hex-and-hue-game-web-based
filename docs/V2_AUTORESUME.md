@@ -50,3 +50,37 @@ is a follow-up. The human playtest (G3) is the real judge of whether the game st
 - A boot error found while doing this: a mistake in the previous change made the board fail to build
   (`this.panels` used before it existed). It is fixed; there is no automated test that builds the
   Phaser scene, which is how it reached a green CI.
+
+## Queueing a box in a free tray (M15.11)
+
+Owner feedback (docs/V2_PLAYTEST.md item 18): a tap failed with "Too many groups are working" or "No
+reachable cube of this colour yet" while trays were empty. The trays are `fieldCap + slots`, so the ones
+meant for waiting boxes looked free whenever the working limit was reached.
+
+Now a tap on a column's front box that cannot work yet is **queued**: it goes straight into the lowest
+free tray, waits there (dimmed, tray open) and the game resumes it by itself when it can work (the
+working limit allows it and it can reach a cube). It fails only when no tray is free, and then with the
+reason it cannot work. `explainTap` (`packages/core/src/collect/actions.ts`) is the tap rule;
+`explain` and `legalActions` stay "can work now", so the solver, hints and measures are unchanged.
+Because queueing only adds options (never removes one), every level that was solvable still is. It does
+change how hard levels are: queueing a front box lets the player peel a column early, so this is part of
+the M15.12 re-measure and of what the human playtest has to judge.
+
+### Consequences of queueing (from the M15.11 review)
+
+- **Loss rules.** In the player's game a board is not a deadlock while queueing a box into a free tray
+  could expose one that can work (`queueCanProgress`, used by `step(state, true)`; the solver, hints,
+  measures and simulated players keep the strict rule, so they can still call such a board dead).
+  After a queue tap the status is re-checked at once (`reassess`), because a settled board does not
+  tick.
+- **A queued box takes a tray a working box may need.** If a working box runs dry while every tray is
+  taken by queued boxes, the game ends as `slotsFull`. Undo and the Extra Slot booster recover it, and
+  nothing is blocked, but an innocent-looking tap can cost the last tray. This is the price of never
+  refusing a tap while a tray looks free; a reserve (keep one tray free while anything works) or
+  sending a never-started queued box back to its column are the alternatives if playtests show it hurts.
+- **The gate does not cover the real rules until M15.12.** The strategy players and the tier gate use
+  the strict rules, so "levels resist column-spam" is **unproven** for the game as played now: a
+  queue-aware column-spam player beats `slice-moonlit-hat` and `art-black-cat` right to left. M15.12
+  must add queue-aware players to the gate before any G3 evidence is collected.
+- **Hints** search the strict rules, so a hint can say Undo is the way out on a board that only a queue
+  tap saves.

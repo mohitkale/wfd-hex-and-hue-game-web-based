@@ -1,5 +1,5 @@
 import { openCell, routeTo } from "./grid";
-import { legalActions } from "./actions";
+import { legalActions, queueCanProgress } from "./actions";
 import type { CollectEvent } from "./events";
 import { cachesOf, topologyOf, type CollectState, type Familiar } from "./state";
 import { hasAssignable, nearestTarget } from "./targeting";
@@ -168,12 +168,16 @@ function stall(s: CollectState, events: CollectEvent[]): boolean {
   return false;
 }
 
-/** Phase 4: win is tested first, then a settled state with no legal action is a deadlock. */
-function updateStatus(s: CollectState, events: CollectEvent[]): void {
+/**
+ * Phase 4: win is tested first, then a settled state with no legal action is a deadlock. With
+ * `queue` (a player's game, not the solver's) a board is not dead while queueing a box into a free
+ * tray could still expose one that can work (`queueCanProgress`).
+ */
+function updateStatus(s: CollectState, events: CollectEvent[], queue = false): void {
   if (s.deliveredTotal === s.cubesTotal) {
     s.status = "won";
     events.push({ type: "won" });
-  } else if (isSettled(s) && legalActions(s).length === 0) {
+  } else if (isSettled(s) && legalActions(s).length === 0 && !(queue && queueCanProgress(s))) {
     s.status = "lost";
     s.lossReason = "deadlock";
     events.push({ type: "lost", reason: "deadlock", group: null });
@@ -197,7 +201,7 @@ export function reviveFromSlotsFull(s: CollectState): CollectEvent[] {
  * One tick (GAME_DESIGN_V2 §7). Phase 0 begin, 1 act, 2 dispatch, 3 resolve (complete, then
  * stall), 4 status. A no-op, returning no events, when the game is over or settled.
  */
-export function step(s: CollectState): CollectEvent[] {
+export function step(s: CollectState, queue = false): CollectEvent[] {
   const events: CollectEvent[] = [];
   if (s.status !== "playing" || isSettled(s)) return events;
   s.tick++;
@@ -217,7 +221,17 @@ export function step(s: CollectState): CollectEvent[] {
   }
   // Phase 3, pass 2 and phase 4.
   if (stall(s, events)) return events;
-  updateStatus(s, events);
+  updateStatus(s, events, queue);
+  return events;
+}
+
+/**
+ * After a player's queue tap on a settled board: the game may now be dead (every tray used and
+ * nothing can work), and no tick will say so because a settled board does not step.
+ */
+export function reassess(s: CollectState): CollectEvent[] {
+  const events: CollectEvent[] = [];
+  if (s.status === "playing") updateStatus(s, events, true);
   return events;
 }
 

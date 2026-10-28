@@ -75,7 +75,7 @@ const summonScript: Step[] = [
   },
 ];
 
-/** 2. A buried colour: red cannot be reached until the blue around it is gone. */
+/** 2. A buried colour: red cannot be reached until the blue around it is gone; it waits meanwhile. */
 const blocked = (): collect.CollectLevel =>
   level(
     "tutorial-blocked",
@@ -91,21 +91,15 @@ const blockedScript: Step[] = [
     id: "try-red",
     text: "Red is buried. Tap it",
     target: () => col(0),
-    done: ({ state, seen }) => seen.has("rejected") || started(state, 0),
+    // It cannot work yet, so it waits in a tray (a tap is never refused while a tray is free).
+    done: ({ state }) => started(state, 1) || started(state, 0),
   },
   {
     id: "clear-blue",
-    text: "Clear the blue around it",
+    text: "It waits. Clear the blue",
     target: () => col(1),
+    // Red then wakes by itself, so there is no third tap to teach.
     done: ({ state }) => started(state, 0),
-  },
-  {
-    id: "red-free",
-    text: "Now red is free: tap it",
-    target: () => col(0),
-    // Only once red can really be reached (a moment after the blue is summoned).
-    ready: (s) => collect.hasAssignable(s, 1),
-    done: ({ state }) => won(state) || started(state, 1),
   },
 ];
 

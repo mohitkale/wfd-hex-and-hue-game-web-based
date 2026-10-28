@@ -183,7 +183,6 @@ describe("the four tutorial levels", () => {
     expect(followHints("tutorial-blocked").hints.map((h) => h.id)).toEqual([
       "try-red",
       "clear-blue",
-      "red-free",
     ]);
     expect(followHints("tutorial-slots").hints.map((h) => h.id)).toEqual(["send-red", "waits"]);
     expect(followHints("tutorial-undo").hints.map((h) => h.id)).toEqual([
@@ -207,17 +206,18 @@ describe("the four tutorial levels", () => {
     expect(session.state.status).toBe("playing");
   });
 
-  it("a refused tap on the buried colour is what teaches it (and costs nothing)", () => {
+  it("a tap on the buried colour waits in a tray, and wakes by itself once the blue is cleared", () => {
     const session = new collect.CollectSession(
       tutorialById("tutorial-blocked")!.make(),
       undefined,
       undefined,
       true,
     );
-    const before = JSON.stringify(session.state);
-    const r = session.tap({ kind: "select", column: 0 });
-    expect(r.ok).toBe(false);
-    expect(JSON.stringify(session.state)).toBe(before);
+    expect(session.tap({ kind: "select", column: 0 }).ok).toBe(true);
+    expect(session.state.groups[0]!.status).toBe("waiting");
+    session.tap({ kind: "select", column: 1 });
+    settle(session);
+    expect(session.state.status).toBe("won");
   });
 });
 
@@ -322,7 +322,7 @@ describe("explaining why", () => {
     });
     session.tap({ kind: "select", column: 0 });
     settle(session);
-    expect(note).toBe("Nothing left to reach: it waits");
+    expect(note).toBe("It waits here and starts by itself");
     expect(eventNote({ type: "groupParked", group: 0, slot: 0, remaining: 0 })).toBeNull();
     expect(eventNote({ type: "won" })).toBeNull();
   });
@@ -424,8 +424,8 @@ describe("other roads: the hint stays true when the player does things in anothe
   it("buried colour: clearing the blue first (never trying red) still teaches the way through", () => {
     const { session, seenHints } = play("tutorial-blocked", [sel(1), sel(0)]);
     expect(session.state.status).toBe("won");
-    // The first hint is on screen before the player's first tap; nothing asks for the refusal after it.
-    expect(seenHints).toEqual(["try-red", "red-free"]);
+    // The first hint is on screen before the player's first tap; red wakes by itself, so no tap is asked.
+    expect(seenHints).toEqual(["try-red"]);
   });
 
   it("summon: the second group first is fine too", () => {

@@ -44,8 +44,9 @@ hints are followed to the mistake, and Undo really does recover (both tested).
 
 ## Explaining why
 
-- A refused tap says why ("No reachable cube of this colour yet", "Wax-sealed: finish the key colour
-  first", "Too many groups are working"), as before.
+- A tap on a box that cannot work yet is queued in a free tray (M15.11); it is refused only when every
+  tray is busy, and then it says why ("Every tray is busy", "No cube to reach yet, and no free tray",
+  "Wax-sealed, and no free tray").
 - **New:** the first time a group runs dry and goes to wait, a short note says so ("Nothing left to
   reach: it waits"); in the tutorial its own hints say it instead.
 - A loss says why on its card ("Out of slots": a group ran out of cubes with every slot full), and in
