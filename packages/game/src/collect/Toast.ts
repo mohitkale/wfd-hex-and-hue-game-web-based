@@ -3,7 +3,7 @@ import { theme } from "../theme";
 import type { CollectLayout } from "./collectLayout";
 
 /**
- * The one-line message above the field strip ("Too many groups are working"). A new message replaces
+ * The one-line message above the field strip ("Every tray is busy"). A new message replaces
  * the old one; it fades by itself and never takes a tap, so it cannot block anything. Wraps to the
  * board's width so long lines fit a 320 px phone.
  */

@@ -6,6 +6,6 @@ import type * as collect from "@hexhue/core/collect";
  * case of a group that ran dry and went to wait in a slot. Null for events that need no explaining.
  */
 export function eventNote(e: collect.CollectEvent): string | null {
-  if (e.type === "groupParked" && e.remaining > 0) return "Nothing left to reach: it waits";
+  if (e.type === "groupParked" && e.remaining > 0) return "It waits here and starts by itself";
   return null;
 }

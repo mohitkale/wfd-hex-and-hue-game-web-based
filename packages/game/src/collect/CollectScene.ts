@@ -99,9 +99,9 @@ const SEAL_HINT = "Wax-sealed cubes wake once their key colour is gathered";
 const REASON_TEXT: Record<Exclude<collect.ActionCheck, "ok">, string> = {
   gameOver: "The game is over",
   unavailable: "Nothing there",
-  fieldFull: "Too many groups are working",
-  noReachableCube: "No reachable cube of this colour yet",
-  sealed: "Wax-sealed: finish the key colour first",
+  fieldFull: "Every tray is busy",
+  noReachableCube: "No cube to reach yet, and no free tray",
+  sealed: "Wax-sealed, and no free tray",
 };
 
 /**

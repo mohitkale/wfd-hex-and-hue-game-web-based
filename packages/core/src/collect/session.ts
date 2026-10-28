@@ -1,4 +1,4 @@
-import { apply, explain, IllegalActionError, type Action, type ActionCheck } from "./actions";
+import { applyTap, explainTap, IllegalActionError, type Action, type ActionCheck } from "./actions";
 import type { CollectEvent, TickBatch } from "./events";
 import { validateCollectLevel, type CollectLevel } from "./level";
 import { autoResume } from "./autoResume";
@@ -82,7 +82,7 @@ export function replay(
       stepOnce();
     }
     try {
-      push(state.tick, apply(state, { ...entry.action }));
+      push(state.tick, applyTap(state, { ...entry.action }));
     } catch (e) {
       if (e instanceof IllegalActionError) throw new ReplayError(index, e.message, { cause: e });
       throw e;
@@ -175,16 +175,16 @@ export class CollectSession {
 
   /** Why an action would or would not work right now (for the tap feedback). */
   check(action: Action): ActionCheck {
-    return explain(this.current, action);
+    return explainTap(this.current, action);
   }
 
   /** Applies a player action between ticks. An illegal action changes nothing and costs nothing. */
   tap(action: Action): { ok: boolean; reason: ActionCheck; events: CollectEvent[] } {
-    const reason = explain(this.current, action);
+    const reason = explainTap(this.current, action);
     if (reason !== "ok") return { ok: false, reason, events: [] };
     this.history.push({ state: cloneState(this.current), logLength: this.entries.length });
     if (this.history.length > this.maxUndo) this.history.shift();
-    const events = apply(this.current, action);
+    const events = applyTap(this.current, action);
     this.entries.push({ tick: this.current.tick, action: { ...action } });
     this.emit({ tick: this.current.tick, events });
     return { ok: true, reason, events };
