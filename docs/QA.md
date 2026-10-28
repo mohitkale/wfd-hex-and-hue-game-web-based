@@ -109,11 +109,11 @@ slower phone.
 
 ## Downloads (`npm run budget`, production build)
 
-| Item                                  | Size          | Budget                                                                                      |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------- |
-| Play page JS (Phaser and v1 game)     | 392.5 KB gzip | 450 KB                                                                                      |
-| v2 board chunk (`v2/CollectScene.js`) | 40.1 KB gzip  | **43 KB** (raised from 40 in M14.5; the tutorial, boosters, daily and events took it to 40) |
-| Whole build                           | 2,471 KB      | 3,072 KB                                                                                    |
+| Item                                  | Size          | Budget                                                                                                                                                              |
+| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Play page JS (Phaser and v1 game)     | 392.5 KB gzip | 450 KB                                                                                                                                                              |
+| v2 board chunk (`v2/CollectScene.js`) | 40.1 KB gzip  | **45 KB** (raised 40 → 43 in M14.5 and 43 → 45 in M15.11 for the new look, trays, auto-resume and queueing; the tutorial, boosters, daily and events took it to 40) |
+| Whole build                           | 2,471 KB      | 3,072 KB                                                                                                                                                            |
 
 The CI perf budget was updated for v2 in M14.5 (40 → 43 KB for the chunk) and needed nothing more here.
 The v2 chunk loads only with `?engine=v2` today; at the M15.5 switch it becomes part of the shell and

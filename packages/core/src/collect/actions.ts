@@ -62,6 +62,24 @@ export function explainTap(s: CollectState, a: Action): ActionCheck {
   return s.slots.includes(null) ? "ok" : reason;
 }
 
+/**
+ * Whether queueing could still get a stuck board moving: some column holds, at depth `d` (1 or more),
+ * a box that can work now, and `d` trays are free to queue the boxes above it into. Queueing moves no
+ * cube, so this does not change while nothing works. Used only by the player's loss rule (`step`'s
+ * `queue` option), so a board is not called a deadlock while a queue tap would still help.
+ */
+export function queueCanProgress(s: CollectState): boolean {
+  let free = 0;
+  for (const slot of s.slots) if (slot === null) free++;
+  if (free === 0) return false;
+  for (const column of s.columns) {
+    for (let depth = 1; depth < column.length && depth <= free; depth++) {
+      if (hasAssignable(s, s.groups[column[depth]!]!.color)) return true;
+    }
+  }
+  return false;
+}
+
 /** Legal actions in the canonical order: column fronts by column, then waiting groups by slot. */
 export function legalActions(s: CollectState): Action[] {
   const out: Action[] = [];

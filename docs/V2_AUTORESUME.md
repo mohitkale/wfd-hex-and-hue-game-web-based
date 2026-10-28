@@ -65,3 +65,22 @@ reason it cannot work. `explainTap` (`packages/core/src/collect/actions.ts`) is 
 Because queueing only adds options (never removes one), every level that was solvable still is. It does
 change how hard levels are: queueing a front box lets the player peel a column early, so this is part of
 the M15.12 re-measure and of what the human playtest has to judge.
+
+### Consequences of queueing (from the M15.11 review)
+
+- **Loss rules.** In the player's game a board is not a deadlock while queueing a box into a free tray
+  could expose one that can work (`queueCanProgress`, used by `step(state, true)`; the solver, hints,
+  measures and simulated players keep the strict rule, so they can still call such a board dead).
+  After a queue tap the status is re-checked at once (`reassess`), because a settled board does not
+  tick.
+- **A queued box takes a tray a working box may need.** If a working box runs dry while every tray is
+  taken by queued boxes, the game ends as `slotsFull`. Undo and the Extra Slot booster recover it, and
+  nothing is blocked, but an innocent-looking tap can cost the last tray. This is the price of never
+  refusing a tap while a tray looks free; a reserve (keep one tray free while anything works) or
+  sending a never-started queued box back to its column are the alternatives if playtests show it hurts.
+- **The gate does not cover the real rules until M15.12.** The strategy players and the tier gate use
+  the strict rules, so "levels resist column-spam" is **unproven** for the game as played now: a
+  queue-aware column-spam player beats `slice-moonlit-hat` and `art-black-cat` right to left. M15.12
+  must add queue-aware players to the gate before any G3 evidence is collected.
+- **Hints** search the strict rules, so a hint can say Undo is the way out on a board that only a queue
+  tap saves.

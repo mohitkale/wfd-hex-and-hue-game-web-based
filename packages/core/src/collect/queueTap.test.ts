@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { apply, applyTap, explain, explainTap, legalActions, type Action } from "./actions";
-import { fixtureB, fixtureD } from "./fixtures";
-import { CollectSession } from "./session";
+import { board, fixtureB, fixtureD } from "./fixtures";
+import { CollectSession, replay } from "./session";
+import { hashState } from "./state";
 import { createCollectState } from "./state";
+import { runUntilSettled } from "./sim";
 
 const select = (column: number): Action => ({ kind: "select", column });
 const settle = (s: CollectSession) => {
@@ -81,5 +83,76 @@ describe("a tap on a box that cannot work yet queues it in a free tray (M15.11)"
     expect(s.undo()).toBe(true);
     expect(s.state.columns.map((c) => c.length)).toEqual(before);
     expect(s.state.slots.every((x) => x === null)).toBe(true);
+  });
+
+  it("a queued tap and the automatic resumes after it replay to the very same state", () => {
+    const level = { ...fixtureD(), slots: 2 };
+    const s = new CollectSession(level, undefined, undefined, true);
+    s.tap(select(0));
+    s.tap(select(1));
+    settle(s);
+    expect(s.log.some((e) => e.auto)).toBe(true);
+    const r = replay(level, s.log);
+    expect(hashState(r.state)).toBe(hashState(s.state));
+    expect(r.state.status).toBe(s.state.status);
+  });
+
+  describe("the loss rules know about queueing", () => {
+    // Z walls R in; B can be collected at once. Column 0 is [R, Z], column 1 is [B].
+    const walled = (slots: number) =>
+      board(
+        ["ZZZ.B", "ZRZ..", "ZZZ.."],
+        [
+          [
+            ["R", 1],
+            ["Z", 8],
+          ],
+          [["B", 1]],
+        ],
+        {
+          colors: "ZRB",
+          slots,
+          squad: 1,
+          spawnGap: 1,
+          fieldCap: 1,
+        },
+      );
+
+    it("is not a deadlock while queueing the walled box would expose a box that can work", () => {
+      const s = new CollectSession(walled(3), undefined, undefined, true);
+      s.tap(select(1)); // B first: afterwards nothing can work strictly
+      settle(s);
+      expect(s.state.status).toBe("playing");
+      expect(s.tap(select(0)).ok).toBe(true); // R queues, Z is the front now
+      expect(s.tap(select(0)).ok).toBe(true); // Z works; R wakes by itself once it is open
+      settle(s);
+      expect(s.state.status).toBe("won");
+    });
+
+    it("the strict solver rules still call that board a deadlock (they are not the player's)", () => {
+      const s = createCollectState(walled(3));
+      apply(s, select(1));
+      runUntilSettled(s);
+      expect(s.status).toBe("lost");
+      expect(s.lossReason).toBe("deadlock");
+    });
+
+    it("a queued box that takes the last tray can make a dry working group lose; Undo recovers it", () => {
+      const level = board(["R.ZZZ", "..ZRZ", "B.ZZZ"], [[["R", 2]], [["B", 1]], [["Z", 8]]], {
+        colors: "RBZ",
+        slots: 1,
+        squad: 1,
+        spawnGap: 1,
+        fieldCap: 1,
+      });
+      const s = new CollectSession(level, undefined, undefined, true);
+      s.tap(select(0));
+      expect(s.tap(select(1)).ok).toBe(true); // queued into the only tray
+      settle(s);
+      expect(s.state.status).toBe("lost");
+      expect(s.state.lossReason).toBe("slotsFull");
+      expect(s.undo()).toBe(true);
+      expect(s.state.status).toBe("playing");
+    });
   });
 });
