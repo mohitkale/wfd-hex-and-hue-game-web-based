@@ -113,5 +113,5 @@ colorblind mode (symbol per color) · one-handed thumb-zone controls.
 
 ## 7. Original content rule
 
-Mechanics are inspired by Food Hunt / Pixel Flow genre; all art, characters, names, UI and audio are
+Mechanics are inspired by the reference game / Pixel Flow genre; all art, characters, names, UI and audio are
 original to Hex & Hue.

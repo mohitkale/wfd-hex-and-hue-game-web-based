@@ -25,22 +25,13 @@ const KB = 1024;
 
 export const BUDGETS: Budget[] = [
   {
-    // Phaser is most of it (~390 KB gzip); the engine and scenes must stay lean around it.
+    // Phaser is most of it (~390 KB gzip); the engine and scenes must stay lean around it. Since the
+    // v2 switch (M15.13) the board is part of this bundle and v1 is gone.
     label: "play page JS",
-    match: (f) => f.path.startsWith("_astro/") && /\.js$/.test(f.path) && !/worker/.test(f.path),
+    match: (f) => f.path.startsWith("_astro/") && /\.js$/.test(f.path),
     measure: "gzip",
     per: "total",
     max: 450 * KB,
-  },
-  {
-    // The v2 review board and engine (`?engine=v2`): its own allowance until v2 replaces v1.
-    // Raised 40 → 43 KB in M14.5: the tutorial, boosters, daily and analytics took the chunk to 40 KB.
-    // Raised 43 → 45 KB in M15.11: the new look, one tray row, auto-resume and queueing took it to 43 KB.
-    label: "v2 collect chunk",
-    match: (f) => f.path === "v2/CollectScene.js",
-    measure: "gzip",
-    per: "total",
-    max: 45 * KB,
   },
   {
     label: "each HTML page",
@@ -48,13 +39,6 @@ export const BUDGETS: Budget[] = [
     measure: "gzip",
     per: "file",
     max: 20 * KB,
-  },
-  {
-    label: "hint worker",
-    match: (f) => /worker.*\.js$/.test(f.path),
-    measure: "gzip",
-    per: "file",
-    max: 10 * KB,
   },
   {
     label: "service worker",
@@ -159,30 +143,4 @@ export function scriptLeaks(
       return { page: p.path, gzip: all.reduce((n, f) => n + (bundles.get(f)?.gzip ?? 0), 0) };
     })
     .filter((r) => r.gzip > max);
-}
-
-/**
- * While the v2 board is a lazily loaded review chunk, the build must contain it under its stable
- * name and the shipped play bundle must reference it by that name only. A hashed name would change
- * the play bundle (and the service worker version) on every v2-only change. `sources` are the
- * `_astro/*.js` files with their text.
- */
-export function v2ChunkProblems(
-  paths: readonly string[],
-  sources: readonly { path: string; text: string }[],
-): string[] {
-  const problems: string[] = [];
-  if (!paths.includes("v2/CollectScene.js")) {
-    problems.push("v2/CollectScene.js is missing: the lazy v2 board chunk lost its stable name");
-  }
-  for (const p of paths) {
-    if (/^_astro\/CollectScene\./.test(p))
-      problems.push(`${p}: v2 chunk landed in _astro/ (hashed, precached)`);
-  }
-  for (const s of sources) {
-    if (/CollectScene\.[A-Za-z0-9_-]{6,}\.js/.test(s.text)) {
-      problems.push(`${s.path} references a hashed v2 chunk name`);
-    }
-  }
-  return problems;
 }

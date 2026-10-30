@@ -22,7 +22,7 @@ describe("sound and vibration are planned from events", () => {
   it("an empty or quiet batch plays nothing", () => {
     expect(planCues([])).toEqual([]);
     expect(
-      planCues([{ type: "familiarMoved", familiar: 0, from: 1, to: 2, carrying: false }]),
+      planCues([{ type: "familiarMoved", familiar: 0, from: 1, to: 2, carrying: false, at: 1 }]),
     ).toEqual([]);
   });
 

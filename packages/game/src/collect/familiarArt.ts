@@ -14,8 +14,12 @@ export const FAMILIAR_H = 14;
 /** Supersampling: each unit is `SS` texture pixels in each direction. */
 export const SS = 4;
 
-/** The two species: bats fly for most worlds, cats trot for the `familiar` pictures. */
-export const SPECIES = ["bat", "cat"] as const;
+/**
+ * The species a player can choose before a level (M15.13): bats and cats from the start, then ants,
+ * owls, frogs and spiders. Without a choice, bats fly for most worlds and cats trot for the `familiar`
+ * pictures.
+ */
+export const SPECIES = ["bat", "cat", "ant", "owl", "frog", "spider"] as const;
 export type Species = (typeof SPECIES)[number];
 
 /** Cats trot for the `familiar` pictures (and the world that is about familiars); every other picture is flown by bats. */
@@ -25,13 +29,24 @@ export const speciesFor = (theme: string | undefined): Species =>
 /** Role names of the tones a species is filled with. */
 export type Role = "outline" | "light" | "mid" | "dark";
 
+/** Frames in one walk (and one carry) cycle: one stride, drawn at evenly spaced points of it. */
+export const WALK_FRAMES = 6;
+
 export const FRAME_NAMES = [
   "idle0",
   "idle1",
   "walk0",
   "walk1",
+  "walk2",
+  "walk3",
+  "walk4",
+  "walk5",
   "carry0",
   "carry1",
+  "carry2",
+  "carry3",
+  "carry4",
+  "carry5",
   "pickup",
   "deliver",
 ] as const;
@@ -124,6 +139,10 @@ export interface Rect {
  * (`pickup`) frame has a shorter torso.
  */
 export function badgeRect(frame: FrameName, species: Species = "bat"): Rect {
+  if (species !== "cat" && species !== "bat")
+    return frame === "pickup"
+      ? { x: 5.6, y: 10.6, w: 4.8, h: 2 }
+      : { x: 5.6, y: 9.4, w: 4.8, h: 2.2 };
   if (species === "bat")
     return frame === "pickup"
       ? { x: 5.6, y: 10.8, w: 4.8, h: 2 }

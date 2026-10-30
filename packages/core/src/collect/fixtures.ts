@@ -1,4 +1,4 @@
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { createRng } from "../rng";
 import type { CollectLevel, GroupSpec } from "./level";
 

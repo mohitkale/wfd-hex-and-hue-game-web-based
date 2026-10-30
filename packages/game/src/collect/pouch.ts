@@ -7,19 +7,40 @@ import type { KeyValueStore } from "./v2Spellbook";
  * Rules and prices: docs/V2_BOOSTERS.md.
  */
 
-export const BOOSTERS = ["undo", "extraSlot", "hint"] as const;
+export const BOOSTERS = ["undo", "extraSlot", "hint", "call", "sweep", "lantern"] as const;
 export type Booster = (typeof BOOSTERS)[number];
 
 /**
  * Prices in coins. A first clear pays 15–40, so every booster is one to three first clears away:
  * earnable, never necessary (Retry is always free).
  */
-export const PRICES: Record<Booster, number> = { undo: 15, extraSlot: 40, hint: 10 };
+export const PRICES: Record<Booster, number> = {
+  undo: 15,
+  extraSlot: 40,
+  hint: 10,
+  // The power-ups (M15.13): Familiar's Call, Besom Sweep, Crystal Lantern.
+  call: 25,
+  sweep: 40,
+  lantern: 15,
+};
+
+/** The power-ups a milestone can give for free (`award`). */
+export const POWERS = ["call", "sweep", "lantern"] as const satisfies readonly Booster[];
+
+/** Every this many first clears, one power-up is given free (picked by the level, not at random). */
+export const GIFT_EVERY = 3;
 
 /** What a first-time player starts with, so each booster can be tried before it is earned. */
 export const STARTING_KIT = {
   coins: 50,
-  boosters: { undo: 2, extraSlot: 1, hint: 2 } satisfies Record<Booster, number>,
+  boosters: {
+    undo: 2,
+    extraSlot: 1,
+    hint: 2,
+    call: 1,
+    sweep: 1,
+    lantern: 1,
+  } satisfies Record<Booster, number>,
 } as const;
 
 export const POUCH_KEY = "hexhue.v2.pouch";
@@ -84,24 +105,42 @@ export function pay(p: Pouch, booster: Booster, payment: Payment): Pouch {
 }
 
 /** Coins for a win. The first clear of a level pays by size; replays pay a token so farming is slow. */
-export function winCoins(o: { cubes: number; firstClear: boolean; dailyBonus?: boolean }): number {
+/** What the first clear of a Hard or Extreme level pays on top (M15.13): about the boosters it may take. */
+export const CHALLENGE_BONUS = { hard: 20, extreme: 40 } as const;
+
+export function winCoins(o: {
+  cubes: number;
+  firstClear: boolean;
+  dailyBonus?: boolean;
+  challenge?: keyof typeof CHALLENGE_BONUS | null;
+}): number {
   const base = o.firstClear ? 15 + Math.min(25, Math.round(Math.max(0, o.cubes) / 40)) : 3;
-  return base + (o.dailyBonus ? 15 : 0);
+  const bonus = o.firstClear && o.challenge ? CHALLENGE_BONUS[o.challenge] : 0;
+  return base + bonus + (o.dailyBonus ? 15 : 0);
 }
 
-/** Records a win: pays the first clear of `levelId` once, replays the token amount. */
+/** The power-up a milestone first clear of `levelId` gives: chosen by the level's id, so it is fixed. */
+export function giftFor(levelId: string): (typeof POWERS)[number] {
+  let h = 0;
+  for (const ch of levelId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return POWERS[h % POWERS.length]!;
+}
+
+/**
+ * Records a win: pays the first clear of `levelId` once, replays the token amount. Every
+ * `GIFT_EVERY`th first clear also gives one power-up (M15.13), so each is earnable by playing.
+ */
 export function award(
   p: Pouch,
   levelId: string,
-  o: { cubes: number; dailyBonus?: boolean },
-): { pouch: Pouch; coins: number; firstClear: boolean } {
+  o: { cubes: number; dailyBonus?: boolean; challenge?: keyof typeof CHALLENGE_BONUS | null },
+): { pouch: Pouch; coins: number; firstClear: boolean; gift: Booster | null } {
   const firstClear = !p.paid.includes(levelId);
   const coins = winCoins({ ...o, firstClear });
-  return {
-    pouch: { ...p, coins: p.coins + coins, paid: firstClear ? [...p.paid, levelId] : p.paid },
-    coins,
-    firstClear,
-  };
+  const paid = firstClear ? [...p.paid, levelId] : p.paid;
+  const gift = firstClear && paid.length % GIFT_EVERY === 0 ? giftFor(levelId) : null;
+  const boosters = gift ? { ...p.boosters, [gift]: p.boosters[gift] + 1 } : p.boosters;
+  return { pouch: { ...p, coins: p.coins + coins, paid, boosters }, coins, firstClear, gift };
 }
 
 /** Reads the pouch and says whether the read can be trusted (a failed read is never overwritten). */

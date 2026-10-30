@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { worlds } from "./levels";
+import { PICTURE_PALETTE } from "./collect/pictureBoard";
 import { contrast, inkFor, luminance } from "./theme";
 
 describe("ink on colors", () => {
   // Symbols are graphical objects: WCAG 1.4.11 asks 3:1 (every shipped color gets at least 4.3).
   it("every shipped palette color gets symbol ink with at least 3:1 contrast", () => {
-    const colors = new Set(worlds.flatMap((w) => w.levels.flatMap((l) => l.level.palette)));
+    const colors = new Set(Object.values(PICTURE_PALETTE));
     for (const hex of colors) {
       const ratio = contrast(luminance(hex), luminance(inkFor(hex)));
       expect(ratio, hex).toBeGreaterThanOrEqual(3);

@@ -14,7 +14,7 @@ import Base from "../layouts/Base.astro";
     <p class="splash-title">Hex &amp; Hue</p>
     <p class="splash-tagline">A Little Magic in Every Color</p>
     <p class="splash-loading" aria-hidden="true">
-      Summoning wisps…
+      Calling your familiars…
     </p>
     <!-- No script can run a watchdog under the CSP: CSS swaps in a hint if loading stalls. -->
     <p class="splash-stalled">Taking a while? Check your connection and reload the page.</p>
@@ -159,6 +159,9 @@ import Base from "../layouts/Base.astro";
     /* Full-bleed and unpadded: Phaser sizes the canvas from the parent box and ignores padding.
        Safe-area insets are handled inside the game layout. */
     inset: 0;
+    /* The visible height: a mobile browser's toolbars never cover the bottom of the board. */
+    height: 100%;
+    height: 100dvh;
   }
   #game canvas {
     display: block;

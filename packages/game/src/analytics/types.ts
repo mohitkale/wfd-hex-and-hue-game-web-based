@@ -42,8 +42,12 @@ export interface EventProps {
   play_abandon: { level: string; seconds: number; moves: number };
   /** An Undo was used; `paid` says how it was paid for ("free" in the tutorial). */
   play_undo: { level: string; paid: PlayPaid };
-  /** An Extra Slot or Hint was used (hint usage is `booster: "hint"`). */
-  play_booster: { level: string; booster: "extraSlot" | "hint"; paid: PlayPaid };
+  /** An Extra Slot, Hint or power-up was used (hint usage is `booster: "hint"`). */
+  play_booster: {
+    level: string;
+    booster: "extraSlot" | "hint" | "call" | "sweep" | "lantern";
+    paid: PlayPaid;
+  };
   /** Whether the optional rewarded 2× ad could be offered on this level (completion is `ad_result`). */
   play_ad_offer: { level: string; placement: string; available: boolean };
 }

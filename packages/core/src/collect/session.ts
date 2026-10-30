@@ -3,6 +3,7 @@ import type { CollectEvent, TickBatch } from "./events";
 import { validateCollectLevel, type CollectLevel } from "./level";
 import { autoResume } from "./autoResume";
 import { addSlot, canAddSlot } from "./boosters";
+import { callForward, canCall, canSweep, sweep } from "./powers";
 import { isSettled, reassess, step } from "./sim";
 import { cloneState, createCollectState, type CollectState } from "./state";
 
@@ -110,7 +111,7 @@ export class CollectSession {
   private current: CollectState;
   private entries: LogEntry[] = [];
   private history: Snapshot[] = [];
-  /** Slots gained from the Extra Slot booster this level; they survive Undo and Retry. */
+  /** Slots gained from the Extra Slot booster this attempt; they survive Undo, not Retry. */
   private extra = 0;
   private listeners = new Set<(batch: TickBatch) => void>();
   private replaceListeners = new Set<(reason: "undo" | "restart") => void>();
@@ -230,12 +231,47 @@ export class CollectSession {
     // Undo must not take the slot away: every earlier snapshot gains it too.
     for (const snap of this.history) {
       snap.state.params.slots++;
+      if (snap.state.params.sharedTrays) snap.state.params.fieldCap++;
       snap.state.slots.push(null);
     }
     this.extra++;
     const events = addSlot(this.current);
     this.emit({ tick: this.current.tick, events });
     return true;
+  }
+
+  /**
+   * Familiar's Call (M15.13): the box at `depth` of `column` moves to the front. One Undo takes it
+   * back. Returns false when it has no effect. The caller charges for it.
+   */
+  callForward(column: number, depth: number): boolean {
+    if (!canCall(this.current, column, depth)) return false;
+    this.snapshot();
+    const events = [...callForward(this.current, column, depth), ...reassess(this.current)];
+    this.emit({ tick: this.current.tick, events });
+    return true;
+  }
+
+  /** Whether Besom Sweep can be cast on box `group` now. */
+  canSweep(group: number): boolean {
+    return canSweep(this.current, group);
+  }
+
+  /**
+   * Besom Sweep (M15.13): the next familiars of box `group` fly over the picture. One Undo takes it
+   * back. Returns false when it has no effect. The caller charges for it.
+   */
+  sweep(group: number): boolean {
+    if (!canSweep(this.current, group)) return false;
+    this.snapshot();
+    const events = sweep(this.current, group);
+    this.emit({ tick: this.current.tick, events });
+    return true;
+  }
+
+  private snapshot(): void {
+    this.history.push({ state: cloneState(this.current), logLength: this.entries.length });
+    if (this.history.length > this.maxUndo) this.history.shift();
   }
 
   /** Restores the state before the last action (and drops it from the log). Works out of a loss. */
@@ -248,9 +284,10 @@ export class CollectSession {
     return true;
   }
 
+  /** A fresh attempt: nothing bought during the last one (extra slots included) carries over (M15.13). */
   restart(): void {
     this.current = createCollectState(this.level);
-    for (let i = 0; i < this.extra; i++) addSlot(this.current);
+    this.extra = 0;
     this.entries = [];
     this.history = [];
     this.notifyReplace("restart");

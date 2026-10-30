@@ -14,20 +14,29 @@ import { CollectSpellbookScene } from "./CollectSpellbookScene";
 import { CompletionOverlay } from "./CompletionOverlay";
 import { ParticleLayer } from "./ParticleLayer";
 import { PanelsView, paintPanelFrames } from "./PanelsView";
-import { AmbientLayer } from "./ambient";
-import { atmosphereForTheme } from "./worldIdentity";
 import { planCues, playCues, rejectionCue, type CueSinks } from "./cues";
 import { Emitter, Particles } from "./particles";
 import { getRewards, safeShow, type AdResult } from "../rewards";
 import { stepFrame } from "./frameStep";
 import { CollectHud } from "./CollectHud";
-import { BoosterTray, undoBadge } from "./BoosterTray";
+import { BoosterTray } from "./BoosterTray";
 import { buildSettingsPanel } from "./SettingsPanel";
 import { GameplayTracker, emitVia } from "./gameplayTracker";
 import { getAnalytics, safeFlush, track } from "../analytics";
-import { MAX_EXTRA_SLOTS, useExtraSlot, useHint, useUndo, type UseResult } from "./boosterUse";
+import {
+  canAfford,
+  MAX_EXTRA_SLOTS,
+  POWER_NAMES,
+  useCall,
+  useExtraSlot,
+  useHint,
+  useLantern,
+  useSweep,
+  type UseResult,
+} from "./boosterUse";
 import {
   award,
+  type Booster,
   paymentFor,
   PRICES,
   readPouch,
@@ -38,8 +47,6 @@ import {
 import {
   applyAdResult,
   BOOST,
-  effectiveSpeed,
-  sprinting,
   type Speed,
   initialSpeedState,
   restoreSpeed,
@@ -72,10 +79,11 @@ import {
 } from "./collectLayout";
 import { RingStats } from "./profile";
 import { shadeTonesGrid, tonesFor } from "./cubePaint";
-import { speciesFor } from "./familiarArt";
+import type { Species } from "./familiarArt";
+import { familiarFor, readFamiliar } from "./familiarChoice";
 import { ensureFamiliarAtlas } from "./familiarTextures";
 import { demoLineFromSearch, dailyFromSearch, levelFromSearch, tutorialStart } from "./levels";
-import { SHOWN_TICKS_PER_SECOND, TickClock } from "./tickClock";
+import { SHOWN_TICKS_PER_SECOND, TickClock, ticksPerSecondFor } from "./tickClock";
 import { worldMoment, type WorldMoment } from "./worldMoment";
 import {
   dailyMoment,
@@ -91,10 +99,21 @@ import { browserStore, readSpellbook, recordWin, saveSpellbook } from "./v2Spell
 import { eventNote } from "./notes";
 import { sealMap } from "./sealView";
 import { VisualModel } from "./visuals";
+import { IdleLoop } from "./idleLoop";
+import { LevelSelectScene } from "./LevelSelectScene";
+import { challengeOf } from "./journey";
+import { comboAfter, NO_COMBO, type Combo } from "./combo";
+import { paintBoard, paintHole, paintHoleFront, paintTable, plankWidth, TABLE } from "./tableLook";
 
 type CollectState = collect.CollectState;
 
 const SEAL_HINT = "Wax-sealed cubes wake once their key colour is gathered";
+
+/** Said as a Hard or Extreme level opens. */
+const CHALLENGE_HINT = {
+  hard: "Hard level: pick boxes whose colour you can reach, or the trays jam",
+  extreme: "Extreme level: plan every pick. Lantern, Call and Extra Tray can save you",
+} as const;
 
 const REASON_TEXT: Record<Exclude<collect.ActionCheck, "ok">, string> = {
   gameOver: "The game is over",
@@ -105,7 +124,7 @@ const REASON_TEXT: Record<Exclude<collect.ActionCheck, "ok">, string> = {
 };
 
 /**
- * The v2 board (`?engine=v2`): summon familiars from a column, watch them fetch, carry and deliver
+ * The board: summon familiars from a column, watch them fetch, carry and deliver
  * cubes. The scene only draws and routes input; every rule lives in `@hexhue/core`'s collect engine,
  * and the renderer drives time (see TickClock), so 1× and 3× play out identically.
  */
@@ -118,7 +137,6 @@ export class CollectScene extends Phaser.Scene {
   private panels!: PanelsView;
   private emitter!: Emitter;
   private particleLayer!: ParticleLayer;
-  private ambient!: AmbientLayer;
   private readonly haptics = new Haptics();
   private readonly sinks: CueSinks = {
     sound: (name, options) => getAudio(this).play(name, options),
@@ -126,23 +144,23 @@ export class CollectScene extends Phaser.Scene {
   };
   /**
    * `?demo=win|lose` (review builds): taps a recorded line one action at a time whenever the board
-   * has settled, so a reviewer can watch a winning or a losing sequence. Any manual tap, undo or
+   * has settled, so a reviewer can watch a winning or a losing sequence. Any manual tap or
    * restart ends it.
    */
   private demo: { line: readonly collect.Action[]; next: number; readyAt: number } | null = null;
   /** The time of the latest frame, for effects started by events between frames. */
   private frameTime = 0;
   private atlas = "";
-  /** 14 ticks a second at 1× (one cell per tick; 24 was too fast to follow): a 14-cell route takes about a second. */
-  private readonly clock = new TickClock(SHOWN_TICKS_PER_SECOND);
+  /** One cell per tick; how many ticks a second follows the cell size (`ticksPerSecondFor`), set in `build`. */
+  private clock = new TickClock(SHOWN_TICKS_PER_SECOND);
   private speed: Speed = 1;
   /** The speed-up rule (M14.3, 3× since M15.6): per level, through an optional rewarded ad; kept across scene restarts. */
   private speedState: SpeedState = initialSpeedState();
-  /** Which wait for an ad is the current one, and how to end it early (the button, Retry, Undo). */
+  /** Which wait for an ad is the current one, and how to end it early (the button, Retry). */
   private adToken = 0;
   private adCancel: (() => void) | null = null;
-  /** How many HUD buttons there are: undo and retry, plus speed when something is offered. */
-  private hudButtons = 2;
+  /** How many HUD buttons there are: retry, plus speed when something is offered (no Undo). */
+  private hudButtons = 1;
   private marks = new Map<number, number>();
   private toaster!: Toast;
   private overlay: Phaser.GameObjects.GameObject[] = [];
@@ -167,6 +185,13 @@ export class CollectScene extends Phaser.Scene {
   private trayMemory: ReadonlyMap<number, number> = new Map();
   private hud!: CollectHud;
   private tray: BoosterTray | null = null;
+  /** A power-up waiting for its target: a box behind a column's front (Call) or a box in a tray (Sweep). */
+  private armed: "call" | "sweep" | null = null;
+  /** Tap zones over the trays, live only while Sweep waits for its box. */
+  private trayZones: Phaser.GameObjects.Zone[] = [];
+  /** The Crystal Lantern was lit for this level (reopening it is free), and its panel if open. */
+  private lanternLit: string | null = null;
+  private lanternObjects: Phaser.GameObjects.GameObject[] = [];
   /** The settings panel is open over the board: play waits, and a rebuild keeps it open. */
   private settingsOpen = false;
   private settingsObjects: Phaser.GameObjects.GameObject[] = [];
@@ -177,6 +202,10 @@ export class CollectScene extends Phaser.Scene {
   private pouchOk = false;
   /** This win's coins were paid (a relayout or end card must not pay twice). */
   private winPaid = false;
+  /** How many coins this win paid, for the win card (null before a win, or when it paid none). */
+  private winCoins: number | null = null;
+  /** The power-up this win gave (every third first clear), shown on the win card. */
+  private winGift: Booster | null = null;
   /** The tutorial being played (M14.2), its level id and layer, and whether its win was recorded. */
   private tutorial: Tutorial | null = null;
   private tutorialId: string | null = null;
@@ -186,6 +215,13 @@ export class CollectScene extends Phaser.Scene {
   private unsubscribe: (() => void)[] = [];
   /** Colour-blind mode (M6.5): each colour also shows its symbol. `?cb=1` forces it for review. */
   private colorblind = false;
+  /** No box is left to choose: the board is shown at 3× until the level ends (see `update`). */
+  private finishing = false;
+  /** Boxes finished in a streak, and the play time (ms at the shown speed) that streaks are timed in. */
+  private combo: Combo = NO_COMBO;
+  private playMs = 0;
+  /** Stops drawing while the board is still (`idleLoop.ts`). */
+  private idle: IdleLoop | null = null;
   /** `?profile=1`: records the CPU time of every `update` so a build can be measured (see perf()). */
   private profile: { update: RingStats; render: RingStats; ticks: number } | null = null;
 
@@ -204,10 +240,16 @@ export class CollectScene extends Phaser.Scene {
     this.overlayTimer?.remove();
     this.overlayTimer = null;
     this.settingsOpen = false;
+    this.lanternLit = null;
+    this.finishing = false;
+    this.combo = NO_COMBO;
+    this.playMs = 0;
     this.overlay = [];
     this.reveal = null;
     this.winRecord = null;
     this.winPaid = false;
+    this.winCoins = null;
+    this.winGift = null;
     this.revealSeen = false;
     this.demo = null;
     this.marks = new Map();
@@ -216,7 +258,7 @@ export class CollectScene extends Phaser.Scene {
     this.pouchOk = read.ok;
     this.frameTime = 0;
     ensureTextures(this);
-    this.cameras.main.setBackgroundColor(theme.night);
+    this.cameras.main.setBackgroundColor(TABLE.wood);
     const search = typeof window !== "undefined" ? window.location.search : "";
     // `v2.level`: a level chosen in the game (Spellbook replay), kept so "Back to the board" returns to it.
     const chosen = this.registry.get("v2.level") as string | undefined;
@@ -232,13 +274,30 @@ export class CollectScene extends Phaser.Scene {
       ? createTutorial(tutorialId, this.registry.get("v2.tutorialSkipped") === true)
       : null;
     this.tutorialSaved = false;
-    const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     const params = new URLSearchParams(search);
+    // A visit without a level asked for starts at home, once (the tutorial and the daily never do):
+    // straight there, before the board is built, so no board flashes up first.
+    if (
+      !chosen &&
+      !tutorialId &&
+      !daily &&
+      !params.has("level") &&
+      !params.has("demo") &&
+      !params.has("view") &&
+      !this.registry.get("v2.homeShown")
+    ) {
+      this.registry.set("v2.homeShown", true);
+      this.goHome();
+      return;
+    }
+    const level = levelFromSearch(search, daily ? daily.levelId : (tutorialId ?? chosen));
     // 3× is unlocked for this level only (a retry keeps it, another level starts at 1×). `?speed=3` is
     // a review override and exists in development builds only: it is not an ad reward.
+    // Every attempt starts at 1×: 3× bought for one attempt never carries to another (M15.13).
+    // `?speed=3` is a review override in development builds only; it is not an ad reward.
     const restored = restoreSpeed(
-      this.registry.get("v2.speedState") as SpeedState | undefined,
-      this.registry.get("v2.speed"),
+      undefined,
+      1,
       level.id,
       params.get("speed") === "3" && import.meta.env?.DEV === true,
     );
@@ -280,6 +339,10 @@ export class CollectScene extends Phaser.Scene {
     });
     const line = demoLineFromSearch(search, level);
     if (line) this.demo = { line, next: 0, readyAt: 0 };
+    // A Hard or Extreme level says so as it opens (it never waits on a tap).
+    const challenge = challengeOf(level.id);
+    if (challenge && !this.tutorialId)
+      this.time.delayedCall(400, () => this.toaster.show(CHALLENGE_HINT[challenge], 4200));
     // The first sealed level of a visit explains the seals once; it never waits on a tap.
     if (level.seals && !this.registry.get("v2.sealIntro")) {
       this.registry.set("v2.sealIntro", true);
@@ -288,11 +351,9 @@ export class CollectScene extends Phaser.Scene {
     this.unsubscribe.push(
       this.session.subscribe((batch) => this.onBatch(batch)),
       this.session.onReplace((reason) => {
-        // Retry and Undo are always free: they also end any wait for an ad.
+        // Retry is always free: it also ends any wait for an ad, and starts a tutorial lesson over.
         this.adCancel?.();
-        // Undo is something the tutorial teaches; a restart starts its lesson over.
-        if (reason === "undo") this.tutorial?.note("undone");
-        else if (this.tutorialId) {
+        if (this.tutorialId) {
           this.tutorial = createTutorial(
             this.tutorialId,
             this.registry.get("v2.tutorialSkipped") === true,
@@ -300,8 +361,17 @@ export class CollectScene extends Phaser.Scene {
           this.tutorialSaved = false;
         }
         this.demo = null;
+        // A retry is a fresh attempt: the Lantern and 3× bought for the last one do not carry over.
+        if (reason === "restart") {
+          this.lanternLit = null;
+          this.speed = 1;
+          this.speedState = initialSpeedState();
+          this.saveSpeed();
+        }
         this.winRecord = null;
         this.winPaid = false;
+        this.winCoins = null;
+        this.winGift = null;
         this.revealSeen = false;
         this.rebuild();
       }),
@@ -338,6 +408,12 @@ export class CollectScene extends Phaser.Scene {
       this.registry.events.off("changedata-reducedMotion", onMotion),
     );
     fadeIn(this);
+    this.idle?.destroy();
+    this.idle = new IdleLoop(this.game, () => this.busy());
+    this.events.once("shutdown", () => {
+      this.idle?.destroy();
+      this.idle = null;
+    });
     if (params.get("profile") === "1") {
       const profile = { update: new RingStats(), render: new RingStats(), ticks: 0 };
       this.profile = profile;
@@ -380,6 +456,7 @@ export class CollectScene extends Phaser.Scene {
 
   /** (Re)creates everything from the session's current state. */
   private rebuild(): void {
+    this.idle?.wake();
     this.tweens.killAll();
     this.overlayTimer?.remove();
     this.overlayTimer = null;
@@ -390,6 +467,8 @@ export class CollectScene extends Phaser.Scene {
   }
 
   private build(): void {
+    // The HUD is drawn afresh: the next frame sets its speed label for the finishing 3× again.
+    this.finishing = false;
     const state = this.session.state;
     const level = this.session.level;
     const { width, height } = this.scale.gameSize;
@@ -404,42 +483,45 @@ export class CollectScene extends Phaser.Scene {
       // Slots gained from the Extra Slot booster are part of the state.
       slots: state.params.slots,
       columns: level.columns.length,
-      fieldCap: level.fieldCap,
+      fieldCap: state.params.fieldCap,
+      sharedTrays: state.params.sharedTrays === true,
       portalX: level.portalX ?? collect.defaultPortalX(level.width),
       // The tutorial teaches without a shop: its boosters are free and there is no tray.
       tray: this.tutorialId === null,
     });
     this.toaster = new Toast(this, this.layout);
+    this.clock = new TickClock(ticksPerSecondFor(this.layout.cell / dpr));
     // Cats trot for the `familiar` pictures; everything else is flown by bats.
-    this.atlas = ensureFamiliarAtlas(this, level.palette, speciesFor(level.subject?.theme));
+    // The familiar the player chose on the home screen, else the one the picture suggests.
+    const species = familiarFor(
+      (this.registry.get("v2.familiar") as Species | undefined) ?? readFamiliar(browserStore()),
+      level.subject?.theme,
+    );
+    this.atlas = ensureFamiliarAtlas(this, level.palette, species);
     const reduced = isReducedMotion(this);
     const tones = level.palette.map(tonesFor);
 
     // Two HUD buttons, or three when there is a 3× offer (or an unlocked switch) to show.
-    this.hudButtons = this.speedView().show ? 3 : 2;
+    this.hudButtons = this.speedView().show ? 2 : 1;
     // Whether the optional 3× ad can be offered here (once per level, never in the tutorial).
     if (!this.tutorialId) this.stats.adOffer("speed2x", getRewards(this).isAvailable("speed2x"));
     this.bakeStaticLayer();
+    // The hole's front lip goes over the familiars, so the ones going in slip down behind it.
+    paintHoleFront(this.add.graphics().setDepth(15.5), this.layout.hole);
     this.model = new VisualModel(state.params.portal, (g) => this.session.state.groups[g]!.color);
     this.model.resync(state);
     this.emitter = new Emitter(new Particles(160), this.layout.cell, reduced);
-    // Each world has its own atmosphere (docs/V2_WORLDS.md); a level without a known picture keeps the default.
-    const look = level.subject ? atmosphereForTheme(level.subject.theme) : undefined;
-    this.ambient = new AmbientLayer(
-      this,
-      this.layout.frame,
-      TEX.glow,
-      reduced,
-      this.layout.cell,
-      look,
-    );
-    this.cameras.main.setBackgroundColor(look?.backdrop ?? theme.night);
+    // The table is the backdrop (M15.13): calm and still, nothing drifts over it.
+    this.cameras.main.setBackgroundColor(TABLE.wood);
     this.cubes = new CubeLayer(
       this,
       this.layout,
       level.palette,
       state.grid.slice(),
-      shadeTonesGrid(level),
+      // The picture's own colours while playing, as it looks when finished (owner request); the
+      // boxes match a cube's colour family.
+      // Picture boards have one flat colour per shade: the full bevel makes each cube a clear block.
+      shadeTonesGrid(level, 0.38),
     );
     this.cubes.setSeals(sealMap(state));
     this.familiars = new FamiliarLayer(
@@ -451,13 +533,13 @@ export class CollectScene extends Phaser.Scene {
       reduced,
       this.colorblind ? level.palette : null,
       this.emitter,
-      speciesFor(level.subject?.theme),
+      species,
     );
     this.familiars.anchorFor = (group) => this.panels.anchor(group);
+    this.familiars.gate = state.params.gate ?? 0;
     this.particleLayer = new ParticleLayer(this, this.emitter.particles, TEX.glow, 8);
-    this.familiars.onDelivered = (_color, group) => {
-      this.panels.badge(group)?.pulse();
-    };
+    // No bump on the box per delivery: with a steady stream it made the boxes dance (M15.13).
+    this.familiars.onDelivered = () => undefined;
     this.panels = new PanelsView(
       this,
       this.layout,
@@ -478,6 +560,9 @@ export class CollectScene extends Phaser.Scene {
           onSlot: () => this.boost(useExtraSlot(this.pouch, this.session, false)),
           onHint: () => this.boost(useHint(this.pouch, this.session, false)),
           onMenu: () => this.openSettings(),
+          onCall: () => this.armCall(),
+          onSweep: () => this.armSweep(),
+          onLantern: () => this.openLantern(),
         });
     this.syncPouch();
     this.tutorialLayer = this.tutorial
@@ -495,52 +580,55 @@ export class CollectScene extends Phaser.Scene {
     this.clock.reset();
     this.settingsObjects = [];
     if (this.settingsOpen) this.showSettings();
+    // A rebuild clears the board's objects: the lantern view and a waiting power-up end with it.
+    this.lanternObjects = [];
+    this.disarm();
     if (state.status !== "playing") this.showEnd(0);
   }
 
   /**
-   * Everything that never changes while playing (board panel and ring, field and slot outlines, HUD
-   * button circles) is drawn once into a single RenderTexture, so it costs one textured quad per
-   * frame instead of re-tessellating rounded rectangles and circles every frame.
+   * Everything that never changes while playing (the wooden table, the cream tray under the picture,
+   * the tray plates and the HUD button discs) is drawn once into a single RenderTexture, so it costs
+   * one textured quad per frame instead of re-tessellating rounded rectangles every frame.
    */
   private bakeStaticLayer(): void {
     const l = this.layout;
     const dpr = this.dpr;
+    const { width, height } = this.scale.gameSize;
     const g = this.make.graphics({}, false);
-    // Nothing is drawn around the picture: the ring is only the walkway. Just a dark backdrop behind
-    // the cubes, so the picture reads and the space is the picture's.
-    g.fillStyle(theme.panel, 1);
-    g.fillRoundedRect(
-      l.boardRect.x + l.cell * 0.7,
-      l.boardRect.y + l.cell * 0.7,
-      l.boardRect.w - 1.4 * l.cell,
-      l.boardRect.h - 1.4 * l.cell,
-      l.cell * 0.5,
+    paintTable(g, { x: 0, y: 0, w: width, h: height }, plankWidth(l.frame.w), dpr);
+    // The picture's tray: the ring around the mosaic is the walkway, so the tray reaches half a cell
+    // into it and the familiars walk along its rim.
+    paintBoard(
+      g,
+      {
+        x: l.boardRect.x + l.cell * 0.45,
+        y: l.boardRect.y + l.cell * 0.45,
+        w: l.boardRect.w - 0.9 * l.cell,
+        h: l.boardRect.h - 0.9 * l.cell,
+      },
+      l.cell * 0.6,
+      dpr,
     );
     paintPanelFrames(g, l, dpr);
+    paintHole(g, l.hole);
     const cy = l.hud.y + l.hud.h / 2;
     const size = Math.round(HUD_BUTTON_CSS * dpr);
     for (let i = 0; i < this.hudButtons; i++) {
-      const x = hudButtonX(l, i, 3);
-      g.fillStyle(theme.dusk, 1);
+      const x = hudButtonX(l, i + 1, 3);
+      g.fillStyle(TABLE.buttonEdge, 1);
+      g.fillCircle(x, cy + 2 * dpr, size / 2);
+      g.fillStyle(TABLE.button, 1);
       g.fillCircle(x, cy, size / 2);
-      g.lineStyle(Math.max(1, dpr * 1.5), theme.mist, 0.5);
-      g.strokeCircle(x, cy, size / 2);
     }
-    // Only the area with static content (HUD, board and the row of trays), not the columns below.
-    const bottom = Math.max(...l.trays.map((r) => r.y + r.h), l.boardRect.y + l.boardRect.h);
-    const rt = this.add
-      .renderTexture(l.frame.x, l.frame.y, l.frame.w, bottom - l.frame.y)
-      .setOrigin(0, 0)
-      .setDepth(0);
-    rt.draw(g, -l.frame.x, -l.frame.y);
+    const rt = this.add.renderTexture(0, 0, width, height).setOrigin(0, 0).setDepth(0);
+    rt.draw(g, 0, 0);
     rt.render();
     g.destroy();
   }
 
   private buildHud(): void {
     this.hud = new CollectHud(this, this.layout, this.session.level.name, this.speedView(), {
-      onUndo: () => this.undo(),
       onRestart: () => this.retry(),
       onSpeed: () => this.onSpeedTap(),
     });
@@ -560,7 +648,6 @@ export class CollectScene extends Phaser.Scene {
 
   private syncPouch(): void {
     this.tray?.sync(this.pouch, this.session.extraSlots < MAX_EXTRA_SLOTS);
-    this.hud.setUndoBadge(this.tutorialId ? "" : undoBadge(this.pouch));
   }
 
   /** Retry: always free and instant; the events say how the attempt stood and begin the next. */
@@ -586,6 +673,7 @@ export class CollectScene extends Phaser.Scene {
           this.rebuild();
         }
       },
+      onHome: () => this.goHome(),
       onClose: () => {
         this.settingsOpen = false;
         for (const o of this.settingsObjects) o.destroy();
@@ -594,14 +682,9 @@ export class CollectScene extends Phaser.Scene {
     });
   }
 
-  /** Undo is a booster outside the tutorial: it costs one from stock or its price in coins. */
-  private undo(): void {
-    this.demo = null;
-    this.boost(useUndo(this.pouch, this.session, this.tutorialId !== null));
-  }
-
   /** Applies the outcome of a booster: store the pouch, say what happened, show a hint's target. */
   private boost(r: UseResult): void {
+    this.idle?.wake();
     if (this.overlay.length > 0 && !r.used) return;
     this.commitPouch(r.pouch);
     this.toaster.show(r.message, 2600);
@@ -637,10 +720,10 @@ export class CollectScene extends Phaser.Scene {
     return revive ? { revive } : {};
   }
 
-  /** The end card's Extra Slot offer after a slots-full loss, with what it costs. */
+  /** The end card's Extra Slot offer after a loss one more tray would undo, with what it costs. */
   private reviveOffer(): { label: string; onPress: () => void } | undefined {
     const state = this.session.state;
-    if (this.tutorialId || state.lossReason !== "slotsFull") return undefined;
+    if (this.tutorialId || state.status !== "lost" || !this.session.canAddSlot) return undefined;
     if (this.session.extraSlots >= MAX_EXTRA_SLOTS) return undefined;
     const pay = paymentFor(this.pouch, "extraSlot");
     if (pay.kind === "short") return undefined;
@@ -663,8 +746,11 @@ export class CollectScene extends Phaser.Scene {
     const r = award(this.pouch, this.session.level.id, {
       cubes: this.session.state.cubesTotal,
       dailyBonus,
+      challenge: challengeOf(this.session.level.id),
     });
     this.commitPouch(r.pouch);
+    this.winCoins = r.coins;
+    this.winGift = r.gift;
     this.toaster.show(`+${r.coins} ✦`, 2400);
   }
 
@@ -711,6 +797,7 @@ export class CollectScene extends Phaser.Scene {
       this.adCancel = () => resolve("unavailable");
     });
     const result = await Promise.race([safeShow(getRewards(this), "speed2x"), cancelled]);
+    this.idle?.wake();
     if (token === this.adToken) this.adCancel = null;
     // The scene may have moved on (shut down, another level, a newer wait) while the ad was up.
     if (!this.scene.isActive() || this.session.level.id !== levelId) return;
@@ -726,7 +813,7 @@ export class CollectScene extends Phaser.Scene {
     this.saveSpeed();
     const view = this.speedView();
     // Rebuild only when the HUD changed shape (a button appeared or went away); else just the label.
-    if (view.show !== (this.hudButtons === 3)) this.rebuild();
+    if (view.show !== (this.hudButtons === 2)) this.rebuild();
     else this.hud.setSpeedLabel(view.label);
     if (outcome.message) this.toaster.show(outcome.message, 2200);
   }
@@ -738,11 +825,136 @@ export class CollectScene extends Phaser.Scene {
         .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h)
         .setDepth(25)
         .setInteractive({ useHandCursor: true });
-      zone.on("pointerdown", () => this.tap({ kind: "select", column }));
+      zone.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        if (this.armed === "call") this.callAt(column, p.worldY);
+        else this.tap({ kind: "select", column });
+      });
       return zone;
     });
     this.placeColumns();
-    // There is no tap on a tray: a pending box goes back to work by itself (auto-resume).
+    // Tapping a familiar on the board makes it jump for joy (just for fun, M15.13).
+    const b = this.layout.boardRect;
+    this.add
+      .zone(b.x + b.w / 2, b.y + b.h / 2, b.w, b.h)
+      .setDepth(5)
+      .setInteractive()
+      .on("pointerdown", (p: Phaser.Input.Pointer) => {
+        if (this.familiars.boop(p.worldX, p.worldY)) this.idle?.wake();
+      });
+    // Normally there is no tap on a tray (a pending box goes back to work by itself); these zones
+    // only listen while Besom Sweep waits for the box to sweep.
+    this.trayZones = this.layout.trays.map((r, tray) => {
+      const zone = this.add
+        .zone(r.x + r.w / 2, r.y + r.h / 2, r.w + this.layout.gap, r.h + this.layout.gap)
+        .setDepth(25)
+        .setInteractive({ useHandCursor: true });
+      zone.on("pointerdown", () => this.sweepTray(tray));
+      if (zone.input) zone.input.enabled = false;
+      return zone;
+    });
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Power-ups (M15.13): Familiar's Call, Besom Sweep, Crystal Lantern
+  // -------------------------------------------------------------------------------------------
+
+  private arm(which: "call" | "sweep", message: string): void {
+    this.armed = which;
+    this.tray?.setArmed(which);
+    for (const z of this.trayZones) if (z.input) z.input.enabled = which === "sweep";
+    this.toaster.show(message, 2600);
+  }
+
+  private disarm(): void {
+    this.armed = null;
+    this.tray?.setArmed(null);
+    for (const z of this.trayZones) if (z.input) z.input.enabled = false;
+  }
+
+  /** Paw: the next tap on a box behind a column's front brings it forward. Tapping Paw again cancels. */
+  private armCall(): void {
+    if (this.armed === "call") return this.disarm();
+    if (this.overlay.length > 0 || this.session.state.status !== "playing") return;
+    const short = canAfford(this.pouch, "call");
+    if (short) return this.toaster.show(short, 2600);
+    if (!this.session.state.columns.some((c) => c.length > 1))
+      return this.toaster.show("No box is waiting behind another", 2400);
+    this.arm("call", "Tap a box behind the front row to call it forward");
+  }
+
+  /** Which drawn box of `column` a tap at `y` hit (0 = the front), from the column's grid. */
+  private callAt(column: number, y: number): void {
+    const r = this.layout.columns[column]!;
+    const depth = Math.floor((y - r.y) / (this.layout.tile + this.layout.gap));
+    if (depth <= 0) return this.toaster.show("That one is already at the front", 2000);
+    const r2 = useCall(this.pouch, this.session, column, depth);
+    this.disarm();
+    this.boost(r2);
+  }
+
+  /** Broom: one stuck box is swept at once; with several in the trays the player picks one. */
+  private armSweep(): void {
+    if (this.armed === "sweep") return this.disarm();
+    if (this.overlay.length > 0 || this.session.state.status !== "playing") return;
+    const short = canAfford(this.pouch, "sweep");
+    if (short) return this.toaster.show(short, 2600);
+    const can = this.session.state.groups.filter(
+      (g) => this.panels.trayOfGroup(g.id) !== null && this.session.canSweep(g.id),
+    );
+    if (can.length === 0) return this.toaster.show("No box in a tray to sweep", 2400);
+    if (can.length === 1) return this.boost(useSweep(this.pouch, this.session, can[0]!.id));
+    this.arm("sweep", "Tap a box in a tray: its familiars will fly to buried cubes");
+  }
+
+  private sweepTray(tray: number): void {
+    if (this.armed !== "sweep") return;
+    const group = this.panels.groupInTray(tray);
+    if (group === null) return this.toaster.show("That tray is empty", 1800);
+    this.disarm();
+    this.boost(useSweep(this.pouch, this.session, group));
+  }
+
+  /** Lantern: lit once per level (paid), then free to reopen; shows every box still to come. */
+  private openLantern(): void {
+    if (this.lanternObjects.length > 0 || this.overlay.length > 0 || this.settingsOpen) return;
+    this.disarm();
+    const levelId = this.session.level.id;
+    if (this.lanternLit !== levelId) {
+      const r = useLantern(this.pouch, this.session);
+      if (!r.used) return this.boost(r);
+      this.lanternLit = levelId;
+      this.commitPouch(r.pouch);
+      if (r.paid) this.stats.booster("lantern", r.paid.how);
+    }
+    // The Lantern's view is its own chunk, loaded the first time it is opened (the board's chunk has a
+    // size budget). Play waits from the tap on: a placeholder marks the panel as open meanwhile.
+    const level = this.session.level;
+    this.lanternObjects = [this.add.zone(0, 0, 1, 1)];
+    void import("./LanternPanel")
+      .then(({ buildLanternPanel }) => {
+        for (const o of this.lanternObjects) o.destroy();
+        // The level changed or the board was rebuilt while it loaded: nothing to show.
+        if (this.session.level !== level || this.lanternObjects.length === 0) {
+          this.lanternObjects = [];
+          return;
+        }
+        this.lanternObjects = buildLanternPanel(
+          this,
+          this.layout,
+          this.session.state,
+          level.palette,
+          () => {
+            for (const o of this.lanternObjects) o.destroy();
+            this.lanternObjects = [];
+          },
+        );
+        this.idle?.wake();
+      })
+      .catch((e: unknown) => {
+        console.error("The Lantern could not be loaded.", e);
+        this.lanternObjects = [];
+        this.toaster.show("Could not open the Lantern. Check your connection", 2600);
+      });
   }
 
   /** Where the box waiting in engine slot `slot` sits now: its tray. */
@@ -780,8 +992,9 @@ export class CollectScene extends Phaser.Scene {
 
   /** `fromDemo` marks taps made by the demo player; any other tap takes over and ends the demo. */
   private tap(action: collect.Action, fromDemo = false): void {
+    this.idle?.wake();
     if (!fromDemo) this.demo = null;
-    if (this.overlay.length > 0 || this.settingsOpen) return;
+    if (this.overlay.length > 0 || this.settingsOpen || this.lanternObjects.length > 0) return;
     const result = this.session.tap(action);
     if (!result.ok) {
       const reason = result.reason;
@@ -879,7 +1092,52 @@ export class CollectScene extends Phaser.Scene {
     const badge = this.panels.badge(group);
     const at = badge ?? this.layout.portal;
     this.emitter.bloom(at.x, at.y, color, this.frameTime);
-    this.emitter.sparks(at.x, at.y, color, 10, this.frameTime, 1.8);
+    // Boxes finished one soon after another make a streak: more sparks, and a word of praise.
+    const { combo, word } = comboAfter(this.combo, this.playMs);
+    this.combo = combo;
+    this.emitter.sparks(
+      at.x,
+      at.y,
+      color,
+      10 + 4 * Math.min(3, combo.count - 1),
+      this.frameTime,
+      1.8,
+    );
+    if (word && !this.tutorialId) this.cheer(word, at.x, at.y);
+  }
+
+  /** A word of praise that pops up over `x, y`, rises and fades (decorative, M15.13). */
+  private cheer(word: string, x: number, y: number): void {
+    const dpr = this.dpr;
+    const f = this.layout.frame;
+    const text = this.add
+      .text(Math.max(f.x + 60 * dpr, Math.min(f.x + f.w - 60 * dpr, x)), y - 18 * dpr, word, {
+        fontFamily: theme.font,
+        fontStyle: "bold",
+        fontSize: `${Math.round(20 * dpr)}px`,
+        color: "#ffd426",
+        stroke: "#5a2a9c",
+        strokeThickness: Math.round(5 * dpr),
+      })
+      .setOrigin(0.5)
+      .setDepth(40)
+      .setScale(0.4);
+    this.idle?.wake();
+    if (isReducedMotion(this)) {
+      text.setScale(1);
+      this.time.delayedCall(900, () => text.destroy());
+      return;
+    }
+    this.tweens.add({ targets: text, scale: 1, duration: 220, ease: "Back.easeOut" });
+    this.tweens.add({
+      targets: text,
+      y: text.y - 34 * dpr,
+      alpha: 0,
+      delay: 520,
+      duration: 480,
+      ease: "Sine.easeIn",
+      onComplete: () => text.destroy(),
+    });
   }
 
   /** Every cube is in: a fountain of the level's colours from the portal. */
@@ -894,14 +1152,25 @@ export class CollectScene extends Phaser.Scene {
     this.frameTime = time;
     const profileStart = this.profile ? performance.now() : 0;
     // The game waits while an ad is on screen.
-    const adWait = this.speedState.adPending || this.settingsOpen;
+    const adWait = this.speedState.adPending || this.settingsOpen || this.lanternObjects.length > 0;
     // Active play only: not an ad wait, an end card or a hidden tab.
     if (!adWait && this.session.state.status === "playing" && !document.hidden) {
       this.stats.active(delta);
     }
-    // The last deliveries play at 3× for free once no decision is left (never in the tutorial).
-    const shown = effectiveSpeed(this.speed, !this.tutorialId && sprinting(this.session.state));
+    // Once no box is left to choose (every column empty), the rest plays itself out at 3× (owner
+    // request, M15.13); otherwise the speed is the one the player chose.
+    const finishing =
+      !this.tutorialId &&
+      this.session.state.status === "playing" &&
+      this.session.state.columns.every((c) => c.length === 0);
+    const shown = finishing ? BOOST : this.speed;
+    if (finishing !== this.finishing) {
+      this.finishing = finishing;
+      this.hud.setSpeedLabel(finishing ? `${BOOST}×` : this.speedView().label);
+    }
+    this.panels.speed = shown;
     const due = stepFrame(this.session, this.clock, delta, shown, adWait);
+    if (!adWait) this.playMs += delta * shown;
     if (this.profile) this.profile.ticks += due;
     this.familiars.update(
       this.session.state.tick,
@@ -910,12 +1179,22 @@ export class CollectScene extends Phaser.Scene {
       this.clock.tickMs / shown,
     );
     this.stepDemo(time);
-    this.ambient.update(time);
     this.particleLayer.update(time);
     this.reveal?.update(time);
     if (this.reveal?.done) this.revealSeen = true;
     this.cubes.flush();
     this.profile?.update.push(performance.now() - profileStart);
+    this.idle?.frame(time);
+  }
+
+  /** Something on screen is moving (or about to): the loop must keep drawing. */
+  private busy(): boolean {
+    const s = this.session.state;
+    if (s.status === "playing" && !collect.isSettled(s)) return true;
+    if (this.tweens.getTweens().length > 0) return true;
+    if (this.emitter.particles.count(this.frameTime) > 0) return true;
+    if (this.overlayTimer || this.demo || this.speedState.adPending) return true;
+    return this.reveal !== null && !this.reveal.done;
   }
 
   /**
@@ -1001,6 +1280,7 @@ export class CollectScene extends Phaser.Scene {
       instant: this.revealSeen,
       onSpellbook: () => this.openSpellbook(),
       onAgain: () => this.retry(),
+      ...(this.tutorialId ? {} : this.winExtras()),
     });
     this.reveal = overlay;
     this.overlay = overlay.objects;
@@ -1062,6 +1342,31 @@ export class CollectScene extends Phaser.Scene {
     this.refreshTutorial();
   }
 
+  /** Home: the level list, where the player picks what to play next (M15.13). */
+  private goHome(): void {
+    // The loop may be asleep (a still board): starting a scene needs it running.
+    this.idle?.wake();
+    if (!this.scene.get("collect-levels"))
+      this.scene.add("collect-levels", LevelSelectScene, false);
+    this.scene.start("collect-levels");
+  }
+
+  /** A win outside the tutorial ends on its reward and one way on: home. */
+  private winExtras(): {
+    next: { label: string; onPress: () => void };
+    coins: number | null;
+    gift: string | null;
+  } {
+    return {
+      next: { label: "Continue", onPress: () => this.goHome() },
+      coins: this.winCoins,
+      gift:
+        this.winGift && this.winGift in POWER_NAMES
+          ? POWER_NAMES[this.winGift as keyof typeof POWER_NAMES]
+          : null,
+    };
+  }
+
   /** A won tutorial level is remembered, and the end card leads on to the next one (or to the game). */
   private tutorialWin(): { label: string; onPress: () => void } | undefined {
     const id = this.tutorialId;
@@ -1092,15 +1397,12 @@ export class CollectScene extends Phaser.Scene {
       won,
       lossReason: state.lossReason,
       delivered: state.deliveredTotal,
-      canUndo: this.session.canUndo,
       delay,
       reduced: isReducedMotion(this),
       onRetry: () => this.retry(),
-      onUndo: () => this.undo(),
       ...(!won ? this.reviveProps() : {}),
       ...(won && this.tutorialId ? { next: this.tutorialWin()! } : {}),
-      // Pointed at by the tutorial's last hint: Undo becomes the main button.
-      emphasizeUndo: !won && this.tutorial?.update(state)?.target?.kind === "undo",
+      ...(won && !this.tutorialId ? { ...this.winExtras(), retry: false } : {}),
     });
   }
 }

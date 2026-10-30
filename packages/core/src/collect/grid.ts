@@ -1,4 +1,4 @@
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 
 /**
  * Padded-grid helpers (docs/V2_PROTOTYPE_SPEC.md §2). The grid is the mosaic plus a one-cell ring;
@@ -58,10 +58,35 @@ export function padCells(width: number, height: number, cells: readonly number[]
  * Canonical distance map: shortest 4-neighbour walking distance from `portal` through open cells
  * (`grid[c] === EMPTY`), -1 for cells not reachable (cubes and sealed pockets).
  */
-export function computeDist(t: Topology, grid: readonly number[], portal: number): number[] {
+export function computeDist(
+  t: Topology,
+  grid: readonly number[],
+  portal: number,
+  edge = false,
+  bias = 1,
+): number[] {
   const dist = new Array<number>(grid.length).fill(-1);
-  dist[portal] = 0;
-  const queue = [portal];
+  // With `edge` (M15.13) every cell of the bottom margin row is a way in and out, not just the portal.
+  const queue = edge ? bottomRow(t) : [portal];
+  for (const c of queue) dist[c] = 0;
+  if (bias !== 1) {
+    // Edge-first (M15.13): cells inside the picture cost `bias` to walk through, the margin ring 1,
+    // so routes keep to the edges and cut in only near their cube. Label-correcting search (a FIFO
+    // queue revisits a cell whenever its distance drops), exact for these small integer costs.
+    for (let head = 0; head < queue.length; head++) {
+      const c = queue[head]!;
+      for (let k = 0; k < 4; k++) {
+        const n = t.neighbors[c * 4 + k]!;
+        if (n < 0 || grid[n] !== EMPTY) continue;
+        const d = dist[c]! + stepCost(t, n, bias);
+        if (dist[n] === -1 || dist[n]! > d) {
+          dist[n] = d;
+          queue.push(n);
+        }
+      }
+    }
+    return dist;
+  }
   for (let head = 0; head < queue.length; head++) {
     const c = queue[head]!;
     const d = dist[c]! + 1;
@@ -76,6 +101,20 @@ export function computeDist(t: Topology, grid: readonly number[], portal: number
   return dist;
 }
 
+/** What it costs to walk into `cell`: 1 on the margin ring, `bias` inside the picture. */
+export function stepCost(t: Topology, cell: number, bias: number): number {
+  if (bias === 1) return 1;
+  const x = cell % t.stride;
+  const y = Math.floor(cell / t.stride);
+  return x === 0 || y === 0 || x === t.stride - 1 || y === t.rows - 1 ? 1 : bias;
+}
+
+/** The cells of the bottom margin row (the walkway under the picture), left to right. */
+export function bottomRow(t: Topology): number[] {
+  const start = (t.rows - 1) * t.stride;
+  return Array.from({ length: t.stride }, (_, x) => start + x);
+}
+
 /**
  * Updates `dist` after `cell` became open (its cube was removed). Distances only decrease or go
  * from -1 to finite, so a queue seeded at the new cell is enough; the result equals a fresh
@@ -86,6 +125,7 @@ export function openCell(
   grid: readonly number[],
   dist: number[],
   cell: number,
+  bias = 1,
 ): number[] {
   let best = -1;
   for (let k = 0; k < 4; k++) {
@@ -96,14 +136,14 @@ export function openCell(
   if (best === -1) throw new Error(`cell ${cell} opened without a reachable neighbour`);
   const newlyReachable: number[] = [];
   if (dist[cell] === -1) newlyReachable.push(cell);
-  dist[cell] = best + 1;
+  dist[cell] = best + stepCost(t, cell, bias);
   const queue = [cell];
   for (let head = 0; head < queue.length; head++) {
     const c = queue[head]!;
-    const d = dist[c]! + 1;
     for (let k = 0; k < 4; k++) {
       const n = t.neighbors[c * 4 + k]!;
       if (n < 0 || grid[n] !== EMPTY) continue;
+      const d = dist[c]! + stepCost(t, n, bias);
       if (dist[n] === -1) {
         newlyReachable.push(n);
         dist[n] = d;
@@ -122,11 +162,16 @@ export function openCell(
  * (up, left, right, down) whose distance is one smaller. Returns the route from the portal to
  * `standing`, inclusive.
  */
-export function routeTo(t: Topology, dist: readonly number[], standing: number): number[] {
+export function routeTo(
+  t: Topology,
+  dist: readonly number[],
+  standing: number,
+  bias = 1,
+): number[] {
   const route = [standing];
   let cur = standing;
   while (dist[cur]! > 0) {
-    const want = dist[cur]! - 1;
+    const want = dist[cur]! - stepCost(t, cur, bias);
     let next = -1;
     for (let k = 0; k < 4; k++) {
       const n = t.neighbors[cur * 4 + k]!;

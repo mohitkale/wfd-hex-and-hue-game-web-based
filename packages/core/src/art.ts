@@ -1,5 +1,13 @@
-import { EMPTY } from "./level";
-import type { Art } from "./generator";
+import { EMPTY } from "./cells";
+
+/** A picture: its size, its colours and every cell's colour index (or `EMPTY`), row by row. */
+export interface Art {
+  width: number;
+  height: number;
+  palette: string[];
+  /** Row-major palette indices or `EMPTY`. */
+  cells: number[];
+}
 
 /**
  * Hand-authored pixel art: each character in `rows` is one cell. `.` and space are empty; every

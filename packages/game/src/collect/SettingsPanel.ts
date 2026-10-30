@@ -19,6 +19,8 @@ export interface PanelHandlers {
   /** A switch was saved (the scene applies what needs a redraw, e.g. colour symbols). */
   onChanged: (id: ToggleId, value: boolean) => void;
   onClose: () => void;
+  /** Home: the level list (M15.13). */
+  onHome?: () => void;
 }
 
 /**
@@ -145,5 +147,17 @@ export function buildSettingsPanel(
   ).setDepth(61);
   scene.add.existing(done);
   push(done);
+  if (handlers.onHome) {
+    const home = new Button(
+      scene,
+      cx,
+      done.y + 56 * dpr,
+      Math.min(l.frame.w * 0.6, 220 * dpr),
+      "Levels",
+      { dpr, onPress: handlers.onHome },
+    ).setDepth(61);
+    scene.add.existing(home);
+    push(home);
+  }
   return parts;
 }

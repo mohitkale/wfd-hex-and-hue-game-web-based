@@ -170,7 +170,7 @@ picture better. The following are prohibited:
 - **P-5** Pure black, and tones so close that a ramp step cannot be seen (A-14).
 - **P-6** Text or letters. Runes are allowed only as shapes drawn to read at cube size, never
   as imitation of real scripts.
-- **P-7** Borrowed material: any trace of Food Hunt art, a reference sprite, an image model's
+- **P-7** Borrowed material: any trace of the reference game art, a reference sprite, an image model's
   bitmap or a copied pixel layout. Everything is drawn here, and its source is recorded (section 6).
 
 What the checker can see of these (exact definitions in section 5a):

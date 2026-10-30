@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import * as collect from "@hexhue/core/collect";
 import { fixtureB, randomLevel } from "../../packages/core/src/collect/fixtures";
 import { ART_LEVELS } from "../../packages/game/src/collect/artLevels";
+import { JOURNEY } from "../../packages/game/src/collect/journey";
 import { TUTORIAL_IDS } from "../../packages/game/src/collect/tutorialLevels";
-import { SLICE_ID } from "../../packages/game/src/collect/slice";
 import { SHIPPED } from "../../content/v2art";
 import { DEV_LEVELS } from "../../packages/game/src/collect/levels";
 import { KNOWN, REPORT, checkAll, inventory, markdown, run, type Entry } from "./production";
@@ -35,9 +35,9 @@ describe("the real inventory", () => {
   const entries = inventory();
   const result = checkAll(entries);
 
-  it("holds every level a player can reach: the tutorial, the slice and every art piece (the daily pool)", () => {
+  it("holds every level a player can reach: the tutorial and the witch's journey (the map and the daily pool)", () => {
     const ids = entries.map((e) => e.level.id);
-    expect(ids).toEqual([...TUTORIAL_IDS, SLICE_ID, ...Object.keys(ART_LEVELS)]);
+    expect(ids).toEqual([...TUTORIAL_IDS, ...JOURNEY.map((e) => e.id)]);
   });
 
   it("passes the gate, every level solved and replayed to a win", () => {
@@ -61,6 +61,10 @@ describe("the real inventory", () => {
       dense24: "density test board",
       dense40: "density test board",
       big: "renderer worst case",
+      slice: "the M10.5 vertical slice (gate G1), kept for the record; not on the journey",
+      ...Object.fromEntries(
+        Object.keys(ART_LEVELS).map((id) => [id, "art library preview, not on the journey"]),
+      ),
     };
     const production = new Set(entries.map((e) => e.level.id));
     for (const [key, make] of Object.entries(DEV_LEVELS)) {
@@ -71,8 +75,8 @@ describe("the real inventory", () => {
     for (const reason of Object.values(DEV_ONLY)) expect(reason.length).toBeGreaterThan(5);
   });
 
-  it("a shipped piece id is matched to its art level id", () => {
-    expect(checkAll(entries, KNOWN, ["black-cat"]).failures).toEqual([]);
+  it("a shipped level id must be in the inventory", () => {
+    expect(checkAll(entries, KNOWN, [JOURNEY[0]!.id]).failures).toEqual([]);
     expect(checkAll(entries, KNOWN, ["nope"]).failures.join()).toMatch(/nope: shipped/);
   });
 
@@ -158,8 +162,9 @@ describe("the command", () => {
   const text = markdown(checkAll(entries, {}));
 
   it("--check passes when the report is current and fails when it is stale or missing", () => {
-    // `run` uses the recorded deviations, which a one-level inventory does not have: all stale, so it fails.
-    expect(run(["--check"], entries, () => text).code).toBe(1);
+    // A current report passes (no deviations are recorded since the journey, M15.14).
+    expect(Object.keys(KNOWN)).toEqual([]);
+    expect(run(["--check"], entries, () => text).code).toBe(0);
     const real = run(["--check"]);
     expect(real.code).toBe(0);
     const stale = run(["--check"], inventory(), () => "old");

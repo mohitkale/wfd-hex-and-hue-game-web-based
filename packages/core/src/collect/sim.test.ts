@@ -66,7 +66,7 @@ describe("fixture A: one familiar, tick by tick (GAME_DESIGN_V2 §14)", () => {
     // Tick 4: move to the standing cell, ready to pick up.
     ev = tick(s);
     expect(ev).toEqual([
-      { type: "familiarMoved", familiar: 0, from: P, to: cell(1), carrying: false },
+      { type: "familiarMoved", familiar: 0, from: P, to: cell(1), carrying: false, at: 1 },
     ]);
     expect(s.familiars[0]!.status).toBe("pickup");
 
@@ -78,7 +78,7 @@ describe("fixture A: one familiar, tick by tick (GAME_DESIGN_V2 §14)", () => {
     // Tick 6: back at the portal.
     ev = tick(s);
     expect(ev).toEqual([
-      { type: "familiarMoved", familiar: 0, from: cell(1), to: P, carrying: true },
+      { type: "familiarMoved", familiar: 0, from: cell(1), to: P, carrying: true, at: 0 },
     ]);
     expect(s.familiars[0]!.status).toBe("deliver");
 

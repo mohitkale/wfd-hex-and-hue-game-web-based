@@ -1,6 +1,6 @@
-# The speed rule (M14.3, changed in M15.6: 2× became 3×, plus a free end-game sprint)
+# The speed rule (M14.3; M15.6: 2× became 3×; M15.13: no automatic sprint, nothing carries over)
 
-1× is always free and is the default. 3× unlocks for the **current level only**, through an **optional** rewarded ad (the ad placement id is still `speed2x`, so providers need no change). **Free end-game sprint:** once no decision is left, the rest of the level plays at 3× without an ad.
+1× is always free and is the default. 3× unlocks for the **current level only**, through an **optional** rewarded ad (the ad placement id is still `speed2x`, so providers need no change). Speed changes only when the player chooses it, and 3× ends with the attempt it was bought for (a retry starts at 1×).
 This replaces the shipped game's alternating free / ad policy for the v2 board (`rewards/speed.ts`,
 which counts `speedTurns` in the v1 save, stays untouched until the v2 switch, M15.5: v1 is not edited).
 The v2 rule is `collect/speedRule.ts` (pure, tested) and keeps its state in the session, not in the save,
@@ -60,15 +60,13 @@ says so; with a "none" provider swapped in, the HUD has only undo and retry.
 game (unit-tested, not clicked through); what happens to the page when a real ad takes over the screen
 (focus, audio, visibility); the 3× unlock surviving a page reload (by design it does not).
 
-## The free end-game sprint (M15.6, owner request)
+## The free end-game sprint (M15.6, removed and then brought back narrower in M15.13)
 
-When nothing is queued in any column and nothing waits in any slot, every remaining cube belongs to a
-group that is already working, so the player has nothing left to decide; the level plays itself out.
-From then on the board is shown at 3× for free (`sprinting` and `effectiveSpeed` in `speedRule.ts`):
+M15.6 played the rest of a level at 3× for free once nothing was left to decide. With every tray
+working (M15.13) that state came early and often, so the board switched to 3× unasked, and with 3×
+chosen on top the owner found it too fast to follow. It was removed: the speed only changes when the
+player chooses it. Every attempt (a retry, a restart, another level) starts at 1×.
 
-- It is **presentation only**, like the speed-up: ticks are the same ticks, shown faster; a test plays
-  the slice and the tutorial levels at 1× and with the sprint and compares the final state hash.
-- It ends by itself if a working group runs dry and goes to wait (then a decision is back).
-- It is never used in the tutorial (the lessons should be watched), and the player does not need an ad.
-- This changes the earlier rule "1× is free; the speed-up only through an ad": the speed-up for the
-  _whole_ level still needs the ad; only the final deliveries speed up for free.
+Later the same day the owner asked for it back in a narrower form: **once no box is left to choose**
+(every column empty), the board switches to 3× by itself for the rest of the level and the speed
+button shows "3×". The player's own choice is untouched (it stays 1× for the next attempt).

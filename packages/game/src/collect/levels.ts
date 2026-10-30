@@ -5,10 +5,13 @@ import { dailyLevelId, dayNumber, utcDate } from "./daily";
 import { TUTORIAL, TUTORIAL_IDS } from "./tutorialLevels";
 import { nextTutorial, shouldOfferTutorial, type TutorialBook } from "./tutorialBook";
 import { layeredOrb } from "./denseBoard";
-import { DEMO_WIN_LINE, LOSE_LINES, SLICE_ID, moonlitHat } from "./slice";
+import { withSharedTrays } from "./trayRules";
+import { toPictureBoard } from "./pictureBoard";
+import { moonlitHat } from "./slice";
+import { JOURNEY, challengeOf, type Tier } from "./journey";
 
 /**
- * Levels for the `?engine=v2` review build. The vertical-slice level (M10.5) replaces `demo` as the
+ * Levels by name (`?level=`): the journey, the tutorial and the dev boards. The vertical-slice level (M10.5) replaces `demo` as the
  * default; these exist so the engine, familiars and board can be played and measured now.
  */
 
@@ -181,8 +184,8 @@ export function stripes(
 }
 
 export const DEV_LEVELS: Record<string, () => collect.CollectLevel> = {
-  /** The M10.5 vertical slice (gate G1). */
-  slice: moonlitHat,
+  /** The M10.5 vertical slice (gate G1), played with every tray working (M15.13). */
+  slice: () => withSharedTrays(toPictureBoard(moonlitHat())),
   parking,
   purple12,
   /** The wax-seal tutorial (M13.4). */
@@ -222,10 +225,54 @@ export function tutorialStart(
   return null;
 }
 
-/** Every art piece as a playable preview level (`?level=art-<piece id>`, M11.5). */
-Object.assign(DEV_LEVELS, ART_LEVELS);
+/** Every art piece as a playable preview level (`?level=art-<piece id>`, M11.5), every tray working (M15.13). */
+for (const [id, make] of Object.entries(ART_LEVELS))
+  DEV_LEVELS[id] = () => withSharedTrays(toPictureBoard(make()));
 
-export const DEFAULT_DEV_LEVEL = "slice";
+/** The witch's journey (M15.13): the levels on the home screen's map, with their recorded deals. */
+for (const e of JOURNEY) DEV_LEVELS[e.id] = e.make;
+
+/** With no level asked for, the journey's first. */
+export const DEFAULT_DEV_LEVEL = JOURNEY[0]!.id;
+
+/** One level in the order the home screen offers them (M15.13). */
+export interface LineEntry {
+  /** The registry name that loads it. */
+  key: string;
+  /** The level's id (the pouch records first clears by it). */
+  id: string;
+  name: string;
+  tier: Tier;
+  chapter: number;
+  chapterName: string;
+  /** Hard or Extreme (shown on its stop), or null for an easy or medium level. */
+  challenge: "hard" | "extreme" | null;
+}
+
+/** The levels in play order: the witch's journey, chapter by chapter, easy to extreme in each. */
+export function levelLine(): LineEntry[] {
+  return JOURNEY.map((e) => ({
+    key: e.id,
+    id: e.id,
+    name: e.name,
+    tier: e.tier,
+    chapter: e.chapter,
+    chapterName: e.chapterName,
+    challenge: challengeOf(e.id),
+  }));
+}
+
+export type LineStatus = "done" | "open" | "locked";
+
+/**
+ * Which levels are finished, which can be played and which wait: the first level is always open, and
+ * each one after it opens once the one before it has been cleared. A finished level can be replayed.
+ */
+export function lineStatus(line: readonly LineEntry[], cleared: ReadonlySet<string>): LineStatus[] {
+  return line.map((e, i) =>
+    cleared.has(e.id) ? "done" : i === 0 || cleared.has(line[i - 1]!.id) ? "open" : "locked",
+  );
+}
 
 /** `?level=<name>` from a URL search string, falling back to the default. */
 export function levelFromSearch(search: string, chosen?: string | null): collect.CollectLevel {
@@ -252,7 +299,10 @@ export function dailyFromSearch(
   // A day picked in the address bar is for review or practice; the Spellbook's Daily button is today.
   const asked = chosen ? "" : (params.get("date") ?? "");
   const date = dayNumber(asked) !== null ? asked : utcDate(now);
-  const levelId = dailyLevelId(date, Object.keys(ART_LEVELS));
+  const levelId = dailyLevelId(
+    date,
+    JOURNEY.map((e) => e.id),
+  );
   return levelId ? { date, levelId } : null;
 }
 
@@ -261,11 +311,9 @@ export function demoLineFromSearch(
   search: string,
   level: collect.CollectLevel,
 ): readonly collect.Action[] | null {
-  if (level.id !== SLICE_ID) return null;
-  const demo = new URLSearchParams(search).get("demo");
-  if (demo === "win") return DEMO_WIN_LINE;
-  // Boxes that wait resume by themselves, so the slot trap cannot be sprung on the board: every
-  // losing demo is the deadlock (the engine's slotsFull line is still tested under free choice).
-  if (demo === "lose" || demo === "slots" || demo === "deadlock") return LOSE_LINES.deadlock;
-  return null;
+  // The board as played is a picture board (M15.13): its winning line comes from the solver, under the
+  // game's own policy (boxes that wait resume by themselves). There is no losing demo: with every tray
+  // working there is no trap to show on a still board.
+  if (new URLSearchParams(search).get("demo") !== "win") return null;
+  return collect.solve(level, undefined, true).line;
 }

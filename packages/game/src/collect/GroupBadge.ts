@@ -36,6 +36,8 @@ export class GroupBadge extends Phaser.GameObjects.Container {
   private readonly opening: Phaser.GameObjects.Graphics;
   private readonly lid: Phaser.GameObjects.Graphics;
   private open = false;
+  /** The lid has finished opening: familiars may come out (M15.13). */
+  private ready = false;
   private readonly glowScale: number;
   private mode: BadgeState = "queued";
   private shown: number;
@@ -51,14 +53,18 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     const tones = tonesFor(opts.colorHex);
     const radius = Math.min(w, h) * 0.22;
     const lw = Math.max(1, dpr * 1.5);
-    const key = `badge:${opts.colorHex}:${Math.round(w)}x${Math.round(h)}:${lw}`;
+    const key = `badge:v2:${opts.colorHex}:${Math.round(w)}x${Math.round(h)}:${lw}`;
+    // A plain block (M15.13): a white rim and the colour's face over a darker lip that gives it depth.
+    // Nothing on top: the tray look (handle, opening) belongs to boxes in the tray row only.
     bake(scene, key, w, h, (g) => {
-      g.fillStyle(tones.dark, 0.95);
-      g.fillRoundedRect(lw / 2, lw / 2, w - lw, h - lw, radius);
-      g.fillStyle(tones.base, 0.35);
-      g.fillRoundedRect(lw / 2, lw / 2, w - lw, (h - lw) * 0.55, radius);
-      g.lineStyle(lw, tones.light, 0.9);
-      g.strokeRoundedRect(lw / 2, lw / 2, w - lw, h - lw, radius);
+      const rim = Math.max(2, Math.round(dpr * 2));
+      const lip = Math.max(2, Math.round(h * 0.1));
+      g.fillStyle(0xffffff, 1);
+      g.fillRoundedRect(0, 0, w, h, radius);
+      g.fillStyle(tones.dark, 1);
+      g.fillRoundedRect(rim, rim, w - 2 * rim, h - 2 * rim, radius * 0.8);
+      g.fillStyle(tones.base, 1);
+      g.fillRoundedRect(rim, rim, w - 2 * rim, h - 2 * rim - lip, radius * 0.8);
     });
     this.glow = scene.add
       .image(0, 0, TEX.glow)
@@ -90,8 +96,8 @@ export class GroupBadge extends Phaser.GameObjects.Container {
         fontStyle: "bold",
         fontSize: `${Math.max(8, fontPx)}px`,
         color: "#ffffff",
-        stroke: "#140b2e",
-        strokeThickness: Math.max(2, Math.round(dpr * 2)),
+        stroke: `#${tones.dark.toString(16).padStart(6, "0")}`,
+        strokeThickness: Math.max(3, Math.round(dpr * 3)),
       })
       .setOrigin(0.5);
     this.add(this.label);
@@ -117,6 +123,21 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.setSize(w, h);
   }
 
+  /**
+   * In a tray the box is a bucket: a handle arches over it (drawn behind the box, so only the arch
+   * shows above the top edge).
+   */
+  setInTray(): void {
+    const { w, h, dpr } = this.opts;
+    const tones = tonesFor(this.opts.colorHex);
+    const handle = this.scene.add.graphics();
+    handle.lineStyle(Math.max(2, Math.round(dpr * 3)), tones.dark, 1);
+    handle.beginPath();
+    handle.arc(0, -h * 0.32, w * 0.3, Math.PI, 0, false);
+    handle.strokePath();
+    this.addAt(handle, 1);
+  }
+
   /** Stops the glow's endless breathing tween with the badge (a tween on a destroyed child would run on). */
   override destroy(fromScene?: boolean): void {
     this.scene?.tweens.killTweensOf([this.glow, this.label, this, this.lid, this.opening]);
@@ -130,23 +151,27 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.scene.tweens.killTweensOf(this.glow);
     // A box that stalls and resumes must not multiply the glow's size each time.
     this.glow.setScale(this.glowScale);
-    const reduced = isReducedMotion(this.scene);
-    if (state === "working") {
-      this.glow.setAlpha(0.55);
-      if (!reduced) {
-        this.scene.tweens.add({
-          targets: this.glow,
-          alpha: 0.2,
-          scale: this.glowScale * 1.08,
-          duration: 520,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-      }
-    } else this.glow.setAlpha(0);
+    // No glow on working boxes (M15.13): a sober look, and a large blended image per box was GPU cost
+    // on integrated graphics. The open tray and the familiars coming out already say it works.
+    this.glow.setAlpha(0).setVisible(false);
     this.bg.setAlpha(state === "waiting" ? 0.62 : 1);
     this.sleep.setAlpha(state === "waiting" ? 0.9 : 0);
+  }
+
+  private sweptMark: Phaser.GameObjects.Text | null = null;
+
+  /** Besom Sweep (M15.13): a broom on the box while its familiars fly. */
+  setSwept(on: boolean): void {
+    if (on && !this.sweptMark) {
+      const { w, h } = this.opts;
+      this.sweptMark = this.scene.add
+        .text(-w * 0.32, -h * 0.3, "🧹", { fontSize: `${Math.max(8, Math.round(h * 0.28))}px` })
+        .setOrigin(0.5);
+      this.add(this.sweptMark);
+    } else if (!on && this.sweptMark) {
+      this.sweptMark.destroy();
+      this.sweptMark = null;
+    }
   }
 
   /** Whether the tray is open (or opening). */
@@ -154,28 +179,37 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     return this.open;
   }
 
+  /** Whether the tray is fully open, so familiars can be seen coming out of it. */
+  get isReady(): boolean {
+    return this.open && this.ready;
+  }
+
   /**
    * Opens the tray: the lid tips back and the dark opening shows, so the familiars can come out.
    * `instant` shows it already open (a box that moved to another place keeps its tray open).
    */
-  openTray(instant = false): void {
+  openTray(instant = false, delayMs = 0, openMs = 160): void {
     if (this.open) return;
     this.open = true;
+    this.ready = false;
     this.scene.tweens.killTweensOf([this.lid, this.opening]);
     this.lid.setAlpha(1).setScale(1, 1);
     const reduced = isReducedMotion(this.scene);
     if (reduced || instant) {
       this.lid.setScale(1, 0.12);
       this.opening.setAlpha(1);
+      this.ready = true;
       return;
     }
     this.scene.tweens.add({
       targets: this.lid,
       scaleY: 0.12,
-      duration: 200,
+      delay: delayMs,
+      duration: openMs,
       ease: "Cubic.easeOut",
+      onComplete: () => (this.ready = this.open),
     });
-    this.scene.tweens.add({ targets: this.opening, alpha: 1, duration: 200 });
+    this.scene.tweens.add({ targets: this.opening, alpha: 1, delay: delayMs, duration: openMs });
   }
 
   /** Closes the tray (the lid comes down), then calls `done`; with reduced motion, at once. */
@@ -185,6 +219,7 @@ export class GroupBadge extends Phaser.GameObjects.Container {
       return;
     }
     this.open = false;
+    this.ready = false;
     this.scene.tweens.killTweensOf([this.lid, this.opening]);
     if (isReducedMotion(this.scene)) {
       this.lid.setAlpha(0);
@@ -221,22 +256,13 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.bar.fillRoundedRect(-bw / 2, y, bw * f, bh, bh / 2);
   }
 
-  /** Shows a new remaining number, with a small pop when it changes. */
+  /** Shows a new remaining number. */
   setNumber(n: number): void {
-    if (n === this.shown) return;
+    // A finished box leaves its tray; it never shows 0 (M15.13).
+    if (n === this.shown || n <= 0) return;
     this.shown = n;
+    // Just the new number: with a steady stream it changes several times a second, and a pop on each
+    // change made the box dance (owner feedback, M15.13).
     this.label.setText(String(n));
-    if (isReducedMotion(this.scene)) return;
-    this.scene.tweens.killTweensOf(this.label);
-    this.label.setScale(1.35);
-    this.scene.tweens.add({ targets: this.label, scale: 1, duration: 160, ease: "Back.easeOut" });
-  }
-
-  /** A small bump when a cube lands in the portal (decorative: the number itself already shows the truth). */
-  pulse(): void {
-    if (isReducedMotion(this.scene)) return;
-    this.scene.tweens.killTweensOf(this);
-    this.setScale(1.08);
-    this.scene.tweens.add({ targets: this, scale: 1, duration: 150, ease: "Back.easeOut" });
   }
 }

@@ -1,4 +1,4 @@
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { legalActions } from "./actions";
 import { createCollectState } from "./state";
 
@@ -67,6 +67,42 @@ export interface CollectLevel {
   spawnGap: number;
   /** Groups that may work at once. */
   fieldCap: number;
+  /**
+   * Shared trays (M15.13, docs/V2_TRAYS.md): the `slots` trays hold every box out of its column,
+   * working or waiting, and every one of them works whenever its colour can be reached. A box that runs
+   * dry just waits in its own tray, so `slotsFull` cannot happen; the game is lost only when every tray
+   * holds a box that cannot work (a deadlock). `fieldCap` must equal `slots`. Absent: the original
+   * rule (`fieldCap` working places plus `slots` waiting places).
+   */
+  sharedTrays?: boolean;
+  /**
+   * The gate (M15.13): ticks a familiar spends at the portal end of each trip, coming out of its tray
+   * on the way out and going down the hole on the way back. Absent or 0: none.
+   */
+  gate?: number;
+  /**
+   * Edge gate (M15.13): familiars enter and leave the picture anywhere along its bottom edge (the
+   * margin row under it), at the edge cell nearest their cube, instead of all through the portal
+   * cell. Distances are measured from that whole row. Absent: the single portal.
+   */
+  edgeGate?: boolean;
+  /**
+   * Edge-first routes (M15.13): walking into a cell inside the picture costs this much against 1 on
+   * the margin ring, so familiars keep to the left, right and top edges and cut in near their cube.
+   * Absent or 1: plain shortest paths.
+   */
+  edgeBias?: number;
+  /**
+   * Row order (M15.13): familiars take the lowest row that holds a cube they can reach, from the
+   * board's centre out, alternating left and right; then the next row up. Absent: the cube nearest the
+   * way in (`nearestTarget`).
+   */
+  rowTargets?: boolean;
+  /**
+   * Ticks a newly chosen box's tray takes to open before its first familiar leaves (M15.13). Counted
+   * in ticks, so it shortens with the speed-up like everything else. Absent or 0: at once.
+   */
+  openDelay?: number;
   /** Portal column in `[0, width - 1]`; default `floor((width - 1) / 2)`. */
   portalX?: number;
   /** Optional sealed cubes; absent means every cube can be collected as soon as it is reachable. */
@@ -84,7 +120,7 @@ export const COLLECT_LIMITS = {
   maxShades: 80,
   maxColumns: 6,
   maxSlots: 8,
-  maxSquad: 6,
+  maxSquad: 40,
   maxFieldCap: 6,
 } as const;
 
@@ -191,6 +227,26 @@ export function validateCollectLevel(level: CollectLevel): string[] {
   if (!isInt(level.spawnGap) || level.spawnGap < 1) errors.push("spawnGap must be an integer ≥ 1");
   if (!isInt(level.fieldCap) || level.fieldCap < 1 || level.fieldCap > L.maxFieldCap)
     errors.push(`fieldCap must be 1..${L.maxFieldCap}`);
+  if (level.sharedTrays !== undefined && typeof level.sharedTrays !== "boolean")
+    errors.push("sharedTrays must be a boolean");
+  if (
+    level.edgeBias !== undefined &&
+    (!isInt(level.edgeBias) || level.edgeBias < 1 || level.edgeBias > 9)
+  )
+    errors.push("edgeBias must be an integer in 1..9");
+  if (
+    level.openDelay !== undefined &&
+    (!isInt(level.openDelay) || level.openDelay < 0 || level.openDelay > 40)
+  )
+    errors.push("openDelay must be an integer in 0..40");
+  if (level.rowTargets !== undefined && typeof level.rowTargets !== "boolean")
+    errors.push("rowTargets must be a boolean");
+  if (level.edgeGate !== undefined && typeof level.edgeGate !== "boolean")
+    errors.push("edgeGate must be a boolean");
+  if (level.gate !== undefined && (!isInt(level.gate) || level.gate < 0 || level.gate > 40))
+    errors.push("gate must be an integer in 0..40");
+  if (level.sharedTrays === true && level.fieldCap !== level.slots)
+    errors.push("with sharedTrays, fieldCap must equal slots (every tray works)");
   if (
     level.portalX !== undefined &&
     (!isInt(level.portalX) || level.portalX < 0 || level.portalX >= width)
@@ -287,6 +343,21 @@ export function parseCollectLevel(json: unknown): CollectLevel {
     fieldCap: num("fieldCap"),
   };
   if (o.portalX !== undefined) level.portalX = num("portalX");
+  if (o.gate !== undefined) level.gate = num("gate");
+  if (o.edgeBias !== undefined) level.edgeBias = num("edgeBias");
+  if (o.openDelay !== undefined) level.openDelay = num("openDelay");
+  if (o.rowTargets !== undefined) {
+    if (typeof o.rowTargets !== "boolean") fail("rowTargets must be a boolean");
+    level.rowTargets = o.rowTargets as boolean;
+  }
+  if (o.edgeGate !== undefined) {
+    if (typeof o.edgeGate !== "boolean") fail("edgeGate must be a boolean");
+    level.edgeGate = o.edgeGate as boolean;
+  }
+  if (o.sharedTrays !== undefined) {
+    if (typeof o.sharedTrays !== "boolean") fail("sharedTrays must be a boolean");
+    level.sharedTrays = o.sharedTrays as boolean;
+  }
   if (o.subject !== undefined) {
     const sub = o.subject as Record<string, unknown> | null;
     if (!sub || typeof sub !== "object") fail("subject must be an object");

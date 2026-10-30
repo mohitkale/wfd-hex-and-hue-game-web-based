@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   award,
+  giftFor,
+  GIFT_EVERY,
   BOOSTERS,
   parsePouch,
   pay,
@@ -18,7 +20,7 @@ import {
 const empty = (): Pouch => ({
   ...startingPouch(),
   coins: 0,
-  boosters: { undo: 0, extraSlot: 0, hint: 0 },
+  boosters: { undo: 0, extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
 });
 
 const store = (initial?: string) => {
@@ -40,7 +42,11 @@ describe("starting kit", () => {
 
 describe("paying", () => {
   it("uses stock first, then coins, and never goes negative", () => {
-    let p: Pouch = { ...empty(), coins: 20, boosters: { undo: 1, extraSlot: 0, hint: 0 } };
+    let p: Pouch = {
+      ...empty(),
+      coins: 20,
+      boosters: { undo: 1, extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
+    };
     expect(paymentFor(p, "undo")).toEqual({ kind: "owned" });
     p = pay(p, "undo", paymentFor(p, "undo"));
     expect(p.boosters.undo).toBe(0);
@@ -70,12 +76,18 @@ describe("earning (every booster is earnable by playing)", () => {
 
   it("a daily's first completion adds a bonus", () => {
     expect(winCoins({ cubes: 0, firstClear: true, dailyBonus: true })).toBe(30);
+    // Hard and Extreme first clears pay more; a replay does not.
+    expect(winCoins({ cubes: 0, firstClear: true, challenge: "hard" })).toBe(35);
+    expect(winCoins({ cubes: 0, firstClear: true, challenge: "extreme" })).toBe(55);
+    expect(winCoins({ cubes: 0, firstClear: false, challenge: "extreme" })).toBe(3);
   });
 
   it("any booster is bought within three first clears of even the smallest level", () => {
     let p = empty();
     for (let i = 0; i < 3; i++) p = award(p, `l${i}`, { cubes: 0 }).pouch;
-    for (const b of BOOSTERS) expect(paymentFor(p, b).kind).toBe("coins");
+    // Affordable with coins (the third clear may also have given one power-up outright).
+    for (const b of BOOSTERS) expect(paymentFor(p, b).kind).not.toBe("short");
+    expect(p.coins).toBeGreaterThanOrEqual(Math.max(...Object.values(PRICES)));
   });
 
   it("replays are slow on purpose: 14 replays to afford an Extra Slot", () => {
@@ -93,7 +105,12 @@ describe("parsing and storage", () => {
       paid: [1, "a", "a", ""],
     });
     expect(p.coins).toBe(0);
-    expect(p.boosters).toEqual({ undo: STARTING_KIT.boosters.undo, hint: 0, extraSlot: 7 });
+    expect(p.boosters).toEqual({
+      ...STARTING_KIT.boosters,
+      undo: STARTING_KIT.boosters.undo,
+      hint: 0,
+      extraSlot: 7,
+    });
     expect(p.paid).toEqual(["a"]);
   });
 
@@ -118,5 +135,24 @@ describe("parsing and storage", () => {
     expect(readPouch(throwing).ok).toBe(false);
     expect(savePouch(throwing, startingPouch())).toBe(false);
     expect(savePouch(null, startingPouch())).toBe(false);
+  });
+});
+
+describe("power-ups (M15.13)", () => {
+  it("start with one of each, and an old pouch without them gets that starter one", () => {
+    expect(startingPouch().boosters).toMatchObject({ call: 1, sweep: 1, lantern: 1 });
+    const old = parsePouch({ coins: 5, boosters: { undo: 0, extraSlot: 0, hint: 0 }, paid: [] });
+    expect(old.boosters).toMatchObject({ call: 1, sweep: 1, lantern: 1 });
+  });
+
+  it("every third first clear gives one power-up, fixed by the level; replays give none", () => {
+    let p: Pouch = { ...empty(), paid: ["a", "b"] };
+    const r = award(p, "c", { cubes: 200 });
+    expect(r.gift).toBe(giftFor("c"));
+    expect(r.pouch.boosters[r.gift!]).toBe(1);
+    p = r.pouch;
+    expect(award(p, "c", { cubes: 200 }).gift).toBeNull();
+    expect(award(p, "d", { cubes: 200 }).gift).toBeNull();
+    expect(GIFT_EVERY).toBe(3);
   });
 });

@@ -1,5 +1,7 @@
 import type { MotionSetting } from "../a11y";
-import { TUTORIAL_TIPS } from "../tips";
+
+/** The v1 tutorial's tips, marked seen for players who already won a level (old saves load unchanged). */
+const TUTORIAL_TIPS = ["launch", "collect", "portal", "park", "relaunch"] as const;
 
 /**
  * Current save format. Bump and add a step to `MIGRATIONS` when the shape changes incompatibly.
@@ -46,7 +48,7 @@ export interface SaveData {
   stats: { plays: number; wins: number; losses: number };
   /** Where the player last was, for "continue". */
   lastPlayed: { world: number; level: number } | null;
-  /** Onboarding tips already shown (see tips.ts); each appears once. */
+  /** Onboarding tips already shown (v1 saves; kept so old saves load unchanged). */
   tips: string[];
 }
 

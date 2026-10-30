@@ -1,12 +1,14 @@
-import { worlds } from "@hexhue/game/levels";
+import { CHAPTERS, JOURNEY, type JourneyEntry } from "@hexhue/game/journey";
+import type { ArtLike } from "./images";
 
 export const SITE = {
   name: "Hex & Hue",
   fullName: "Hex & Hue: Magic Pixel Puzzle",
   tagline: "A Little Magic in Every Color",
   description:
-    "A free, cozy, magical color-sorting pixel puzzle. Summon wisps, collect every fragment and " +
-    "fill your Spellbook with moon, crystal and zodiac art. No timers, no lives, no paywalls.",
+    "A free, cozy, magical pixel puzzle. Pick a box, send your familiars to fetch every cube of " +
+    "its colour, and walk a witch's journey of 24 pictures, from a first candle to your own " +
+    "grimoire. No timers, no lives, no paywalls.",
 } as const;
 
 export interface GalleryItem {
@@ -27,21 +29,35 @@ export interface GalleryWorld {
   items: GalleryItem[];
 }
 
-/** Every shipped mosaic, grouped by world, in play order. */
+/** Every journey picture as drawn (palette and cells), by level id: built once per build. */
+const pictures = new Map<string, { entry: JourneyEntry; art: ArtLike; lore: string }>();
+export function journeyPictures(): { entry: JourneyEntry; art: ArtLike; lore: string }[] {
+  if (pictures.size === 0)
+    for (const entry of JOURNEY) {
+      const level = entry.base();
+      pictures.set(entry.id, { entry, art: level, lore: level.subject?.lore ?? "" });
+    }
+  return [...pictures.values()];
+}
+
+/** Every picture of the witch's journey, grouped by chapter, in play order. */
 export function gallery(): GalleryWorld[] {
-  return worlds.map((w) => ({
-    id: w.id,
-    name: w.name,
-    items: w.levels.map((l, i) => ({
-      id: l.level.id,
-      name: l.level.name,
-      lore: l.lore,
-      world: w.name,
-      worldId: w.id,
-      number: i + 1,
-      width: l.level.width,
-      height: l.level.height,
-    })),
+  const all = journeyPictures();
+  return CHAPTERS.map((name, ci) => ({
+    id: `chapter-${ci + 1}`,
+    name: `Chapter ${ci + 1}: ${name}`,
+    items: all
+      .filter((p) => p.entry.chapter === ci + 1)
+      .map((p, i) => ({
+        id: p.entry.id,
+        name: p.entry.name,
+        lore: p.lore,
+        world: name,
+        worldId: `chapter-${ci + 1}`,
+        number: i + 1,
+        width: p.art.width,
+        height: p.art.height,
+      })),
   }));
 }
 

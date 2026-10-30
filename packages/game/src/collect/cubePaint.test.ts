@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { SHADED_BEVEL, paintCube, shadeTonesGrid, tonesFor } from "./cubePaint";
 
+const paintedEdge = (t: { base: number; light: number; dark: number }): number => {
+  let first = -1;
+  paintCube(
+    {
+      fillStyle: (c: number) => {
+        if (first < 0) first = c;
+      },
+      fillRect: () => undefined,
+      fillRoundedRect: () => undefined,
+    },
+    0,
+    0,
+    20,
+    t,
+  );
+  return first;
+};
+
 describe("tonesFor", () => {
   it("lightens and darkens by the bevel, more for plain art than for shaded art", () => {
     const plain = tonesFor("#808080");
@@ -53,16 +71,18 @@ describe("paintCube", () => {
     };
   };
 
-  it("is a rounded tile: a dark lip, the colour, then a soft highlight and a bright dot", () => {
+  it("is the square top face of a 3D block: a line where faces meet, a lit top and left (M15.13)", () => {
     const { calls, g } = record();
     paintCube(g, 10, 20, 20, { base: 1, light: 2, dark: 3 });
-    expect(calls[0]).toBe("fill 3");
-    expect(calls[2]).toBe("fill 1");
-    expect(calls).toContain("fill 2 @0.5");
-    expect(calls).toContain("fill 16777215 @0.55");
-    expect(calls.filter((c) => c.startsWith("round"))).toHaveLength(4);
-    // Rounded, never a hard square.
-    expect(calls.filter((c) => c.startsWith("rect"))).toHaveLength(0);
+    // The edge is only partly toward the dark tone: lighter than it, darker than the face.
+    const edge = paintedEdge({ base: 0x808080, light: 0xc0c0c0, dark: 0x202020 });
+    expect(edge).toBeGreaterThan(0x202020);
+    expect(edge).toBeLessThan(0x808080);
+    expect(calls).toContain("fill 1");
+    expect(calls).toContain("fill 2 @0.65");
+    expect(calls.some((c) => c.startsWith("fill 16777215"))).toBe(false);
+    // Square, no rounding (owner decision): cubes meet edge to edge; the depth is the board's front faces.
+    expect(calls.filter((c) => c.startsWith("round"))).toHaveLength(0);
   });
 
   it("stays inside its square, even tiny", () => {

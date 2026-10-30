@@ -3,7 +3,7 @@ import { theme } from "../theme";
 import { Button } from "../view/Button";
 import { DragScroll, takeRestoredScroll } from "../view/DragScroll";
 import { fadeIn } from "../view/transition";
-import { artLevelForPiece } from "./artLevels";
+import { pictureLevel } from "./journey";
 import { computeCollectLayout } from "./collectLayout";
 import { utcDate } from "./daily";
 import { dailyStatus, readDailyBook } from "./dailyBook";
@@ -12,10 +12,10 @@ import { fitCell, paintPicture, paintSilhouette } from "./pictureView";
 import { browserStore, loadSpellbook } from "./v2Spellbook";
 
 /**
- * The v2 Spellbook as a collectible gallery (M11.5, M13.2): the art library grouped by world, each
+ * The Spellbook as a collectible gallery (M11.5, M13.2): the journey's pictures by chapter, each
  * picture finished with its name once you have completed it and a silhouette until then. Tap a
  * collected card to read its page (lore, completions, first date) and play it again. Review build
- * only (`?engine=v2`); the shipped game's Spellbook is untouched.
+ * (M15.13: the game has only this board since the v2 switch).
  */
 export class CollectSpellbookScene extends Phaser.Scene {
   private open: string | null = null;
@@ -106,7 +106,7 @@ export class CollectSpellbookScene extends Phaser.Scene {
         y += tag.height + 10 * dpr;
       }
       section.cards.forEach((card, n) => {
-        const level = artLevelForPiece(card.pieceId);
+        const level = pictureLevel(card.pieceId);
         if (!level) return;
         const x = frame.x + side + (n % cols) * (cardW + gap);
         const cy = y + Math.floor(n / cols) * (cardH + gap);
@@ -231,7 +231,7 @@ export class CollectSpellbookScene extends Phaser.Scene {
 
   /** A collected picture's page: finished art, name, lore, and a way to play it again. */
   private showPage(id: string): void {
-    const level = artLevelForPiece(id);
+    const level = pictureLevel(id);
     const page = pageFor(loadSpellbook(browserStore()), id);
     if (!level || !page) return;
     this.open = id;

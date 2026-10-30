@@ -144,15 +144,14 @@ describe("the machine", () => {
   });
 });
 
-describe("the four tutorial levels", () => {
-  it("are in teaching order, with distinct ids", () => {
-    expect(TUTORIAL_IDS).toEqual([
-      "tutorial-summon",
-      "tutorial-blocked",
-      "tutorial-slots",
-      "tutorial-undo",
-    ]);
-    expect(new Set(TUTORIAL_IDS).size).toBe(4);
+describe("the three tutorial levels", () => {
+  it("are in teaching order, with distinct ids (no Undo lesson: there is no Undo)", () => {
+    expect(TUTORIAL_IDS).toEqual(["tutorial-summon", "tutorial-blocked", "tutorial-slots"]);
+    expect(new Set(TUTORIAL_IDS).size).toBe(3);
+  });
+
+  it("play by the game's rules: every tray works", () => {
+    for (const t of TUTORIAL) expect(t.make().sharedTrays, t.id).toBe(true);
   });
 
   it.each(TUTORIAL.map((t) => [t.id]))("%s is valid and the solver can win it", (id) => {
@@ -185,25 +184,6 @@ describe("the four tutorial levels", () => {
       "clear-blue",
     ]);
     expect(followHints("tutorial-slots").hints.map((h) => h.id)).toEqual(["send-red", "waits"]);
-    expect(followHints("tutorial-undo").hints.map((h) => h.id)).toEqual([
-      "red",
-      "green",
-      "undo",
-      "blue",
-      "finish",
-    ]);
-  });
-
-  it("the undo level really does lose on the pointed-at mistake, and Undo really does recover", () => {
-    const t = tutorialById("tutorial-undo")!;
-    const session = new collect.CollectSession(t.make(), undefined, undefined, true);
-    session.tap({ kind: "select", column: 0 });
-    settle(session);
-    session.tap({ kind: "select", column: 1 });
-    settle(session);
-    expect(session.state.status).toBe("lost");
-    expect(session.undo()).toBe(true);
-    expect(session.state.status).toBe("playing");
   });
 
   it("a tap on the buried colour waits in a tray, and wakes by itself once the blue is cleared", () => {
@@ -348,8 +328,8 @@ describe("where a visit starts", () => {
       "tutorial-blocked",
     );
     expect(tutorialStart("?level=tutorial", undefined, all)).toBe("tutorial-summon");
-    expect(tutorialStart("?level=tutorial-undo", undefined, markSkipped(fresh))).toBe(
-      "tutorial-undo",
+    expect(tutorialStart("?level=tutorial-slots", undefined, markSkipped(fresh))).toBe(
+      "tutorial-slots",
     );
     // A choice made in the game (the end card's Next / Play) wins over the address bar.
     expect(tutorialStart("", "slice", fresh)).toBeNull();
@@ -403,22 +383,6 @@ describe("other roads: the hint stays true when the player does things in anothe
     expect(seenHints).toContain("waits");
     expect(session.state.status).toBe("won");
     expect(session.log.some((e) => e.auto)).toBe(true);
-  });
-
-  it("undo: another road never shows the Undo hint when nothing was lost", () => {
-    for (const order of [
-      [sel(0), sel(2), sel(1)],
-      [sel(2), sel(0), sel(1)],
-    ]) {
-      const { seenHints } = play("tutorial-undo", order);
-      expect(seenHints, JSON.stringify(order)).not.toContain("undo");
-    }
-  });
-
-  it("undo: the real loss does show it, and only then", () => {
-    const { seenHints, session } = play("tutorial-undo", [sel(0), sel(1)]);
-    expect(session.state.status).toBe("lost");
-    expect(seenHints[seenHints.length - 1]).toBe("undo");
   });
 
   it("buried colour: clearing the blue first (never trying red) still teaches the way through", () => {

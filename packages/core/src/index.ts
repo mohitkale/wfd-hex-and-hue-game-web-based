@@ -1,62 +1,9 @@
+/**
+ * The Hex & Hue engine (v2): the collect game in `collect` (rules, simulation, solver, simulated
+ * players, generator), plus the seeded random numbers and the ASCII picture format the art library is
+ * written in. No DOM, no Phaser; deterministic.
+ */
 export { createRng, type Rng } from "./rng";
-export {
-  EMPTY,
-  LEVEL_LIMITS,
-  countCharges,
-  countFragments,
-  parseLevel,
-  validateLevel,
-  type Level,
-  type WispSpec,
-} from "./level";
-export { buildTrack, firstInSight, type Lane, type Sight, type TrackCell } from "./track";
-export {
-  advance,
-  canLaunch,
-  cloneState,
-  createState,
-  entryOpen,
-  launch,
-  runQuiet,
-  runUntilIdle,
-  step,
-  trackFor,
-  wispAt,
-  type LaunchSource,
-  type SimEvent,
-  type SimState,
-  type Status,
-  type TrackWisp,
-  type Wisp,
-} from "./sim";
-export { GameSession, type SessionEvent, type SessionListener } from "./session";
-export {
-  analyzeLevel,
-  difficultyScore,
-  playSequential,
-  sequentialMoves,
-  solve,
-  solveState,
-  stateWithSlots,
-  verifySolution,
-  type AnalyzeOptions,
-  type DifficultyReport,
-  type SolveOptions,
-  type SolveResult,
-  type SolveStatus,
-} from "./solver";
-export {
-  fixedChunks,
-  generateLevel,
-  naturalSequence,
-  type Art,
-  type GenerateOptions,
-  type GeneratedLevel,
-} from "./generator";
-export { parseAsciiArt, type AsciiArt } from "./art";
-export { shuffleColumns } from "./shuffle";
-export type { BuiltLevel, BuiltWorld } from "./content";
-export { addSlot, applyWand, exposedCells, wandColors, type WandResult } from "./boosters";
-export { collectAt } from "./sim";
-export type { SnapshotKind } from "./session";
+export { EMPTY } from "./cells";
+export { parseAsciiArt, type Art, type AsciiArt } from "./art";
 export * as collect from "./collect";

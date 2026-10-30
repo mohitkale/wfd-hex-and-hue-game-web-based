@@ -73,7 +73,7 @@ Rules for M8–M15:
 - Same loop as before (one task = one branch = one PR; the PR ticks its box), with one change:
   a task starts when its dependencies are merged, and milestone boundaries do **not** pause for
   approval. Only the human gates below stop the run.
-- v2 code is additive and unreachable by default (`?engine=v2`) until the switch in M15.5, because
+- v2 code was additive and unreachable by default (`?engine=v2`) until the switch (done in M15.14, awaiting G4 approval to merge), because
   `main` is the deploy branch. v1 modules are not edited except for bug fixes.
 - Passing CI is never recorded as human approval.
 
@@ -178,6 +178,8 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 - [x] **M15.10** Auto-resume and a calmer pace — owner feedback round 4 (docs/V2_PLAYTEST.md items 15-17): a pending box resumes by itself and its tray stays open (docs/V2_AUTORESUME.md), the board shows 14 ticks a second, and a boot crash from M15.9 fixed.
 - [x] **M15.11** Queue a box in a free tray — owner feedback round 5 (docs/V2_PLAYTEST.md item 18): a tap on a box that cannot work yet (working limit reached, nothing reachable, or sealed) no longer fails while a tray is free; it waits in the tray and wakes by itself (docs/V2_AUTORESUME.md).
 - [ ] **M15.12** Re-measure under auto-resume and queueing (found in the M15.10 and M15.11 reviews; do before G3 evidence is collected): add queue-aware column-spam and round-robin players to the strategy gate (a queue-aware column-spam already beats `slice-moonlit-hat` and `art-black-cat`), make the hint search queue-aware, run the simulated players, `strategyReport` tiers, `minSlots` and the difficulty measures with the policy on, and re-check that art levels still resist column-spam and greedy play. See docs/V2_AUTORESUME.md.
+- [x] **M15.13** Every tray works, a calmer walk and a warm table look — owner feedback round 6 (docs/V2_PLAYTEST.md items 19 to 23, docs/V2_TRAYS.md): shared trays (a box in any tray works whenever its colour is reachable and otherwise waits in its own tray, so the "out of slots" trap and the sleeping-tray confusion are gone), squads of 8 leaving every tick, 8 cells a second at 1×, Extra Slot revives a stuck board when a new tray helps, and a bright wooden-table look (cream board, plates under the trays, glossy boxes, faded back rows). The tutorial keeps the original rule until its lessons are rewritten.
+- [x] **M15.14** v2 only and the witch's journey — owner request (2026-10-31): v1 removed from the code (track engine, scenes, levels, tools; `/play` mounts the board with no flag); 24 levels in six chapters drawn in the bordered style (`journey.ts`, `pixelCanvas.ts`), each dealt offline to its tier with the normal trays (`tools/collect/journey.ts`; difficulty from box size, box order and wax seals, never fewer trays); the palette spread to ΔE ≥ 27; a scrollable home map with chapters; characters face where they walk, walk at 30 fps with a stride-driven cycle and dive into the hole at walking pace; the site's gallery and share images show the journey; the cookbook (`docs/COOKBOOK.md`). The owner asked for a PR and a new major version; **the PR is not merged, and v2.0.0 not tagged, until the owner approves it manually** (G4).
 
 ## Later (post-MVP, not scheduled)
 

@@ -1,4 +1,4 @@
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { computeDist, topologyFor } from "./grid";
 import { sealGate } from "./seals";
 import { cachesOf, type CollectState } from "./state";
@@ -11,7 +11,13 @@ export function violation(s: CollectState): string | null {
   const t = topologyFor(s.params.width, s.params.height);
 
   // dist equals a fresh BFS.
-  const fresh = computeDist(t, s.grid, s.params.portal);
+  const fresh = computeDist(
+    t,
+    s.grid,
+    s.params.portal,
+    s.params.edgeGate === true,
+    s.params.edgeBias ?? 1,
+  );
   for (let i = 0; i < fresh.length; i++) {
     if (fresh[i] !== s.dist[i]) return `dist[${i}] = ${s.dist[i]}, fresh BFS says ${fresh[i]}`;
   }

@@ -11,8 +11,7 @@ import {
 } from "./collectLayout";
 import { endCardText } from "./endCardText";
 import { DEVICE_MATRIX as MATRIX } from "./deviceMatrix";
-import { ART_LEVELS } from "./artLevels";
-import { moonlitHat } from "./slice";
+import { JOURNEY } from "./journey";
 import { tonesFor } from "./cubePaint";
 import { HUD_BUTTON_CSS, HUD_ZONE_CSS } from "./collectLayout";
 import { numberLayout, DIGIT_EM } from "./badgeBox";
@@ -122,8 +121,10 @@ describe("portrait phones and tablets: thumb-sized targets and readable numbers"
         expect(css(l, badgeFontPx(tray.w, tray.h))).toBeGreaterThanOrEqual(
           l.trays.length <= 5 ? 14 : 10,
         );
-        // The picture stays readable: cubes are not specks.
-        const minCell = s.board <= 10 ? 20 : s.board <= 24 ? 10 : 6.5;
+        // The picture stays readable: cubes are not specks (and at most 16 css px, about half a
+        // familiar, owner request).
+        const minCell = s.board <= 10 ? 15 : s.board <= 24 ? 10 : 6.5;
+        expect(css(l, l.cell)).toBeLessThanOrEqual(16.5);
         expect(css(l, l.cell)).toBeGreaterThanOrEqual(minCell);
       });
 });
@@ -378,9 +379,7 @@ describe("white group numbers on every badge colour", () => {
       "#b44ae2",
       "#4ae2d8",
     ]);
-    for (const make of Object.values(ART_LEVELS))
-      for (const hex of make().palette) palettes.add(hex);
-    for (const hex of moonlitHat().palette) palettes.add(hex);
+    for (const e of JOURNEY) for (const hex of e.base().palette) palettes.add(hex);
     let worst = Infinity;
     for (const hex of palettes) {
       const dark = tonesFor(hex).dark;
@@ -394,7 +393,7 @@ describe("white group numbers on every badge colour", () => {
 });
 
 describe("the levels that ship, on the matrix", () => {
-  const levels = [moonlitHat(), ...Object.values(ART_LEVELS).map((make) => make())];
+  const levels = JOURNEY.map((e) => e.make());
   for (const d of DEVICES.filter((x) => x.framed))
     it(`${d.name}: every shipped level fits, with readable cubes and numbers`, () => {
       for (const level of levels) {
@@ -408,6 +407,7 @@ describe("the levels that ship, on the matrix", () => {
           slots: level.slots,
           columns: level.columns.length,
           fieldCap: level.fieldCap,
+          sharedTrays: level.sharedTrays === true,
           portalX: level.portalX ?? Math.floor((level.width - 1) / 2),
         });
         for (const r of [...l.trays, ...l.columns]) expect(overlap(l.boardRect, r)).toBe(false);

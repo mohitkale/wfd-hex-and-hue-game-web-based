@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseAsciiArt } from "./art";
-import { EMPTY } from "./level";
+import { EMPTY } from "./cells";
 
 describe("parseAsciiArt", () => {
   it("maps characters to palette indices in legend order, with . and space empty", () => {

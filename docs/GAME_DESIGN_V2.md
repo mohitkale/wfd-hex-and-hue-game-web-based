@@ -563,5 +563,5 @@ selecting two groups of one colour against a single reachable cube is a poor cho
 
 The collect-and-deliver structure is a genre mechanic; this spec was written from the product brief,
 and the reference game's description of the loop (creatures fetching items to a hole) is mechanical
-inspiration only. All art, characters, names, UI and audio are original to Hex & Hue; no Food Hunt
+inspiration only. All art, characters, names, UI and audio are original to Hex & Hue; none of the reference game's
 assets, characters, sounds or interface are used or imitated.

@@ -1,10 +1,12 @@
 import * as collect from "@hexhue/core/collect";
 import { Tutorial, type Step, type Target } from "./tutorial";
+import { withSharedTrays } from "./trayRules";
 
 /**
- * The four tutorial levels (M14.2, docs/V2_ONBOARDING.md), each tiny, each teaching one thing and
- * each solver-verified: summon and watch, a buried colour, slots, and undoing a mistake. Their hints
- * are scripts over the game state (`tutorial.ts`).
+ * The three tutorial levels (M14.2, docs/V2_ONBOARDING.md), each tiny, each teaching one thing and
+ * each solver-verified: summon and watch, a buried colour, and a box that waits in its tray. They play
+ * by the same rules as the game (every tray works, `withSharedTrays`, M15.13); the Undo lesson went
+ * with Undo itself (owner decision). Their hints are scripts over the game state (`tutorial.ts`).
  */
 
 const RED = "#e24a4a";
@@ -37,6 +39,9 @@ function level(
     ...opts,
   };
 }
+
+/** A lesson's level as the game plays it. */
+const played = (make: () => collect.CollectLevel) => () => withSharedTrays(make());
 
 type State = Readonly<collect.CollectState>;
 const col = (index: number): Target => ({ kind: "column", index });
@@ -133,59 +138,6 @@ const slotsScript: Step[] = [
   },
 ];
 
-/** 4. A mistake and undo: one slot only, so the wrong order loses and Undo takes it back. */
-const undo = (): collect.CollectLevel =>
-  level(
-    "tutorial-undo",
-    "Undo",
-    ["BBBBB", "BRBGB", "BBBBB", "BRBGB"],
-    "BRG",
-    [BLUE, RED, GREEN],
-    [[["R", 2]], [["G", 2]], [["B", 16]]],
-    { slots: 1 },
-  );
-
-const undoScript: Step[] = [
-  {
-    id: "red",
-    text: "Tap the red group",
-    target: () => col(0),
-    done: ({ state }) => state.groups[0]!.status !== "queued",
-  },
-  {
-    id: "green",
-    text: "Now tap the green group",
-    target: () => col(1),
-    done: ({ state }) => state.groups[1]!.status !== "queued" || state.status === "lost",
-  },
-  {
-    id: "undo",
-    text: "Out of slots. Tap Undo",
-    target: () => ({ kind: "undo" }),
-    // Only when something really was lost; if the player took another road, the lesson moves on.
-    ready: (s) => s.status === "lost",
-    done: ({ state, seen, shown }) =>
-      (shown && seen.has("undone") && state.status === "playing") ||
-      won(state) ||
-      started(state, 0),
-  },
-  {
-    id: "blue",
-    text: "Clear the blue first",
-    target: () => col(2),
-    done: ({ state }) => started(state, 0),
-  },
-  {
-    id: "finish",
-    text: "Now red, then green",
-    target: (s) => {
-      const next = s.columns.findIndex((c) => c.length > 0);
-      return next >= 0 ? col(next) : null;
-    },
-    done: ({ state }) => won(state),
-  },
-];
-
 /** A machine for a tutorial level; `skipped` ones show nothing (Skip is for the whole visit). */
 export function createTutorial(id: string, skipped = false): Tutorial | null {
   const t = tutorialById(id);
@@ -203,10 +155,9 @@ export interface TutorialLevel {
 
 /** In teaching order. */
 export const TUTORIAL: readonly TutorialLevel[] = [
-  { id: "tutorial-summon", make: summon, script: () => summonScript },
-  { id: "tutorial-blocked", make: blocked, script: () => blockedScript },
-  { id: "tutorial-slots", make: slots, script: () => slotsScript },
-  { id: "tutorial-undo", make: undo, script: () => undoScript },
+  { id: "tutorial-summon", make: played(summon), script: () => summonScript },
+  { id: "tutorial-blocked", make: played(blocked), script: () => blockedScript },
+  { id: "tutorial-slots", make: played(slots), script: () => slotsScript },
 ];
 
 export const TUTORIAL_IDS: readonly string[] = TUTORIAL.map((t) => t.id);

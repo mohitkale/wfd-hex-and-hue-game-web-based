@@ -41,7 +41,7 @@ const settle = (s: collect.CollectSession) => {
 const broke = (): Pouch => ({
   ...startingPouch(),
   coins: 0,
-  boosters: { undo: 0, extraSlot: 0, hint: 0 },
+  boosters: { undo: 0, extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
 });
 const lostSession = () => {
   const s = new collect.CollectSession(fixtureB());

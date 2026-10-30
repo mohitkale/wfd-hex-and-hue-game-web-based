@@ -1,4 +1,5 @@
 import type { Insets, Rect } from "../layout";
+import { trayCount } from "./trays";
 
 /**
  * Pure portrait layout for the v2 board, in device pixels (kept free of Phaser so it is unit tested
@@ -28,6 +29,8 @@ export interface CollectLayoutInput {
   slots: number;
   columns: number;
   fieldCap: number;
+  /** Every tray works (M15.13): `slots` trays in all, instead of `fieldCap + slots`. */
+  sharedTrays?: boolean;
   portalX: number;
   /** Reserve a strip under the HUD for the booster tray (M14.4). */
   tray?: boolean;
@@ -43,6 +46,11 @@ export interface CollectLayout {
   boardRect: Rect;
   /** The walkway cell where a familiar is drawn when it has no box to come from. */
   portal: { x: number; y: number };
+  /**
+   * The hole between the picture and the trays (M15.13): familiars come out of their box's tray and
+   * carry every cube into here. `rx`/`ry` are its half-width and half-height.
+   */
+  hole: { x: number; y: number; rx: number; ry: number };
   /** Every group box (column front, waiting, working) is a square of this size, in device pixels. */
   tile: number;
   /** The space between tiles; a slot's tap zone is its tile plus this, so it stays a full thumb target. */
@@ -67,13 +75,23 @@ export const CSS = {
   hud: 52,
   gap: 8,
   sidePad: 12,
-  tray: 30,
+  tray: 36,
   slot: 48,
+  /** Room between the picture and the trays for the hole the cubes go into. */
+  hole: 72,
   /** Breathing room under the columns (the OS home bar is handled by the safe-area insets). */
-  bottomPad: 12,
+  bottomPad: 6,
 } as const;
 
 const COMPACT_BELOW = 700;
+/**
+ * The largest a cube is drawn, in css px (M15.13: tiny boards had giant cubes; then the owner asked
+ * for cubes about half a familiar's size, so 16).
+ */
+export const MAX_CELL_CSS = 16;
+/** Screens at least this tall (css px) get the full room around the hole; at or below the other, a quarter. */
+const HOLE_FULL_FROM = 780;
+const HOLE_FULL_BELOW = 667;
 const MIN_COMPACT = 0.62;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -105,7 +123,7 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const hud: Rect = { x: frame.x, y: frame.y, w: frame.w, h: px(CSS.hud) };
   // Colours boxes, trays and the boxes' grid share one spacing (`gap`), horizontally and vertically.
   const colGap = gap;
-  const trayTotal = input.fieldCap + input.slots;
+  const trayTotal = trayCount(input.fieldCap, input.slots, input.sharedTrays);
   const fit = (count: number) => Math.floor((inner.w - (count - 1) * gap) / count);
   // One size for every box, whatever it is doing (in a column or in a tray): the largest square that
   // fits the widest row (the columns or the trays), up to 48 css px.
@@ -120,14 +138,22 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const trayH = input.tray ? px(CSS.tray) : 0;
   const tray: Rect = { x: inner.x, y: hud.y + hud.h, w: inner.w, h: trayH };
   const boardTop = tray.y + trayH;
-  const boardBottom = trayY - gap;
+  // The room around the hole (M15.13: tripled so the familiars' drop into it can be seen). Short
+  // screens get less, down to a quarter, so cubes stay readable there.
+  const tall = clamp((safeH / dpr - HOLE_FULL_BELOW) / (HOLE_FULL_FROM - HOLE_FULL_BELOW), 0, 1);
+  const holeRoom = px(CSS.hole * (1 / 4 + (3 / 4) * tall));
+  const boardBottom = trayY - gap - holeRoom;
   const ringW = input.boardWidth + 2;
   const ringH = input.boardHeight + 2;
   // The ring is only a walkway: nothing is drawn around the picture, so the picture may use nearly the
   // whole width of the frame.
   const side = Math.round(gap / 2);
   const wide = frame.w - 2 * side;
-  const cell = Math.max(1, Math.floor(Math.min(wide / ringW, (boardBottom - boardTop) / ringH)));
+  // Capped, so a tiny board (the tutorial's) gets pixel-sized cubes, not giant blocks.
+  const cell = Math.max(
+    1,
+    Math.floor(Math.min(wide / ringW, (boardBottom - boardTop) / ringH, MAX_CELL_CSS * dpr)),
+  );
   const bw = ringW * cell;
   const bh = ringH * cell;
   const boardRect: Rect = {
@@ -141,6 +167,19 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
     x: boardRect.x + (input.portalX + 1.5) * cell,
     y: boardRect.y + boardRect.h - cell / 2,
   };
+  // The hole sits in the space under the picture (its own room plus the gap above the trays); it is
+  // sized to fit there, so on short phones it shrinks rather than taking cube size away.
+  const below = boardRect.y + boardRect.h;
+  // The hole sits in the middle of the space between the picture and the trays, with clear space
+  // around it for the familiars climbing up from the trays and dropping in from the edge.
+  const room = Math.max(px(10), trayY - below);
+  const holeRy = Math.round(Math.min(room * 0.18, px(14), tile * 0.3));
+  const hole = {
+    x: portal.x,
+    y: Math.round(below + room * 0.5),
+    rx: Math.round(holeRy / 0.55),
+    ry: holeRy,
+  };
   return {
     dpr,
     frame,
@@ -148,6 +187,7 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
     tray,
     boardRect,
     portal,
+    hole,
     tile,
     gap,
     colGap,
@@ -198,8 +238,27 @@ export function cellCenter(layout: CollectLayout, idx: number): { x: number; y: 
 }
 
 /** Device pixels per sprite unit so a 16-unit familiar is about 1.15 cells wide (0.7..6; smooth art needs no whole numbers). */
-export function spriteScaleForCell(cell: number, spriteWidth = 16): number {
-  return clamp((cell * 1.15) / spriteWidth, 0.7, 6);
+export function spriteScaleForCell(cell: number, spriteWidth = 16, minPx = 0): number {
+  return clamp(Math.max(cell * 1.15, minPx) / spriteWidth, 0.7, 6);
+}
+
+/**
+ * The smallest a familiar is drawn, in css px (M15.13): on big pictures the cells are about 10 px, and
+ * a bat or cat drawn at cell size was too small to read as one. It may be larger than a cube.
+ */
+export const MIN_FAMILIAR_CSS = 24;
+
+/** The largest a familiar is drawn, in css px. */
+export const MAX_FAMILIAR_CSS = 34;
+
+/**
+ * A familiar's sprite scale on cells of `cell` device px (M15.13, owner request): about twice a cube
+ * wide, so a cube reads as half a familiar, never smaller than `MIN_FAMILIAR_CSS` nor larger than
+ * `MAX_FAMILIAR_CSS` css px.
+ */
+export function familiarScale(cell: number, dpr: number, spriteWidth = 16): number {
+  const px = clamp(cell * 2.1, MIN_FAMILIAR_CSS * dpr, MAX_FAMILIAR_CSS * dpr);
+  return px / spriteWidth;
 }
 
 /** The HUD buttons: a 36 css px circle inside a 44 css px tap target. */

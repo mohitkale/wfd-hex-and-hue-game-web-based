@@ -25,6 +25,33 @@ both. Code: `packages/core/src/collect/{boosters,hint}.ts` (what a booster does)
 | Magic Wand | **Retired**                | It collected cubes by itself, bypassing the pick-up, carry and deliver loop that is the v2 game.                                                                                                                 |
 | (new) Hint | **Added**                  | Names a move after which the level is still winnable, found by the real solver; says so if nothing wins.                                                                                                         |
 
+## Undo removed (M15.13, owner decision)
+
+There is no Undo on the v2 board: no HUD button, no "Undo last move" on the loss card and no Undo
+lesson in the tutorial. Retry is the free, instant way to start over. The engine keeps
+`CollectSession.undo()` (tests and tools use it), and old pouches keep their `undo` count, unused.
+
+## Power-ups (M15.13)
+
+Three more, asked for by the owner after the reference game's power-up row. All keep the v2 loop:
+familiars still come out of a tray, fetch one cube each and carry it into the hole. Code:
+`packages/core/src/collect/powers.ts` (what they do), `boosterUse.ts` (`useCall`, `useSweep`,
+`useLantern`), the round buttons in `BoosterTray.ts`, the view in `LanternPanel.ts`.
+
+| Power-up        | Button | Price | What it does                                                                                                                                                                            |
+| --------------- | ------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Familiar's Call | 🐾     | 25 ✦  | Tap it, then a box behind a column's front: that box moves to the front. One Undo takes it back.                                                                                        |
+| Besom Sweep     | 🧹     | 40 ✦  | Tap it, then a box in a tray (with one sweepable box it applies at once): its next 6 familiars fly over the picture to cubes of its colour that other colours bury. Undo takes it back. |
+| Crystal Lantern | 🏮     | 15 ✦  | Shows every box still to come in every column, front first; play waits while it is open. Paid once per level, then free to reopen.                                                      |
+
+- Stock first, then coins; a power-up that would do nothing costs nothing.
+- **Earnable by playing:** the starting kit has one of each (an older pouch without them gets that
+  one too), and every third first clear gives one, chosen by the level's id (`giftFor`), shown on the
+  win card.
+- Besom Sweep can only help: it removes cubes of the box's own colour, never adds a constraint, and
+  the engine's invariants hold after it (`powers.test.ts`). A flown-out buried cube leaves an enclosed
+  pocket that joins the walkway when a neighbour opens.
+
 ## Effects
 
 - **Undo.** `session.undo()`: the state returns to before the last `select`/`resume` and that action

@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { ART_PIECE_IDS } from "./artLevels";
+import { JOURNEY } from "./journey";
 import { DAILY_VERSION, dailyIndex, dailyLevelId, dayNumber, dayToDate, utcDate } from "./daily";
 
 /** M13.5: the same date gives the same level on every device, and the schedule is fair. */
 
+/** Any pool, for the schedule's own rules. */
 const POOL = ART_PIECE_IDS.map((id) => `art-${id}`);
+/** The game's pool: the witch's journey (M15.13). */
+const JOURNEY_POOL = JOURNEY.map((e) => e.id);
 
 describe("dates", () => {
   it("turns real calendar dates into day numbers and back, and rejects everything else", () => {
@@ -36,31 +40,49 @@ describe("dates", () => {
 
 describe("the schedule is deterministic and pinned", () => {
   it("the pool is pinned: change it and you must bump DAILY_VERSION and update this list", () => {
-    expect([...POOL].sort()).toEqual([
-      "art-amethyst-cluster",
-      "art-black-cat",
-      "art-crescent-moon",
-      "art-libra-scales",
-      "art-triple-moon",
-      "art-witchs-cauldron",
+    expect([...JOURNEY_POOL].sort()).toEqual([
+      "j-amethyst",
+      "j-as-above",
+      "j-blessed-cat",
+      "j-brew-cauldron",
+      "j-broom",
+      "j-candle",
+      "j-crescent",
+      "j-crystal-ball",
+      "j-crystal-grid",
+      "j-grimoire",
+      "j-lavender",
+      "j-mandrake",
+      "j-mortar",
+      "j-owl-moon",
+      "j-pentacle",
+      "j-quartz",
+      "j-raven",
+      "j-samhain",
+      "j-spider-web",
+      "j-tarot-star",
+      "j-toad",
+      "j-triple-moon",
+      "j-wheel-of-year",
+      "j-witchs-hat",
     ]);
-    expect(DAILY_VERSION).toBe(1);
+    expect(DAILY_VERSION).toBe(2);
   });
 
-  it("gives these exact levels on these dates (version 1): identical on every device", () => {
+  it("gives these exact levels on these dates (version 2): identical on every device", () => {
     const expected: [string, string][] = [
-      ["2026-10-24", "art-black-cat"],
-      ["2026-10-25", "art-libra-scales"],
-      ["2026-10-26", "art-triple-moon"],
-      ["2026-10-27", "art-witchs-cauldron"],
-      ["2026-10-28", "art-black-cat"],
-      ["2026-10-29", "art-witchs-cauldron"],
-      ["2026-10-30", "art-amethyst-cluster"],
-      ["2026-10-31", "art-triple-moon"],
-      ["2027-01-01", "art-amethyst-cluster"],
-      ["2028-02-29", "art-libra-scales"],
+      ["2026-10-24", "j-as-above"],
+      ["2026-10-25", "j-witchs-hat"],
+      ["2026-10-26", "j-owl-moon"],
+      ["2026-10-27", "j-grimoire"],
+      ["2026-10-28", "j-mandrake"],
+      ["2026-10-29", "j-crystal-grid"],
+      ["2026-10-30", "j-toad"],
+      ["2026-10-31", "j-crescent"],
+      ["2027-01-01", "j-samhain"],
+      ["2028-02-29", "j-mandrake"],
     ];
-    for (const [date, id] of expected) expect(dailyLevelId(date, POOL), date).toBe(id);
+    for (const [date, id] of expected) expect(dailyLevelId(date, JOURNEY_POOL), date).toBe(id);
   });
 
   it("does not depend on the order the pool is listed in", () => {
@@ -144,10 +166,10 @@ describe("?level=daily", () => {
   it("picks today's level by the UTC date, and ?date= another day (a bad date falls back to today)", async () => {
     const { dailyFromSearch } = await import("./levels");
     const today = dailyFromSearch("?engine=v2&level=daily", now);
-    expect(today).toEqual({ date: "2026-10-24", levelId: "art-black-cat" });
+    expect(today).toEqual({ date: "2026-10-24", levelId: "j-as-above" });
     expect(dailyFromSearch("?level=daily&date=2026-10-26", now)).toEqual({
       date: "2026-10-26",
-      levelId: "art-triple-moon",
+      levelId: "j-owl-moon",
     });
     expect(dailyFromSearch("?level=daily&date=2026-02-30", now)?.date).toBe("2026-10-24");
   });

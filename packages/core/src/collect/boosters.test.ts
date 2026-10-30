@@ -119,7 +119,7 @@ describe("CollectSession boosters", () => {
     expect(afterFirst).not.toBe(before);
   });
 
-  it("an extra slot is kept through Undo and Retry", () => {
+  it("an extra slot is kept through Undo, but Retry starts without it (M15.13)", () => {
     const session = new CollectSession(fixtureB());
     session.tap(select(0));
     settle(session);
@@ -129,8 +129,9 @@ describe("CollectSession boosters", () => {
     session.undo();
     expect(session.state.slots).toHaveLength(2);
     session.restart();
-    expect(session.state.slots).toEqual([null, null]);
-    expect(session.extraSlots).toBe(1);
+    // A fresh attempt: nothing bought for the last one carries over.
+    expect(session.state.slots).toEqual([null]);
+    expect(session.extraSlots).toBe(0);
   });
 
   it("an extra slot after a loss revives it, and Undo then goes back before the losing tap", () => {

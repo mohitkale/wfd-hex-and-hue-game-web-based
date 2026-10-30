@@ -1,5 +1,7 @@
 import { hasSealedAccessible } from "./seals";
+import { uncommitted } from "./groups";
 import { hasAssignable } from "./targeting";
+import { canWork } from "./powers";
 import type { CollectEvent } from "./events";
 import type { CollectState } from "./state";
 
@@ -35,15 +37,34 @@ function targetGroup(s: CollectState, a: Action): number | null {
   return s.slots[a.slot] ?? null;
 }
 
+/**
+ * Trays no box is using. With shared trays a waiting box holds one, and so does a working box until
+ * all of its familiars have come out (M15.13): then the box leaves the tray, and the tray is free
+ * while those familiars finish carrying their cubes to the hole.
+ */
+function freeTrays(s: CollectState): number {
+  let free = 0;
+  for (const slot of s.slots) if (slot === null) free++;
+  if (s.params.sharedTrays)
+    for (const g of s.groups) if (g.status === "working" && uncommitted(g) > 0) free--;
+  return free;
+}
+
 export function explain(s: CollectState, a: Action): ActionCheck {
   if (s.status !== "playing") return "gameOver";
   const id = targetGroup(s, a);
   if (id === null) return "unavailable";
-  let working = 0;
-  for (const g of s.groups) if (g.status === "working") working++;
-  if (working >= s.params.fieldCap) return "fieldFull";
-  const color = s.groups[id]!.color;
-  if (hasAssignable(s, color)) return "ok";
+  if (s.params.sharedTrays) {
+    // Every tray works: a new box needs a free tray; a waiting box already has its own.
+    if (a.kind === "select" && freeTrays(s) <= 0) return "fieldFull";
+  } else {
+    let working = 0;
+    for (const g of s.groups) if (g.status === "working") working++;
+    if (working >= s.params.fieldCap) return "fieldFull";
+  }
+  const group = s.groups[id]!;
+  const color = group.color;
+  if (canWork(s, group)) return "ok";
   return hasSealedAccessible(s, color) ? "sealed" : "noReachableCube";
 }
 
@@ -59,7 +80,7 @@ export function explainTap(s: CollectState, a: Action): ActionCheck {
   const reason = explain(s, a);
   if (reason === "ok" || a.kind !== "select") return reason;
   if (reason === "gameOver" || reason === "unavailable") return reason;
-  return s.slots.includes(null) ? "ok" : reason;
+  return freeTrays(s) > 0 ? "ok" : reason;
 }
 
 /**
@@ -69,9 +90,8 @@ export function explainTap(s: CollectState, a: Action): ActionCheck {
  * `queue` option), so a board is not called a deadlock while a queue tap would still help.
  */
 export function queueCanProgress(s: CollectState): boolean {
-  let free = 0;
-  for (const slot of s.slots) if (slot === null) free++;
-  if (free === 0) return false;
+  const free = freeTrays(s);
+  if (free <= 0) return false;
   for (const column of s.columns) {
     for (let depth = 1; depth < column.length && depth <= free; depth++) {
       if (hasAssignable(s, s.groups[column[depth]!]!.color)) return true;
@@ -120,7 +140,8 @@ function applyChecked(s: CollectState, a: Action): CollectEvent[] {
     events.push({ type: "groupSelected", group: id, column: a.column });
     if (canWork) {
       g.status = "working";
-      g.nextSpawn = s.tick + 1;
+      // Its tray opens first (`openDelay`, M15.13): the first familiar leaves once it is open.
+      g.nextSpawn = s.tick + 1 + (s.params.openDelay ?? 0);
     } else {
       // Queued: straight into the lowest free tray, to be resumed when it can work.
       const slot = s.slots.indexOf(null);

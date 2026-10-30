@@ -1,4 +1,4 @@
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { createRng, type Rng } from "../rng";
 import { apply, legalActions } from "./actions";
 import { computeDist, topologyFor } from "./grid";

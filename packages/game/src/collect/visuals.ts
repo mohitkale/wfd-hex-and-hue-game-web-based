@@ -24,6 +24,9 @@ export interface FamiliarVisual {
   target: number | null;
   /** Tick at which `mode` was entered. */
   since: number;
+  /** Route indices where this tick's move started and ended (0 is the portal end), for the gate. */
+  atFrom: number;
+  atTo: number;
 }
 
 /**
@@ -56,6 +59,8 @@ export class VisualModel {
           delivered: null,
           target: null,
           since: tick,
+          atFrom: 0,
+          atTo: 0,
         });
         return;
       case "cubeReserved": {
@@ -69,6 +74,8 @@ export class VisualModel {
         v.mode = e.carrying ? "carry" : "walk";
         v.from = e.from;
         v.to = e.to;
+        v.atFrom = e.carrying ? e.at + 1 : e.at - 1;
+        v.atTo = e.at;
         v.delivered = null;
         v.since = tick;
         return;
@@ -78,6 +85,7 @@ export class VisualModel {
         if (!v) return;
         v.mode = "pickup";
         v.from = v.to;
+        v.atFrom = v.atTo;
         v.carried = e.color;
         v.delivered = null;
         v.target = null;
@@ -90,6 +98,8 @@ export class VisualModel {
         v.mode = "deliver";
         v.from = this.portal;
         v.to = this.portal;
+        v.atFrom = 0;
+        v.atTo = 0;
         v.delivered = v.carried;
         v.carried = null;
         v.since = tick;
@@ -125,14 +135,17 @@ export class VisualModel {
       let from = here;
       let carried: number | null = null;
       const delivered: number | null = null;
+      let atFrom = f.at;
       switch (f.status) {
         case "toCube":
           mode = "walk";
           from = f.route[f.at - 1] ?? here;
+          atFrom = Math.max(0, f.at - 1);
           break;
         case "carrying":
           mode = "carry";
           from = f.route[f.at + 1] ?? here;
+          atFrom = f.at + 1;
           carried = group.color;
           break;
         case "pickup":
@@ -141,6 +154,7 @@ export class VisualModel {
           if (f.at > 0) {
             mode = "walk";
             from = f.route[f.at - 1] ?? here;
+            atFrom = f.at - 1;
           } else {
             mode = "pickup";
           }
@@ -150,6 +164,7 @@ export class VisualModel {
           // until then the picture is still "carrying" (the `cubeDelivered` event starts the drop).
           mode = "carry";
           from = f.route[f.at + 1] ?? here;
+          atFrom = f.at + 1;
           carried = group.color;
           break;
         case "idle":
@@ -166,6 +181,8 @@ export class VisualModel {
         delivered,
         target: f.status === "toCube" || f.status === "pickup" ? f.cube : null,
         since: state.tick,
+        atFrom,
+        atTo: f.at,
       });
     }
   }
@@ -181,13 +198,20 @@ export function lerpPoint(
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
-/** The sprite frame for a visual at `tick` (steps alternate with the tick so the gait is steady). */
-export function frameFor(v: FamiliarVisual, tick: number): FrameName {
+const WALK = ["walk0", "walk1", "walk2", "walk3", "walk4", "walk5"] as const;
+const CARRY = ["carry0", "carry1", "carry2", "carry3", "carry4", "carry5"] as const;
+
+/**
+ * The sprite frame for a visual at `tick`. Walking and carrying show frame `stride` of the cycle
+ * (`gait.ts` picks it from the distance walked, so the legs keep pace with the ground); standing
+ * still alternates with the tick.
+ */
+export function frameFor(v: FamiliarVisual, tick: number, stride = 0): FrameName {
   switch (v.mode) {
     case "walk":
-      return (tick + v.id) % 2 === 0 ? "walk0" : "walk1";
+      return WALK[stride] ?? "walk0";
     case "carry":
-      return (tick + v.id) % 2 === 0 ? "carry0" : "carry1";
+      return CARRY[stride] ?? "carry0";
     case "pickup":
       return "pickup";
     case "deliver":

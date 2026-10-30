@@ -14,6 +14,8 @@ import {
   artLevelForPiece,
 } from "../../packages/game/src/collect/artLevels";
 import { DEV_LEVELS } from "../../packages/game/src/collect/levels";
+import { withSharedTrays } from "../../packages/game/src/collect/trayRules";
+import { toPictureBoard } from "../../packages/game/src/collect/pictureBoard";
 import { effectForTheme } from "../../packages/game/src/collect/completion";
 import { cellColor, fitCell } from "../../packages/game/src/collect/pictureView";
 import {
@@ -59,7 +61,10 @@ describe("the art library's preview levels", () => {
   it("the game's registry plays them: ?level=art-<id>, and the finished picture is reachable by id", () => {
     expect(ART_PIECE_IDS).toEqual(pieces.map((p) => p.id));
     for (const p of pieces) {
-      expect(DEV_LEVELS[`art-${p.id}`], p.id).toBe(ART_LEVELS[`art-${p.id}`]);
+      // The board plays the piece's level with every tray working (M15.13).
+      expect(DEV_LEVELS[`art-${p.id}`]!(), p.id).toEqual(
+        withSharedTrays(toPictureBoard(ART_LEVELS[`art-${p.id}`]!())),
+      );
       expect(artLevelForPiece(p.id)?.subject?.name).toBe(p.name);
     }
     expect(artLevelForPiece("no-such-piece")).toBeNull();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { createRng } from "../rng";
 import { computeDist, openCell, padCells, paddedIndex, routeTo, topologyFor } from "./grid";
 

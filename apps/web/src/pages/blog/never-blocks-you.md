@@ -3,7 +3,7 @@ layout: ../../layouts/BlogPost.astro
 title: Designing a puzzle game that never blocks you
 description: No lives, no energy, no timers. The rules Hex & Hue is built around, and why every level is checked by a solver.
 date: 2026-10-22
-art: zodiac-01
+art: j-blessed-cat
 ---
 
 A lot of mobile puzzle games are built to stop you: out of lives, wait four hours, or pay. Hex &
