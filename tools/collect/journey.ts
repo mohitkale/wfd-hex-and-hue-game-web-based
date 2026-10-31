@@ -35,7 +35,7 @@ export const TARGET: Record<
   { band: Band | null; random: [number, number]; boxes: number[] }
 > = {
   easy: { band: null, random: [0.3, 1], boxes: [80, 50, 35] },
-  medium: { band: "medium", random: [0.05, 0.45], boxes: [40, 30, 22] },
+  medium: { band: "medium", random: [0.05, 0.45], boxes: [40, 34, 30, 26, 22] },
   hard: { band: "medium", random: [0, 0.25], boxes: [25, 18, 14] },
   extreme: { band: "medium", random: [0, 0.1], boxes: [20, 15, 12] },
 };
@@ -146,6 +146,13 @@ export function sealVariants(level: collect.CollectLevel): collect.CollectLevel[
   return out;
 }
 
+/** Whether a level may get wax seals: hard or extreme, from chapter 3 on. */
+export const sealsAllowed = (entry: Pick<JourneyEntry, "tier" | "chapter">): boolean =>
+  (entry.tier === "hard" || entry.tier === "extreme") && entry.chapter >= SEALS_FROM_CHAPTER;
+
+/** The first chapter whose hard and extreme levels may use wax seals. */
+export const SEALS_FROM_CHAPTER = 3;
+
 export function findDeal(
   entry: JourneyEntry,
   log: (s: string) => void = () => undefined,
@@ -158,14 +165,20 @@ export function findDeal(
       log(`  ${entry.id} box≤${max}: not solvable as cut`);
       continue;
     }
-    const found = climb(start, entry.tier, 101 + max * 13);
+    let found = climb(start, entry.tier, 101 + max * 13);
+    // A near miss (one rule off) often goes through from another start: two more tries.
+    for (let k = 1; k <= 2 && found.distance > 0 && found.distance <= 1; k++) {
+      const again = climb(found.level, entry.tier, 101 + max * 13 + k * 7919);
+      if (again.distance < found.distance) found = again;
+    }
     log(`  ${entry.id} box≤${max} trays=${base.slots}: ${found.distance.toFixed(2)}`);
     if (!closest || found.distance < closest.distance) closest = found;
     if (found.distance === 0 && distance(found.level, entry.tier, collect.RANDOM_RUNS) === 0)
       return deal(found.level);
   }
-  // A level the deal alone cannot bring into its tier gets wax seals (never an easy one).
-  if (entry.tier !== "easy") {
+  // Wax seals are an extra rule to learn: only for hard and extreme levels, and never in the first two
+  // chapters (owner feedback: no such complexity while a player is still learning the game).
+  if (sealsAllowed(entry)) {
     const max = TARGET[entry.tier].boxes[0]!;
     for (const sealed of sealVariants(cut(base, max))) {
       if (!solved(sealed)) continue;

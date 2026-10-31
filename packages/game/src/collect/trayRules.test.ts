@@ -88,6 +88,26 @@ describe("the home screen's level line (M15.13)", () => {
     expect(after.slice(0, 3)).toEqual(["done", "open", "locked"]);
   });
 
+  it("wax seals only on hard and extreme levels, never in the first two chapters (owner feedback)", async () => {
+    const { JOURNEY } = await import("./journey");
+    for (const e of JOURNEY) {
+      const sealed = (e.make().seals?.length ?? 0) > 0;
+      if (e.chapter < 3 || e.tier === "easy" || e.tier === "medium")
+        expect(sealed, e.id).toBe(false);
+    }
+  });
+
+  it("every journey picture fills its whole board: the art sits on a full canvas", async () => {
+    const { JOURNEY } = await import("./journey");
+    for (const e of JOURNEY) {
+      const level = e.base();
+      expect(
+        level.cells.every((c) => c >= 0),
+        e.id,
+      ).toBe(true);
+    }
+  });
+
   it("every journey level keeps its board's trays: a hard level is not a level with fewer trays", async () => {
     const { JOURNEY } = await import("./journey");
     const { boardShape } = await import("./trayRules");

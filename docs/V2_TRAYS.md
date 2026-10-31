@@ -268,3 +268,16 @@ journey:deal`, recorded in `journeyDeals.json`). The production gate holds each 
 - **Fit.** `/play` follows the visible viewport (`100dvh`, `visualViewport` resize), so a phone's
   toolbars never cover the boxes. Every journey level is checked on the device matrix.
 - **The site.** The landing gallery, `/spellbook` and the share images show the journey's pictures.
+
+## Round 8 (owner feedback): a full canvas, and no seals while learning
+
+- **A full canvas behind every picture.** The board looked incomplete next to the win reveal: sparse
+  pictures left most of the board empty and pale, while the reveal sits on a dark backdrop. Every
+  journey picture now fills its whole board with a background chosen for it (`bg` in `journey.ts`:
+  night navy, sky blue, parchment or deep purple) and a scatter of stars that never touch the art.
+  The art keeps its outline, so it pops out of the canvas on the board as it does in the reveal.
+  Boards are now 544 to 1,024 cubes.
+- **No seals while learning.** Wax seals (cubes that wait for another colour to be finished) are an
+  extra rule. They are now used only on hard and extreme levels from chapter 3 on (`sealsAllowed` in
+  `tools/collect/journey.ts`); a test fails if an easy or medium level, or any level in the first two
+  chapters, has one.
