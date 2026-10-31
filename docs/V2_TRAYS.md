@@ -295,8 +295,9 @@ journey:deal`, recorded in `journeyDeals.json`). The production gate holds each 
 - **Dust, not cubes, at the hole**: the puff is five soft, see-through clouds that billow up and
   fade, instead of solid specks that looked like cubes popping out.
 - **The map's stops show the hand cursor** over any level that can be played.
-- **Boxes**: the front box of each column (and every box in a tray) is a raised 3D button, with a
-  glossy face, a deep side and a soft shadow, like the cubes. The boxes behind are flat tiles,
-  **fully opaque** (they used to fade to 62 % and 42 %, which made their colours hard to read).
-- **Trays**: a working box opens like a box with its lid up. The lid swings up behind it on its hinge
-  and the inside shows in the box's own colour, in place of the black slot and dark handle.
+- **Boxes** (revised after owner review): flat, with no 3D side or shadow, and **fully opaque** (the
+  rows behind used to fade to 62 % and 42 %, which made their colours hard to read). The front box
+  of each column, and every box in a tray, has a soft sheen across the top so it stands out.
+- **Trays** (revised after owner review): a working box shows a tray rising out of it. The tray has a
+  curved, domed rim in the box's light colour with a white edge, and the box's mouth is a light
+  curve under its top edge. There is no dark shading.
