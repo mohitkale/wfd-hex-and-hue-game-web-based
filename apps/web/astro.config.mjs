@@ -25,6 +25,8 @@ export default defineConfig({
     build: {
       // Phaser is one large chunk by design; it is only loaded on /play.
       chunkSizeWarningLimit: 2000,
+      // Never inline a page script, however small: the CSP allows script files only.
+      assetsInlineLimit: (file) => (file.endsWith(".js") ? false : undefined),
     },
   },
 });
