@@ -32,7 +32,7 @@ describe("validateCollectLevel", () => {
     bad({ squad: 0 }, "squad must be");
     bad({ spawnGap: 0 }, "spawnGap must be");
     bad({ fieldCap: 7 }, "fieldCap must be");
-    bad({ width: 41 }, "width must be");
+    bad({ width: COLLECT_LIMITS.maxSize + 1 }, "width must be");
     bad({ portalX: 3 }, "portalX must be");
     bad({ portalX: -1 }, "portalX must be");
     bad({ palette: ["red"] }, "not #rrggbb");

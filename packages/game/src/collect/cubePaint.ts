@@ -21,12 +21,14 @@ function mix(color: number, target: number, t: number): number {
 
 export function tonesFor(hex: string, bevel = 0.38): CubeTones {
   const base = hexToNumber(hex);
-  // The dark tone carries the white box numbers: on a light colour (yellow) it is taken deeper until
-  // white on it reaches 3.5:1.
-  let dark = mix(base, 0x140b2e, bevel);
-  for (let t = bevel; t < 0.9 && contrast(1, luminance(hexOf(dark))) < 3.5; t += 0.04)
-    dark = mix(base, 0x140b2e, t);
-  return { base, light: mix(base, 0xffffff, bevel), dark };
+  // Shades stay in the colour's own hue (owner feedback: mixing toward the night purple made every
+  // colour look dull): the dark tone is the colour toward black, the light one toward white. The dark
+  // tone carries the white box numbers: on a light colour (yellow) it is taken deeper until white on
+  // it reaches 3.5:1.
+  let dark = mix(base, 0x000000, bevel * 0.7);
+  for (let t = bevel * 0.7; t < 0.9 && contrast(1, luminance(hexOf(dark))) < 3.5; t += 0.04)
+    dark = mix(base, 0x000000, t);
+  return { base, light: mix(base, 0xffffff, bevel + 0.04), dark };
 }
 
 const hexOf = (n: number): string => `#${n.toString(16).padStart(6, "0")}`;
@@ -114,9 +116,9 @@ export function paintCube(g: TilePainter, x: number, y: number, size: number, t:
   g.fillStyle(t.base);
   g.fillRect(x, y, s, s);
   const lip = Math.max(1, Math.round(s * 0.18));
-  g.fillStyle(t.light, 0.65);
+  g.fillStyle(t.light, 0.8);
   g.fillRect(x, y, s, lip);
-  g.fillStyle(t.light, 0.35);
+  g.fillStyle(t.light, 0.4);
   g.fillRect(x, y + lip, Math.max(1, Math.round(s * 0.12)), s - lip);
   g.fillStyle(t.dark, 0.18);
   g.fillRect(x, y + s - lip, s, lip);

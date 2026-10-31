@@ -114,7 +114,8 @@ export interface CollectLevel {
 }
 
 export const COLLECT_LIMITS = {
-  maxSize: 40,
+  /** Board width and height (M15.14: 72, for the journey's finer mosaic of up to 68 cubes across). */
+  maxSize: 72,
   maxColors: 16,
   /** Display shades per level (5 per family at most, ART_DIRECTION_V2 A-11). */
   maxShades: 80,

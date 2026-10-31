@@ -6,6 +6,10 @@ import { numberLayout } from "./badgeBox";
 import { bake } from "./bake";
 import { tonesFor } from "./cubePaint";
 
+/** The cork of a tray's potion bottle, and its darker grain and edge. */
+const CORK = 0xd9a86c;
+const CORK_EDGE = 0x8a5a2b;
+
 export interface BadgeOptions {
   w: number;
   h: number;
@@ -25,7 +29,7 @@ export type BadgeState = "queued" | "working" | "waiting";
 /**
  * A summon group: one coloured square with the number of cubes it can still deliver. The number is
  * real remaining capacity (it changes only when a cube is delivered). A working group opens its tray
- * (a tray slides up out of a slot in its top and the familiars come out of it), glows and breathes, and
+ * (in a tray it is a potion bottle: the cork lifts and the familiars come out of it), glows and breathes, and
  * closes the tray again when it is done; a waiting group is dimmed with "zz"; a thin bar along the
  * bottom fills as it delivers.
  */
@@ -36,8 +40,10 @@ export class GroupBadge extends Phaser.GameObjects.Container {
   private readonly sleep: Phaser.GameObjects.Text;
   private readonly bg: Phaser.GameObjects.Image;
   private readonly opening: Phaser.GameObjects.Graphics;
-  /** The front edge of the tray's slot, drawn over the tray's foot. */
+  /** The bottle's glass neck and rim (a box in a tray only). */
   private readonly lip: Phaser.GameObjects.Graphics;
+  /** Where the bottle's mouth is (local y): the cork sits here and the familiars come out of it. */
+  private readonly neckTop: number;
   private readonly lid: Phaser.GameObjects.Graphics;
   /** The front (with a sheen) and back (plain) textures of this box (`setRaised`). */
   private readonly keys: { raised: string; flat: string };
@@ -101,57 +107,66 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.glowScale = this.glow.scale;
     this.bg = scene.add.image(0, 0, opts.raised === false ? this.keys.flat : this.keys.raised);
     this.bar = scene.add.graphics();
-    // The tray (owner feedback): when the box works, a tray slides up out of a slot in its top. The
-    // slot is a hollow in the box's own dark tone, shaded deeper at the back; the tray, a little
-    // rounded rectangle in the box's light colour with a white edge, rises from inside it, shaded
-    // where it comes out of the hollow, and the box's front edge is drawn over its foot.
-    const slot = { x: -w * 0.42, y: -h * 0.43, w: w * 0.84, h: h * 0.17 };
-    const slotMid = slot.y + slot.h * 0.45;
+    // In a tray the box is a potion bottle (owner feedback: a tray should read as a container the
+    // familiars come out of; ours is witchy): a glass neck in the box's light colour with a white rim,
+    // stoppered with a cork. While the box works the cork lifts off at a tilt and the bottle's mouth
+    // shows; the familiars come out of it. Only a box in a tray shows the neck and the cork.
+    const neckW = w * 0.44;
+    const neckH = h * 0.2;
+    this.neckTop = -h / 2 - neckH;
+    this.lip = scene.add.graphics();
+    this.lip.fillStyle(tones.light, 1);
+    this.lip.fillRoundedRect(-neckW / 2, this.neckTop, neckW, neckH + h * 0.08, neckW * 0.2);
+    this.lip.lineStyle(Math.max(1.5, lw), 0xffffff, 1);
+    this.lip.strokeRoundedRect(-neckW / 2, this.neckTop, neckW, neckH + h * 0.08, neckW * 0.2);
+    this.lip.fillStyle(0xffffff, 0.55);
+    this.lip.fillRoundedRect(
+      -neckW * 0.32,
+      this.neckTop + neckH * 0.3,
+      neckW * 0.14,
+      neckH * 0.6,
+      2,
+    );
+    // The rim round the bottle's mouth.
+    this.lip.fillStyle(0xffffff, 1);
+    this.lip.fillRoundedRect(
+      -neckW * 0.62,
+      this.neckTop - h * 0.04,
+      neckW * 1.24,
+      h * 0.09,
+      h * 0.04,
+    );
+    this.lip.fillStyle(tones.light, 1);
+    this.lip.fillRoundedRect(
+      -neckW * 0.55,
+      this.neckTop - h * 0.025,
+      neckW * 1.1,
+      h * 0.06,
+      h * 0.03,
+    );
+    this.lip.setAlpha(0);
     this.opening = scene.add.graphics();
     this.opening.fillStyle(tones.dark, 1);
-    this.opening.fillRoundedRect(slot.x, slot.y, slot.w, slot.h, slot.h * 0.45);
-    this.opening.fillStyle(0x000000, 0.28);
-    this.opening.fillRoundedRect(slot.x, slot.y, slot.w, slot.h * 0.55, slot.h * 0.4);
+    this.opening.fillEllipse(0, this.neckTop + h * 0.005, neckW * 0.86, h * 0.06);
     this.opening.setAlpha(0);
+    // The cork, drawn round its foot so it can lift and tilt from the mouth.
+    const corkW = neckW * 0.82;
+    const corkH = h * 0.2;
     this.lid = scene.add.graphics();
-    this.lid.setPosition(0, slotMid);
-    const lidW = w * 0.74;
-    const lidH = h * 0.44;
-    const corner = h * 0.07;
-    this.lid.fillStyle(tones.light, 1);
-    this.lid.fillRoundedRect(-lidW / 2, -lidH, lidW, lidH + 1, {
-      tl: corner,
-      tr: corner,
-      bl: 0,
-      br: 0,
-    });
-    this.lid.fillStyle(tones.base, 1);
-    this.lid.fillRoundedRect(-lidW * 0.36, -lidH * 0.84, lidW * 0.72, lidH * 0.42, corner * 0.6);
-    // Shade where the tray comes up out of the hollow.
-    this.lid.fillGradientStyle(tones.dark, tones.dark, tones.dark, tones.dark, 0, 0, 0.75, 0.75);
-    this.lid.fillRect(-lidW / 2, -lidH * 0.32, lidW, lidH * 0.32 + 1);
-    this.lid.lineStyle(Math.max(1.5, lw), 0xffffff, 1);
-    this.lid.strokeRoundedRect(-lidW / 2, -lidH, lidW, lidH + 1, {
-      tl: corner,
-      tr: corner,
-      bl: 0,
-      br: 0,
-    });
-    // Down in the box, the tray has no height; opening raises it.
-    this.lid.setScale(1, 0).setAlpha(0);
-    // The front edge of the slot, over the tray's foot.
-    this.lip = scene.add.graphics();
-    this.lip.fillStyle(tones.base, 1);
-    this.lip.fillRoundedRect(slot.x, slotMid, slot.w, slot.y + slot.h - slotMid, {
-      tl: 0,
-      tr: 0,
-      bl: slot.h * 0.4,
-      br: slot.h * 0.4,
-    });
-    this.lip.lineStyle(Math.max(1, lw * 0.7), tones.light, 0.9);
-    this.lip.lineBetween(slot.x + slot.h * 0.3, slotMid, slot.x + slot.w - slot.h * 0.3, slotMid);
-    this.lip.setAlpha(0);
-    this.add([this.glow, this.bg, this.bar, this.opening, this.lid, this.lip]);
+    this.lid.setPosition(0, this.neckTop);
+    this.lid.fillStyle(CORK, 1);
+    this.lid.fillRoundedRect(-corkW / 2, -corkH * 0.8, corkW, corkH, corkH * 0.3);
+    this.lid.lineStyle(Math.max(1, lw * 0.8), CORK_EDGE, 1);
+    this.lid.strokeRoundedRect(-corkW / 2, -corkH * 0.8, corkW, corkH, corkH * 0.3);
+    this.lid.fillStyle(CORK_EDGE, 0.55);
+    for (const fx of [-0.22, 0.05, 0.28])
+      this.lid.fillCircle(
+        corkW * fx,
+        -corkH * (0.35 + Math.abs(fx) * 0.3),
+        Math.max(1, corkH * 0.08),
+      );
+    this.lid.setAlpha(0);
+    this.add([this.glow, this.lip, this.bg, this.bar, this.opening, this.lid]);
 
     const numberAt = numberLayout(w, h);
     const fontPx = numberAt.fontPx;
@@ -188,9 +203,16 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.setSize(w, h);
   }
 
-  /** In a tray the box has the front look (its tray rises out of it while it works). */
+  /** In a tray the box is a stoppered potion bottle (its cork lifts while it works). */
   setInTray(): void {
     this.setRaised(true);
+    this.lip.setAlpha(1);
+    this.lid.setAlpha(1);
+  }
+
+  /** How far above the box's centre its bottle's mouth is (where the familiars come out). */
+  get mouthOffset(): number {
+    return -this.neckTop;
   }
 
   /** The front look (a sheen: the front box of a column, a box in a tray) or the plain one behind it. */
@@ -260,33 +282,28 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     if (this.open) return;
     this.open = true;
     this.ready = false;
-    this.scene.tweens.killTweensOf([this.lid, this.opening, this.lip]);
-    this.lid.setAlpha(1).setScale(1, 0);
-    const reduced = isReducedMotion(this.scene);
-    if (reduced || instant) {
-      this.lid.setScale(1, 1);
+    this.scene.tweens.killTweensOf([this.lid, this.opening]);
+    const { w, h } = this.opts;
+    const lifted = { x: w * 0.16, y: this.neckTop - h * 0.16, rotation: 0.55 };
+    if (isReducedMotion(this.scene) || instant) {
+      this.lid.setPosition(lifted.x, lifted.y).setRotation(lifted.rotation);
       this.opening.setAlpha(1);
-      this.lip.setAlpha(1);
       this.ready = true;
       return;
     }
+    // The cork pops up and tips over, and the mouth shows.
     this.scene.tweens.add({
       targets: this.lid,
-      scaleY: 1,
+      ...lifted,
       delay: delayMs,
       duration: openMs,
-      ease: "Cubic.easeOut",
+      ease: "Back.easeOut",
       onComplete: () => (this.ready = this.open),
     });
-    this.scene.tweens.add({
-      targets: [this.opening, this.lip],
-      alpha: 1,
-      delay: delayMs,
-      duration: openMs,
-    });
+    this.scene.tweens.add({ targets: this.opening, alpha: 1, delay: delayMs, duration: openMs });
   }
 
-  /** Closes the tray (the lid comes down), then calls `done`; with reduced motion, at once. */
+  /** Closes the bottle (the cork goes back in), then calls `done`; with reduced motion, at once. */
   closeTray(done: () => void): void {
     if (!this.open) {
       done();
@@ -294,27 +311,26 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     }
     this.open = false;
     this.ready = false;
-    this.scene.tweens.killTweensOf([this.lid, this.opening, this.lip]);
+    this.scene.tweens.killTweensOf([this.lid, this.opening]);
     if (isReducedMotion(this.scene)) {
-      this.lid.setAlpha(0);
+      this.lid.setPosition(0, this.neckTop).setRotation(0);
       this.opening.setAlpha(0);
-      this.lip.setAlpha(0);
       done();
       return;
     }
     this.scene.tweens.add({
       targets: this.lid,
-      scaleY: 0,
+      x: 0,
+      y: this.neckTop,
+      rotation: 0,
       duration: 180,
       ease: "Cubic.easeIn",
       onComplete: () => {
-        this.lid.setAlpha(0);
         this.opening.setAlpha(0);
-        this.lip.setAlpha(0);
         done();
       },
     });
-    this.scene.tweens.add({ targets: [this.opening, this.lip], alpha: 0, duration: 180 });
+    this.scene.tweens.add({ targets: this.opening, alpha: 0, duration: 180 });
   }
 
   /** How much of the group is delivered (0..1): a thin bar along the bottom of a whole box. */

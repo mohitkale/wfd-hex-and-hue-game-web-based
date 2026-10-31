@@ -89,6 +89,9 @@ const FILL_FROM = 0.7;
  */
 const BOX_MAX = 80;
 
+/** The art library's pictures stay at most this size when densified and framed (their old board limit). */
+const PICTURE_MAX = 40;
+
 /** Every two palette colours differ at least this much (CIE76 ΔE). */
 export const MIN_PALETTE_DELTA_E = 27;
 /** Two colours that touch in a picture must differ at least this much (ΔE), else they blur together. */
@@ -202,8 +205,7 @@ function depths(width: number, height: number): number[] {
  * fits the board limit, so every board is about as dense as the reference's (30 to 40 cubes across).
  */
 export function densify(level: collect.CollectLevel): collect.CollectLevel {
-  const L = collect.COLLECT_LIMITS;
-  if (level.width * 2 > L.maxSize || level.height * 2 > L.maxSize || level.width >= 24)
+  if (level.width * 2 > PICTURE_MAX || level.height * 2 > PICTURE_MAX || level.width >= 24)
     return level;
   const w = level.width * 2;
   const h = level.height * 2;
@@ -231,8 +233,7 @@ export function densify(level: collect.CollectLevel): collect.CollectLevel {
  * that the scene fills, so the board has about twice the cubes and the picture sits in the middle.
  */
 export function frame(level: collect.CollectLevel): collect.CollectLevel {
-  const L = collect.COLLECT_LIMITS;
-  const pad = (n: number) => Math.min(L.maxSize, n + 2 * Math.max(3, Math.round(n * 0.18)));
+  const pad = (n: number) => Math.min(PICTURE_MAX, n + 2 * Math.max(3, Math.round(n * 0.18)));
   const w = pad(level.width);
   const h = pad(level.height);
   if (w === level.width && h === level.height) return level;

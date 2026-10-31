@@ -79,7 +79,7 @@ describe("paintCube", () => {
     expect(edge).toBeGreaterThan(0x202020);
     expect(edge).toBeLessThan(0x808080);
     expect(calls).toContain("fill 1");
-    expect(calls).toContain("fill 2 @0.65");
+    expect(calls).toContain("fill 2 @0.8");
     expect(calls.some((c) => c.startsWith("fill 16777215"))).toBe(false);
     // Square, no rounding (owner decision): cubes meet edge to edge; the depth is the board's front faces.
     expect(calls.filter((c) => c.startsWith("round"))).toHaveLength(0);

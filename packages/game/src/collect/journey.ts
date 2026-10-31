@@ -1,7 +1,7 @@
 import type * as collect from "@hexhue/core/collect";
 import * as A from "./journeyArtA";
 import * as B from "./journeyArtB";
-import { asLevel, type Canvas } from "./pixelCanvas";
+import { asLevel, upscale, type Canvas } from "./pixelCanvas";
 import { PICTURE_PALETTE as P, toPictureBoard } from "./pictureBoard";
 import { withSharedTrays } from "./trayRules";
 import deals from "./journeyDeals.json";
@@ -23,15 +23,24 @@ export interface JourneyEntry {
   chapter: number;
   chapterName: string;
   tier: Tier;
-  /** The board as drawn, before its recorded deal (for the dealing tool). */
+  /**
+   * The board at its design size, one cube per drawn cell, before its deal: what the dealing tool
+   * searches (deals are recorded at this size, where the search is four times quicker).
+   */
+  design: () => collect.CollectLevel;
+  /** The board as played (the finer mosaic, `FINE`), before its deal. */
   base: () => collect.CollectLevel;
-  /** The level as played: the board with its recorded deal (or the plain deal if none is recorded). */
+  /** The level as played: the finer board with its recorded deal, scaled up (or a plain deal). */
   make: () => collect.CollectLevel;
 }
 
 /** A recorded deal: every column's boxes, front first, as `[colour, cubes]`, and any wax seals. */
 export interface JourneyDeal {
   columns: number[][][];
+  /** A winning line found by the solver at the design size (it wins the finer board too). */
+  line?: unknown[];
+  /** Set when no deal reached the level's tier: how far the closest winnable one is (see the report). */
+  missed?: number;
   /** Wax seals: the cubes at `cells` wait until every box of colour `key` is finished. */
   seals?: collect.SealSpec[];
 }
@@ -42,14 +51,54 @@ const DEALS = deals as Record<string, JourneyDeal>;
 export function dealt(level: collect.CollectLevel): collect.CollectLevel {
   const deal = DEALS[level.id];
   if (!deal) return level;
+  // A deal is recorded at the design size; on the finer board every cell is FINE × FINE cubes, so
+  // every box holds FINE² times the cubes and every sealed cell seals its whole block.
+  const f = Math.round(Math.sqrt(level.cells.length / designCells(level)));
+  const designW = level.width / f;
+  const block = (i: number) => {
+    const x = (i % designW) * f;
+    const y = Math.floor(i / designW) * f;
+    const out: number[] = [];
+    for (let dy = 0; dy < f; dy++)
+      for (let dx = 0; dx < f; dx++) out.push((y + dy) * level.width + x + dx);
+    return out;
+  };
   return {
     ...level,
-    ...(deal.seals ? { seals: deal.seals } : {}),
+    ...(deal.seals
+      ? {
+          seals: deal.seals.map((s) => ({
+            key: s.key,
+            cells: s.cells.flatMap(block).sort((a, b) => a - b),
+          })),
+        }
+      : {}),
     columns: deal.columns.map((c) =>
-      c.map(([color, capacity]) => ({ color: color!, capacity: capacity! })),
+      c.map(([color, capacity]) => ({ color: color!, capacity: capacity! * f * f })),
     ),
   };
 }
+
+/** The largest number a box shows (owner rule: two digits). */
+export const MAX_BOX = 99;
+
+/** How far the level's recorded deal is from its tier when the search kept a closest one, else null. */
+export const dealMissed = (id: string): number | null => DEALS[id]?.missed ?? null;
+
+/** The recorded winning line of a level (design size; it wins the finer board too), or null. */
+export const dealLine = (id: string): readonly collect.Action[] | null =>
+  (DEALS[id]?.line as collect.Action[] | undefined) ?? null;
+
+/**
+ * The finer mosaic (owner request: cubes half the size): every drawn cell is played as FINE × FINE
+ * cubes, so the picture keeps its size on screen with four times the cubes.
+ */
+export const FINE = 2;
+
+/** Design-size cells of a level id's picture (its finer board divides by FINE²). */
+const designSize = new Map<string, number>();
+const designCells = (level: collect.CollectLevel): number =>
+  designSize.get(level.id) ?? level.cells.length;
 
 export const CHAPTERS = [
   "The Calling",
@@ -68,8 +117,9 @@ interface Spec {
   draw: () => Canvas;
   /**
    * The canvas behind the art (owner feedback: the art must sit on a full canvas to pop out, as it
-   * does in the win reveal): every empty cell becomes `colour`, with a scatter of `star` cells. A
-   * finale draws its own background and has none.
+   * does in the win reveal): every empty cell becomes `colour`, with a scatter of `star` cells. Bright
+   * and light (sky blue, pink, lilac, mint, parchment), so the outlined art pops; a finale draws its
+   * own night scene and has none.
    */
   bg?: { colour: string; star: string };
 }
@@ -85,7 +135,7 @@ const SPECS: readonly Spec[][] = [
       theme: "ritual",
       lore: "Every witch begins the same way: one small flame, lit on purpose.",
       draw: A.candle,
-      bg: { colour: P.navy, star: P.yellow },
+      bg: { colour: P.skyBlue, star: P.white },
     },
     {
       picture: "witchs-hat",
@@ -93,7 +143,7 @@ const SPECS: readonly Spec[][] = [
       theme: "ritual",
       lore: "Too big at first. It fits a little better after every spell.",
       draw: A.witchsHat,
-      bg: { colour: P.skyBlue, star: P.white },
+      bg: { colour: P.pink, star: P.white },
     },
     {
       picture: "broom",
@@ -101,7 +151,7 @@ const SPECS: readonly Spec[][] = [
       theme: "ritual",
       lore: "Before it ever flies, a besom sweeps: old dust out, fresh luck in.",
       draw: A.broom,
-      bg: { colour: P.navy, star: P.white },
+      bg: { colour: P.skyBlue, star: P.white },
     },
     {
       picture: "blessed-cat",
@@ -118,7 +168,7 @@ const SPECS: readonly Spec[][] = [
       theme: "ritual",
       lore: "The first herb a hedge witch learns: it smells of calm and dries in a week.",
       draw: A.lavender,
-      bg: { colour: P.tan, star: P.white },
+      bg: { colour: P.skyBlue, star: P.white },
     },
     {
       picture: "mortar",
@@ -126,7 +176,7 @@ const SPECS: readonly Spec[][] = [
       theme: "ritual",
       lore: "Grind slowly and think of what you want. The stone remembers.",
       draw: A.mortar,
-      bg: { colour: P.skyBlue, star: P.white },
+      bg: { colour: P.lightPurple, star: P.white },
     },
     {
       picture: "mandrake",
@@ -151,7 +201,7 @@ const SPECS: readonly Spec[][] = [
       theme: "crystal",
       lore: "A clear point to start with: it takes on whatever you set into it.",
       draw: A.quartz,
-      bg: { colour: P.darkPurple, star: P.white },
+      bg: { colour: P.pink, star: P.white },
     },
     {
       picture: "amethyst",
@@ -159,7 +209,7 @@ const SPECS: readonly Spec[][] = [
       theme: "crystal",
       lore: "Kept by the bed for quiet dreams, and by the door for quiet visitors.",
       draw: A.amethyst,
-      bg: { colour: P.navy, star: P.white },
+      bg: { colour: P.skyBlue, star: P.white },
     },
     {
       picture: "crystal-ball",
@@ -167,7 +217,7 @@ const SPECS: readonly Spec[][] = [
       theme: "crystal",
       lore: "A glass full of slow purple weather, where small stars drift and settle.",
       draw: A.crystalBall,
-      bg: { colour: P.navy, star: P.white },
+      bg: { colour: P.lightGreen, star: P.white },
     },
     {
       picture: "crystal-grid",
@@ -184,7 +234,7 @@ const SPECS: readonly Spec[][] = [
       theme: "moon",
       lore: "The moon grows from here: a good night to begin something.",
       draw: B.crescentMoon,
-      bg: { colour: P.navy, star: P.white },
+      bg: { colour: P.blue, star: P.white },
     },
     {
       picture: "triple-moon",
@@ -192,7 +242,7 @@ const SPECS: readonly Spec[][] = [
       theme: "moon",
       lore: "Waxing, full and waning: beginnings, plenty and letting go.",
       draw: B.tripleMoon,
-      bg: { colour: P.darkPurple, star: P.white },
+      bg: { colour: P.lightPurple, star: P.white },
     },
     {
       picture: "owl-moon",
@@ -200,7 +250,7 @@ const SPECS: readonly Spec[][] = [
       theme: "moon",
       lore: "The owl keeps the night's hours so the witch can keep her own.",
       draw: B.owlAndMoon,
-      bg: { colour: P.navy, star: P.white },
+      bg: { colour: P.skyBlue, star: P.white },
     },
     {
       picture: "as-above",
@@ -217,7 +267,7 @@ const SPECS: readonly Spec[][] = [
       theme: "familiar",
       lore: "A patient friend who knows every herb by the pond.",
       draw: B.toad,
-      bg: { colour: P.blue, star: P.skyBlue },
+      bg: { colour: P.skyBlue, star: P.white },
     },
     {
       picture: "raven",
@@ -225,7 +275,7 @@ const SPECS: readonly Spec[][] = [
       theme: "familiar",
       lore: "It remembers every face, and brings back the shiny things you lose.",
       draw: B.raven,
-      bg: { colour: P.darkPurple, star: P.white },
+      bg: { colour: P.pink, star: P.white },
     },
     {
       picture: "spider-web",
@@ -233,7 +283,7 @@ const SPECS: readonly Spec[][] = [
       theme: "familiar",
       lore: "Weave slowly and well; what you need comes to the web.",
       draw: B.spiderWeb,
-      bg: { colour: P.navy, star: P.white },
+      bg: { colour: P.purple, star: P.white },
     },
     {
       picture: "samhain",
@@ -250,7 +300,7 @@ const SPECS: readonly Spec[][] = [
       theme: "ritual",
       lore: "Five points for earth, air, fire, water and spirit, held in one circle.",
       draw: B.pentacle,
-      bg: { colour: P.navy, star: P.white },
+      bg: { colour: P.skyBlue, star: P.white },
     },
     {
       picture: "tarot-star",
@@ -258,7 +308,7 @@ const SPECS: readonly Spec[][] = [
       theme: "astrology",
       lore: "After the storm, the Star: hope, poured out like water.",
       draw: B.tarotStar,
-      bg: { colour: P.darkPurple, star: P.white },
+      bg: { colour: P.pink, star: P.white },
     },
     {
       picture: "wheel-of-year",
@@ -266,7 +316,7 @@ const SPECS: readonly Spec[][] = [
       theme: "ritual",
       lore: "Eight festivals round the year, and every one a reason to gather.",
       draw: B.wheelOfYear,
-      bg: { colour: P.navy, star: P.navy },
+      bg: { colour: P.tan, star: P.tan },
     },
     {
       picture: "grimoire",
@@ -302,16 +352,21 @@ function backdrop(g: Canvas, colour: string, star: string): void {
 }
 
 /** The board a picture plays on: the picture exactly as drawn, edge to edge (the walkway rings it). */
-function board(spec: Spec): collect.CollectLevel {
-  const g = spec.draw();
-  if (spec.bg) backdrop(g, spec.bg.colour, spec.bg.star);
+function board(spec: Spec, fine = 1): collect.CollectLevel {
+  const drawn = spec.draw();
+  if (spec.bg) backdrop(drawn, spec.bg.colour, spec.bg.star);
+  designSize.set(`j-${spec.picture}`, drawn.w * drawn.h);
+  const g = fine > 1 ? upscale(drawn, fine) : drawn;
   const level = asLevel(`j-${spec.picture}`, g, {
     id: spec.picture,
     name: spec.name,
     theme: spec.theme,
     lore: spec.lore,
   });
-  return withSharedTrays(toPictureBoard(level, { margin: false, scene: false }));
+  const out = withSharedTrays(toPictureBoard(level, { margin: false, scene: false }));
+  // Four times the cubes: familiars leave their bottle twice as often, so a level takes about twice
+  // as long, not four times.
+  return fine > 1 ? { ...out, spawnGap: Math.max(1, Math.round(out.spawnGap / fine)) } : out;
 }
 
 export const JOURNEY: readonly JourneyEntry[] = SPECS.flatMap((chapter, ci) =>
@@ -323,8 +378,9 @@ export const JOURNEY: readonly JourneyEntry[] = SPECS.flatMap((chapter, ci) =>
       chapter: ci + 1,
       chapterName: CHAPTERS[ci]!,
       tier,
-      base: () => board(spec),
-      make: () => dealt(board(spec)),
+      design: () => board(spec),
+      base: () => board(spec, FINE),
+      make: () => dealt(board(spec, FINE)),
     };
   }),
 );

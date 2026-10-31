@@ -38,6 +38,8 @@ export interface CollectLayoutInput {
 
 export interface CollectLayout {
   dpr: number;
+  /** Padding between the picture and the edge of its board, device px. */
+  boardPad: number;
   frame: Rect;
   hud: Rect;
   /** The booster tray under the HUD (zero height when the level has none). */
@@ -103,6 +105,9 @@ function row(area: Rect, count: number, max: number, gap: number, y: number, h: 
   return Array.from({ length: count }, (_, i) => ({ x: x0 + i * (w + gap), y, w, h }));
 }
 
+/** Padding between the picture and the edge of its board, css px. */
+export const BOARD_PAD_CSS = 10;
+
 export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   const { dpr, insets } = input;
   const safeW = input.width - insets.left - insets.right;
@@ -148,11 +153,15 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   // The ring is only a walkway: nothing is drawn around the picture, so the picture may use nearly the
   // whole width of the frame.
   const side = Math.round(gap / 2);
-  const wide = frame.w - 2 * side;
+  // The board's padding round the picture (owner feedback: cubes must not touch the board's edges).
+  const boardPad = px(BOARD_PAD_CSS);
+  const wide = frame.w - 2 * side - 2 * boardPad;
   // Capped, so a tiny board (the tutorial's) gets pixel-sized cubes, not giant blocks.
   const cell = Math.max(
     1,
-    Math.floor(Math.min(wide / ringW, (boardBottom - boardTop) / ringH, MAX_CELL_CSS * dpr)),
+    Math.floor(
+      Math.min(wide / ringW, (boardBottom - boardTop - 2 * boardPad) / ringH, MAX_CELL_CSS * dpr),
+    ),
   );
   const bw = ringW * cell;
   const bh = ringH * cell;
@@ -182,6 +191,7 @@ export function computeCollectLayout(input: CollectLayoutInput): CollectLayout {
   };
   return {
     dpr,
+    boardPad,
     frame,
     hud,
     tray,

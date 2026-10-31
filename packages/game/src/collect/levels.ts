@@ -8,7 +8,7 @@ import { layeredOrb } from "./denseBoard";
 import { withSharedTrays } from "./trayRules";
 import { toPictureBoard } from "./pictureBoard";
 import { moonlitHat } from "./slice";
-import { JOURNEY, challengeOf, type Tier } from "./journey";
+import { JOURNEY, challengeOf, dealLine, type Tier } from "./journey";
 
 /**
  * Levels by name (`?level=`): the journey, the tutorial and the dev boards. The vertical-slice level (M10.5) replaces `demo` as the
@@ -311,9 +311,9 @@ export function demoLineFromSearch(
   search: string,
   level: collect.CollectLevel,
 ): readonly collect.Action[] | null {
-  // The board as played is a picture board (M15.13): its winning line comes from the solver, under the
-  // game's own policy (boxes that wait resume by themselves). There is no losing demo: with every tray
-  // working there is no trap to show on a still board.
+  // A journey level plays its recorded winning line (the production gate proves it wins the board as
+  // played); any other board asks the solver, under the game's own policy. There is no losing demo:
+  // with every tray working there is no trap to show on a still board.
   if (new URLSearchParams(search).get("demo") !== "win") return null;
-  return collect.solve(level, undefined, true).line;
+  return dealLine(level.id) ?? collect.solve(level, undefined, true).line;
 }

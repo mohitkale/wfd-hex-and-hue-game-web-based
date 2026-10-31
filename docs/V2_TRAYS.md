@@ -304,3 +304,36 @@ journey:deal`, recorded in `journeyDeals.json`). The production gate holds each 
   rectangle in the box's light colour with a white edge, shaded where it comes out of the hollow,
   and the box's front edge is drawn over its foot, so it rises from inside the box. There is no
   black shading.
+
+## Round 10 (owner feedback, release 2.0.0): brighter, finer, bottles
+
+- **Brighter.** The non-finale pictures sit on light, bright backdrops (sky blue, pink, lilac, mint,
+  parchment) instead of navy and deep purple, and cube shading stays in each colour's own hue (toward
+  white and black, not toward the night purple that dulled every colour). The highlight is brighter.
+- **A finer mosaic** (owner choice: cubes half the size). Every drawn cell is played as 2 × 2 cubes
+  (`FINE` in `journey.ts`): the picture keeps its size on screen with four times the cubes (boards up
+  to 64 × 64, cubes of about 5 css px on a phone; the board limit is now 72).
+  - Deals are found and recorded at the design size, where the search is four times quicker, and
+    scaled up: every box holds four times the cubes, and a sealed cell seals its block.
+  - **Boxes show two digits at most** (owner rule). At the design size boxes are cut to a pattern
+    (`BOX_PATTERN`: mostly 5 to 12 cubes, a few of 1 or 2, a few up to 18), so on the finer board
+    most boxes show numbers in the 20s to 40s, a few single digits and a few higher, never above 99.
+    That is many more boxes (about 50 to 130 per level): more choices, more ways to jam the trays.
+    A picture whose many small boxes no deal can make winnable falls back to larger boxes.
+  - **Proof.** On the finer board the solver's search can run out of budget, and the scale-up does
+    not always keep the solver's verdict. Every deal therefore records the winning line the solver
+    found at the design size, and the production gate replays it in the live session on the board
+    as played: a win proves the level winnable.
+  - Familiars leave their bottle twice as often, so a level takes about twice as long, not four times.
+  - Walking keeps its on-screen speed: up to 36 ticks a second.
+- **Padding.** The board reaches 10 css px beyond the picture on every side
+  (`BOARD_PAD_CSS`), so no cube touches its edge.
+- **Trays are potion bottles.** A box in a tray has a glass neck and a cork. While it works the cork
+  pops off at a tilt and the familiars climb out of the bottle's mouth.
+
+- **Difficulty after the finer mosaic (release 2.0.0).** A deal tuned at the design size does not keep
+  its difficulty exactly on the finer board. 13 levels miss their tier there; their deals carry
+  `missed` in `journeyDeals.json`, and the production report lists each miss under "human" notes
+  (not as a failure), because every one of them is proven winnable by its replayed line. Most miss by
+  one rule. Wheel of the Year (hard), Samhain and So Mote It Be (extreme) play easier than their
+  tier. Tuning them on the finer board itself is the follow-up.

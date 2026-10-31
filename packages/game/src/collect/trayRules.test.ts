@@ -56,9 +56,10 @@ describe("the board plays with every tray working (M15.13)", () => {
     expect(levelFromSearch("?level=tutorial-summon").sharedTrays).toBe(true);
   });
 
-  it("the board's winning demo (the solver's line) wins on the board", () => {
+  it("the board's winning demo (its recorded line) wins on the board", async () => {
+    const { demoLineFromSearch } = await import("./levels");
     const level = levelFromSearch("");
-    const line = collect.solve(level, undefined, true).line!;
+    const line = demoLineFromSearch("?demo=win", level)!;
     expect(collect.replayLine(level, line, true).state.status).toBe("won");
   });
 
@@ -97,6 +98,21 @@ describe("the home screen's level line (M15.13)", () => {
     }
   });
 
+  it("every box shows two digits at most, most of them in the 20s to 40s (owner rule)", async () => {
+    const { JOURNEY, MAX_BOX } = await import("./journey");
+    const all: number[] = [];
+    for (const e of JOURNEY) {
+      const sizes = e
+        .make()
+        .columns.flat()
+        .map((g) => g.capacity);
+      for (const n of sizes) expect(n, e.id).toBeLessThanOrEqual(MAX_BOX);
+      all.push(...sizes);
+    }
+    const mid = all.filter((n) => n >= 20 && n < 50).length;
+    expect(mid / all.length).toBeGreaterThan(0.5);
+  });
+
   it("every journey picture fills its whole board: the art sits on a full canvas", async () => {
     const { JOURNEY } = await import("./journey");
     for (const e of JOURNEY) {
@@ -126,7 +142,7 @@ describe("walking speed is the same on screen on every board (M15.13)", () => {
     const { ticksPerSecondFor, WALK_CSS_PER_SECOND } = await import("./tickClock");
     expect(ticksPerSecondFor(22) * 22).toBeCloseTo(WALK_CSS_PER_SECOND);
     expect(ticksPerSecondFor(10) * 10).toBeCloseTo(WALK_CSS_PER_SECOND);
-    expect(ticksPerSecondFor(1)).toBe(20);
+    expect(ticksPerSecondFor(1)).toBe(36);
   });
 });
 

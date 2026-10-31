@@ -20,7 +20,8 @@ export const WALK_CSS_PER_SECOND = 150;
 
 /** Ticks a second at 1× for a board whose cells are `cellCss` css px: a steady on-screen walk. */
 export function ticksPerSecondFor(cellCss: number): number {
-  return Math.max(4, Math.min(20, WALK_CSS_PER_SECOND / Math.max(1, cellCss)));
+  // Up to 36 a second: the journey's finer mosaic has cubes of about 5 css px (M15.14).
+  return Math.max(4, Math.min(36, WALK_CSS_PER_SECOND / Math.max(1, cellCss)));
 }
 
 export class TickClock {

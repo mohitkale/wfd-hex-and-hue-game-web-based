@@ -28,33 +28,50 @@ const DEALS_FILE = new URL("../../packages/game/src/collect/journeyDeals.json", 
 /**
  * What each tier asks of a level: the cheap-player band its simple strategies must fit (none for
  * easy levels, which may be won by simple play), the share of random-tapping games it may let win (the
- * owner's test: careless play must lose a hard level), and the box sizes to try, largest first.
+ * owner's test: careless play must lose a hard level), and the scales of the box-size pattern
+ * (`BOX_PATTERN`) to try: the preferred ones first, then larger boxes for a picture whose many small
+ * boxes no deal can make winnable.
  */
 export const TARGET: Record<
   Tier,
   { band: Band | null; random: [number, number]; boxes: number[] }
 > = {
-  easy: { band: null, random: [0.3, 1], boxes: [80, 50, 35] },
-  medium: { band: "medium", random: [0.05, 0.45], boxes: [40, 34, 30, 26, 22] },
-  hard: { band: "medium", random: [0, 0.25], boxes: [25, 18, 14] },
-  extreme: { band: "medium", random: [0, 0.1], boxes: [20, 15, 12] },
+  easy: { band: null, random: [0.3, 1], boxes: [1.2, 1, 0.85, 1.6, 2] },
+  medium: { band: "medium", random: [0.05, 0.45], boxes: [1, 0.9, 0.8, 0.7, 1.4, 1.8] },
+  hard: { band: "medium", random: [0, 0.25], boxes: [1, 0.85, 0.7, 1.4, 1.8] },
+  extreme: { band: "medium", random: [0, 0.1], boxes: [0.9, 0.75, 0.6, 1.3, 1.7] },
 };
 const QUICK_RUNS = 60;
 const STEPS = 140;
 
-/** Splits every box into boxes of at most `max` cubes, keeping the order the board shows them in. */
-export function cut(level: collect.CollectLevel, max: number): collect.CollectLevel {
+/**
+ * Box sizes at the design size, in turn (owner rule: on the finer board, where every box holds four
+ * times as many, most numbers are in the 20s to 40s, a few single digits, a few higher, never more
+ * than two digits).
+ */
+export const BOX_PATTERN = [
+  6, 9, 11, 7, 2, 8, 12, 6, 15, 8, 10, 2, 11, 6, 9, 18, 7, 10, 1, 9, 12, 7, 16, 10,
+];
+
+/**
+ * Cuts every box into boxes of the pattern's sizes (times `scale`, never above 24 so a box shows two
+ * digits on the finer board), keeping the order the board shows them in, and deals them round the
+ * columns again.
+ */
+export function cut(level: collect.CollectLevel, scale: number): collect.CollectLevel {
   const order: collect.GroupSpec[] = [];
   const depth = Math.max(...level.columns.map((c) => c.length));
   for (let d = 0; d < depth; d++) for (const c of level.columns) if (c[d]) order.push(c[d]!);
+  let k = 0;
   const boxes: collect.GroupSpec[] = [];
   for (const g of order) {
-    const n = Math.ceil(g.capacity / max);
-    for (let k = 0; k < n; k++)
-      boxes.push({
-        color: g.color,
-        capacity: Math.floor(g.capacity / n) + (k < g.capacity % n ? 1 : 0),
-      });
+    let left = g.capacity;
+    while (left > 0) {
+      const size = Math.round(BOX_PATTERN[k++ % BOX_PATTERN.length]! * scale);
+      const n = Math.min(left, Math.max(1, Math.min(24, size)));
+      boxes.push({ color: g.color, capacity: n });
+      left -= n;
+    }
   }
   const columns: collect.GroupSpec[][] = Array.from({ length: level.columns.length }, () => []);
   boxes.forEach((g, i) => columns[i % columns.length]!.push(g));
@@ -157,7 +174,7 @@ export function findDeal(
   entry: JourneyEntry,
   log: (s: string) => void = () => undefined,
 ): JourneyDeal | null {
-  const base = entry.base();
+  const base = entry.design();
   let closest: { level: collect.CollectLevel; distance: number } | null = null;
   for (const max of TARGET[entry.tier].boxes) {
     const start = cut(base, max);
@@ -186,16 +203,54 @@ export function findDeal(
       log(
         `  ${entry.id} sealed (colour ${sealed.cells[sealed.seals![0]!.cells[0]!]} by ${sealed.seals![0]!.key}): ${found.distance.toFixed(2)}`,
       );
+      if (!closest || found.distance < closest.distance) closest = found;
       if (found.distance === 0 && distance(found.level, entry.tier, collect.RANDOM_RUNS) === 0)
         return deal(found.level);
     }
   }
-  return null;
+  // Even box sizes (at most 24 at the design size: two digits on the finer board), as the deals were
+  // before the pattern: a picture whose pattern cut has no winnable start often has one this way.
+  for (const max of [24, 18, 12]) {
+    const start = even(base, max);
+    if (!solved(start)) {
+      log(`  ${entry.id} even box≤${max}: not solvable as cut`);
+      continue;
+    }
+    const found = climb(start, entry.tier, 211 + max * 7);
+    log(`  ${entry.id} even box≤${max}: ${found.distance.toFixed(2)}`);
+    if (!closest || found.distance < closest.distance) closest = found;
+    if (found.distance === 0 && distance(found.level, entry.tier, collect.RANDOM_RUNS) === 0)
+      return deal(found.level);
+  }
+  // Nothing reached the tier: keep the closest winnable deal, marked as a miss (the production gate
+  // lists it), so the level is never left without a proven deal.
+  return closest ? { ...deal(closest.level), missed: Number(closest.distance.toFixed(2)) } : null;
+}
+
+/** Every box cut into boxes of at most `max`, in the order the board shows them, dealt round again. */
+function even(level: collect.CollectLevel, max: number): collect.CollectLevel {
+  const order: collect.GroupSpec[] = [];
+  const depth = Math.max(...level.columns.map((c) => c.length));
+  for (let d = 0; d < depth; d++) for (const c of level.columns) if (c[d]) order.push(c[d]!);
+  const boxes: collect.GroupSpec[] = [];
+  for (const g of order) {
+    const n = Math.ceil(g.capacity / max);
+    for (let k = 0; k < n; k++)
+      boxes.push({
+        color: g.color,
+        capacity: Math.floor(g.capacity / n) + (k < g.capacity % n ? 1 : 0),
+      });
+  }
+  const columns: collect.GroupSpec[][] = Array.from({ length: level.columns.length }, () => []);
+  boxes.forEach((g, i) => columns[i % columns.length]!.push(g));
+  return { ...level, columns };
 }
 
 const deal = (level: collect.CollectLevel): JourneyDeal => ({
   columns: level.columns.map((c) => c.map((g) => [g.color, g.capacity])),
   ...(level.seals ? { seals: level.seals } : {}),
+  // A winning line at the design size: it wins the finer board too (the production gate replays it).
+  line: collect.solve(level, undefined, true).line ?? [],
 });
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -206,7 +261,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const t = Date.now();
     const found = findDeal(entry, (s) => process.stdout.write(`${s}\n`));
     console.log(
-      `${entry.id} (${entry.tier}): ${found ? "found" : "NOT FOUND"} (${Math.round((Date.now() - t) / 1000)} s)`,
+      `${entry.id} (${entry.tier}): ${found ? (found.missed ? `closest (${found.missed} off)` : "found") : "NOT FOUND"} (${Math.round((Date.now() - t) / 1000)} s)`,
     );
     if (found) {
       // Read again just before writing: several searches may run side by side.

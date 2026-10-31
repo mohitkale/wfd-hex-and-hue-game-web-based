@@ -411,7 +411,8 @@ describe("the levels that ship, on the matrix", () => {
           portalX: level.portalX ?? Math.floor((level.width - 1) / 2),
         });
         for (const r of [...l.trays, ...l.columns]) expect(overlap(l.boardRect, r)).toBe(false);
-        expect(css(l, l.cell), `${level.id} cube`).toBeGreaterThanOrEqual(7);
+        // The journey's finer mosaic (owner request): cubes of 4 css px and up on the smallest phone.
+        expect(css(l, l.cell), `${level.id} cube`).toBeGreaterThanOrEqual(4);
         for (const c of l.columns)
           expect(css(l, c.w + l.gap), `${level.id} column`).toBeGreaterThanOrEqual(44);
         const front = badgeBox(l, "column", 0, 0);

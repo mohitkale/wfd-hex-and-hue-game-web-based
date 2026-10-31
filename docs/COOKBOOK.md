@@ -118,7 +118,10 @@ Tier targets used by the journey (`TARGET` in `tools/collect/journey.ts`):
    rule to learn, so they are allowed only on hard and extreme levels **from chapter 3 on**
    (`sealsAllowed`); easy and medium levels and the first two chapters never have them. The deal is
    recorded in `journeyDeals.json`.
-5. **Gate it** (`npm run production:check`), then review it on the art sheet (`npm run art:journey`).
+5. **Play it finer** (optional): a deal found at the design size scales to a finer mosaic (every
+   cell as 2 × 2 cubes, boxes × 4, seals by block), so the search stays quick and the picture keeps
+   its size on screen with smaller cubes.
+6. **Gate it** (`npm run production:check`), then review it on the art sheet (`npm run art:journey`).
 
 To add a level: draw a function, add it to a chapter in `journey.ts`, run `journey:deal` for it,
 then regenerate the production report.
@@ -247,6 +250,8 @@ none` and `overscroll-behavior: none`.
 | White numbers were hard to read on yellow boxes                                       | The badge's dark tone was not dark enough                                                  | The dark tone is deepened until white on it reaches 3.5:1                                                                                                        |
 | Characters looked at the player whatever way they walked; an ant seemed to have wings | Front-facing sprites; legs drawn as thick arches                                           | Every species drawn from above with its real anatomy, turned to its heading                                                                                      |
 | Boxes behind the front row were hard to read                                          | They faded to 62 % and 42 %                                                                | Every box flat and fully opaque; the front box has a soft sheen; a working box shows a curved tray rising out of it                                              |
+| Colours looked dull                                                                   | Dark backdrops, and shading mixed toward a night purple                                    | Light, bright backdrops; shading within each colour's own hue                                                                                                    |
+| Cubes looked too big next to the familiars                                            | One cube per drawn cell                                                                    | A finer mosaic: every drawn cell as 2 × 2 cubes, deals scaled up, familiars out twice as often                                                                   |
 | Mobile toolbars could cover the bottom of the board                                   | The game box was sized to the layout viewport                                              | `100dvh` plus `visualViewport` resize events                                                                                                                     |
 
 ---

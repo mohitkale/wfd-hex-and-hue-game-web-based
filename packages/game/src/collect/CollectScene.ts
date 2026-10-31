@@ -597,17 +597,18 @@ export class CollectScene extends Phaser.Scene {
     const { width, height } = this.scale.gameSize;
     const g = this.make.graphics({}, false);
     paintTable(g, { x: 0, y: 0, w: width, h: height }, plankWidth(l.frame.w), dpr);
-    // The picture's tray: the ring around the mosaic is the walkway, so the tray reaches half a cell
-    // into it and the familiars walk along its rim.
+    // The picture's board: padded all round (owner feedback), so no cube touches its edge; the
+    // familiars walk round the picture on it.
+    const pad = Math.max(l.boardPad, l.cell);
     paintBoard(
       g,
       {
-        x: l.boardRect.x + l.cell * 0.45,
-        y: l.boardRect.y + l.cell * 0.45,
-        w: l.boardRect.w - 0.9 * l.cell,
-        h: l.boardRect.h - 0.9 * l.cell,
+        x: l.boardRect.x + l.cell - pad,
+        y: l.boardRect.y + l.cell - pad,
+        w: l.boardRect.w - 2 * l.cell + 2 * pad,
+        h: l.boardRect.h - 2 * l.cell + 2 * pad,
       },
-      l.cell * 0.6,
+      Math.max(l.cell * 0.6, pad * 0.6),
       dpr,
     );
     paintPanelFrames(g, l, dpr);

@@ -209,6 +209,14 @@ export class Canvas {
   }
 }
 
+/** `g` with every cell drawn as an `f` × `f` block (a finer mosaic of the same picture). */
+export function upscale(g: Canvas, f: number): Canvas {
+  const out = new Canvas(g.w * f, g.h * f);
+  for (let y = 0; y < out.h; y++)
+    for (let x = 0; x < out.w; x++) out.set(x, y, g.get(Math.floor(x / f), Math.floor(y / f)));
+  return out;
+}
+
 /**
  * A picture as a level: one box per colour to start (the board maker deals the real boxes). The
  * board keeps the picture as drawn, its subject (name and lore for the win and the Spellbook) and its

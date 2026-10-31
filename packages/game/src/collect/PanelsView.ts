@@ -286,7 +286,8 @@ export class PanelsView {
     if (!t.badge.isReady) return null;
     // One shared object (read it at once): the renderer asks every frame, so nothing is allocated.
     this.anchorOut.x = t.badge.x;
-    this.anchorOut.y = t.badge.y - this.layout.tile * 0.3;
+    // The mouth of its bottle.
+    this.anchorOut.y = t.badge.y - t.badge.mouthOffset;
     return this.anchorOut;
   }
 
