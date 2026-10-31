@@ -3,8 +3,8 @@ import * as collect from "@hexhue/core/collect";
 import { createRng } from "../../packages/core/src/rng";
 import { checkStrategies, type Tier as Band } from "../../content/difficulty";
 import {
-  dealt,
   JOURNEY,
+  MAX_BOX,
   type JourneyDeal,
   type JourneyEntry,
   type Tier,
@@ -37,27 +37,28 @@ export const TARGET: Record<
   Tier,
   { band: Band | null; random: [number, number]; boxes: number[] }
 > = {
-  easy: { band: null, random: [0.3, 1], boxes: [1.2, 1, 0.85, 1.6, 2] },
-  medium: { band: "medium", random: [0.05, 0.45], boxes: [1, 0.9, 0.8, 0.7, 1.4, 1.8] },
-  hard: { band: "medium", random: [0, 0.25], boxes: [1, 0.85, 0.7, 1.4, 1.8] },
-  extreme: { band: "medium", random: [0, 0.1], boxes: [0.9, 0.75, 0.6, 1.3, 1.7] },
+  easy: { band: null, random: [0.3, 1], boxes: [1.2, 1, 1.6, 2] },
+  medium: { band: "medium", random: [0.05, 0.45], boxes: [1, 1.2, 0.85, 1.5] },
+  hard: { band: "medium", random: [0, 0.25], boxes: [1, 1.2, 0.85, 1.5] },
+  extreme: { band: "medium", random: [0, 0.1], boxes: [1, 1.2, 0.85, 1.5] },
 };
 const QUICK_RUNS = 60;
 const STEPS = 140;
 
+/** The smallest leftover kept as a box of its own when a colour is cut. */
+export const MIN_BOX = 12;
+
 /**
- * Box sizes at the design size, in turn (owner rule: on the finer board, where every box holds four
- * times as many, most numbers are in the 20s to 40s, a few single digits, a few higher, never more
- * than two digits).
+ * Box sizes, in turn (owner rules: most numbers in the 20s to 40s, a few single digits, a few higher,
+ * never more than two digits; and few small boxes, so a level is not a long run of taps).
  */
 export const BOX_PATTERN = [
-  6, 9, 11, 7, 2, 8, 12, 6, 15, 8, 10, 2, 11, 6, 9, 18, 7, 10, 1, 9, 12, 7, 16, 10,
+  24, 36, 44, 28, 8, 32, 48, 24, 60, 32, 40, 8, 44, 24, 36, 72, 28, 40, 4, 36, 48, 28, 64, 40,
 ];
 
 /**
- * Cuts every box into boxes of the pattern's sizes (times `scale`, never above 24 so a box shows two
- * digits on the finer board), keeping the order the board shows them in, and deals them round the
- * columns again.
+ * Cuts every box into boxes of the pattern's sizes (times `scale`, never above `MAX_BOX`, two digits),
+ * keeping the order the board shows them in, and deals them round the columns again.
  */
 export function cut(level: collect.CollectLevel, scale: number): collect.CollectLevel {
   const order: collect.GroupSpec[] = [];
@@ -69,7 +70,10 @@ export function cut(level: collect.CollectLevel, scale: number): collect.Collect
     let left = g.capacity;
     while (left > 0) {
       const size = Math.round(BOX_PATTERN[k++ % BOX_PATTERN.length]! * scale);
-      const n = Math.min(left, Math.max(1, Math.min(24, size)));
+      let n = Math.min(left, Math.max(1, Math.min(MAX_BOX, size)));
+      // A leftover too small to be a box of its own goes with this one (or the two share it), so a
+      // colour does not end in a run of tiny boxes (owner feedback: every box is a tap).
+      if (left - n > 0 && left - n < MIN_BOX) n = left <= MAX_BOX ? left : Math.ceil(left / 2);
       boxes.push({ color: g.color, capacity: n });
       left -= n;
     }
@@ -171,39 +175,18 @@ export const sealsAllowed = (entry: Pick<JourneyEntry, "tier" | "chapter">): boo
 /** The first chapter whose hard and extreme levels may use wax seals. */
 export const SEALS_FROM_CHAPTER = 3;
 
-/**
- * Whether a deal found at the design size holds on the finer board as played: its recorded line
- * wins there, and (with `tier`) the full random runs and simple players still fit the tier. The
- * scale-up keeps neither for sure, so the search checks both before it keeps a deal.
- */
-function holdsOnFine(entry: JourneyEntry, found: JourneyDeal, tier?: Tier): boolean {
-  const fine = dealt(entry.base(), found);
-  try {
-    if (
-      collect.replayLine(fine, (found.line ?? []) as collect.Action[], true).state.status !== "won"
-    )
-      return false;
-  } catch {
-    return false;
-  }
-  return !tier || tierMisses(collect.strategyReport(fine), tier).length === 0;
-}
-
 export function findDeal(
   entry: JourneyEntry,
   log: (s: string) => void = () => undefined,
 ): JourneyDeal | null {
-  const base = entry.design();
+  const base = entry.base();
   const near: { level: collect.CollectLevel; distance: number }[] = [];
-  // A deal at the tier on both boards ends the search; one off the tier is kept to fall back on.
+  // A deal at the tier (with the full random runs) ends the search; one off it is kept to fall back on.
   const accept = (found: { level: collect.CollectLevel; distance: number }) => {
-    near.push(found);
-    if (found.distance > 0 || distance(found.level, entry.tier, collect.RANDOM_RUNS) > 0)
-      return null;
-    const d = deal(found.level);
-    const ok = holdsOnFine(entry, d, entry.tier);
-    log(`  ${entry.id}: at the tier at the design size; on the finer board ${ok ? "too" : "not"}`);
-    return ok ? d : null;
+    const full =
+      found.distance > 0 ? found.distance : distance(found.level, entry.tier, collect.RANDOM_RUNS);
+    near.push({ ...found, distance: full });
+    return full === 0 ? deal(found.level) : null;
   };
   for (const max of TARGET[entry.tier].boxes) {
     const start = cut(base, max);
@@ -231,13 +214,13 @@ export function findDeal(
       log(
         `  ${entry.id} sealed (colour ${sealed.cells[sealed.seals![0]!.cells[0]!]} by ${sealed.seals![0]!.key}): ${found.distance.toFixed(2)}`,
       );
-      if (found.distance === 0 && distance(found.level, entry.tier, collect.RANDOM_RUNS) === 0)
-        return deal(found.level);
+      const kept = accept(found);
+      if (kept) return kept;
     }
   }
-  // Even box sizes (at most 24 at the design size: two digits on the finer board), as the deals were
-  // before the pattern: a picture whose pattern cut has no winnable start often has one this way.
-  for (const max of [24, 18, 12]) {
+  // Even box sizes, as the deals were before the pattern: a picture whose pattern cut has no winnable
+  // start often has one this way.
+  for (const max of [96, 72, 48]) {
     const start = even(base, max);
     if (!solved(start)) {
       log(`  ${entry.id} even box≤${max}: not solvable as cut`);
@@ -248,14 +231,12 @@ export function findDeal(
     const kept = accept(found);
     if (kept) return kept;
   }
-  // Nothing reached the tier on both boards: keep the closest deal whose line wins the finer board,
-  // marked as a miss (the production gate lists it), so the level is never left without a proven deal.
-  for (const n of near.sort((a, b) => a.distance - b.distance)) {
-    const d = deal(n.level);
-    if (holdsOnFine(entry, d))
-      return { ...d, missed: Number(Math.max(n.distance, 0.01).toFixed(2)) };
-  }
-  return null;
+  // Nothing reached the tier: keep the closest winnable deal, marked as a miss (the production gate
+  // lists it), so the level is never left without a proven deal.
+  const closest = near.sort((a, b) => a.distance - b.distance)[0];
+  return closest
+    ? { ...deal(closest.level), missed: Number(Math.max(closest.distance, 0.01).toFixed(2)) }
+    : null;
 }
 
 /** Every box cut into boxes of at most `max`, in the order the board shows them, dealt round again. */
@@ -280,7 +261,7 @@ function even(level: collect.CollectLevel, max: number): collect.CollectLevel {
 const deal = (level: collect.CollectLevel): JourneyDeal => ({
   columns: level.columns.map((c) => c.map((g) => [g.color, g.capacity])),
   ...(level.seals ? { seals: level.seals } : {}),
-  // A winning line at the design size: it wins the finer board too (the production gate replays it).
+  // A winning line (the production gate replays it rather than search again).
   line: collect.solve(level, undefined, true).line ?? [],
 });
 

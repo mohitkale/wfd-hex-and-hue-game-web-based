@@ -113,17 +113,26 @@ describe("the home screen's level line (M15.13)", () => {
     expect(mid / all.length).toBeGreaterThan(0.5);
   });
 
-  it("journey boards are covered by tier: easy leaves room, medium most, hard and finales all", async () => {
+  it("every journey level fits its tier's cube budget, and boxes stay large (few taps)", async () => {
+    const { JOURNEY, CUBE_BUDGET, MAX_BOX } = await import("./journey");
+    for (const e of JOURNEY) {
+      const level = e.make();
+      const cubes = level.cells.filter((c) => c >= 0).length;
+      expect(cubes, e.id).toBeLessThanOrEqual(CUBE_BUDGET[e.tier]);
+      const boxes = level.columns.flat();
+      expect(Math.max(...boxes.map((b) => b.capacity)), e.id).toBeLessThanOrEqual(MAX_BOX);
+      // About 30 cubes a box or more: a level is never a long run of small boxes.
+      expect(cubes / boxes.length, e.id).toBeGreaterThanOrEqual(25);
+    }
+  });
+
+  it("easy pictures stand alone; finales fill their board", async () => {
     const { JOURNEY } = await import("./journey");
     for (const e of JOURNEY) {
       const level = e.base();
       const covered = level.cells.filter((c) => c >= 0).length / level.cells.length;
-      if (e.tier === "easy") expect(covered, e.id).toBeLessThan(0.6);
-      if (e.tier === "medium") {
-        expect(covered, e.id).toBeGreaterThan(0.75);
-        expect(covered, e.id).toBeLessThan(1);
-      }
-      if (e.tier === "hard" || e.tier === "extreme") expect(covered, e.id).toBe(1);
+      if (e.tier === "easy") expect(covered, e.id).toBeLessThan(0.5);
+      if (e.tier === "extreme") expect(covered, e.id).toBe(1);
     }
   });
 

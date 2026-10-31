@@ -43,7 +43,7 @@ export function candle(): Canvas {
   g.rect(5, 26, 16, 26, P.brown);
   g.ring(19.5, 23.5, 2.6, 1.2, P.ochre);
   g.outline(P.black, { keep: [P.yellow, P.white], families: FAMILIES });
-  g.set(11, 11, P.black);
+  g.dot(11, 11, P.black);
   sparkles(g, [
     [2, 4],
     [19, 3],
@@ -181,9 +181,9 @@ export function blessedCat(): Canvas {
   g.outline(P.lightPurple, { around: [P.black] });
   g.outline(P.black, { around: [P.tan, P.ochre] });
   // Eyes, nose, stars and the words.
-  g.set(10, 8, P.lightGreen);
-  g.set(14, 8, P.lightGreen);
-  g.set(12, 10, P.pink);
+  g.dot(10, 8, P.lightGreen);
+  g.dot(14, 8, P.lightGreen);
+  g.dot(12, 10, P.pink);
   for (const [x, y] of [
     [3, 3],
     [6, 1],
@@ -192,7 +192,7 @@ export function blessedCat(): Canvas {
     [30, 1],
     [25, 17],
   ] as const)
-    g.set(x, y, P.white);
+    g.dot(x, y, P.white);
   g.star(4, 7, P.yellow);
   g.star(29, 14, P.yellow);
   g.textCentred(16, 21, "BLESSED", P.darkPurple);
@@ -304,8 +304,8 @@ export function mortar(): Canvas {
   );
   g.disc(20.6, 2, 1.8, P.tan);
   g.outline(P.black, { families: FAMILIES });
-  g.set(2, 2, P.lightGreen);
-  g.set(24, 8, P.lightGreen);
+  g.dot(2, 2, P.lightGreen);
+  g.dot(24, 8, P.lightGreen);
   return g;
 }
 
@@ -372,10 +372,10 @@ export function mandrake(): Canvas {
   g.rect(0, 26, 27, 26, P.darkGreen);
   g.outline(P.black, { families: FAMILIES });
   // A screaming little face.
-  g.set(12, 14, P.black);
-  g.set(16, 14, P.black);
+  g.dot(12, 14, P.black);
+  g.dot(16, 14, P.black);
   g.rect(13, 17, 15, 18, P.red);
-  for (const x of [3, 9, 20, 25]) g.set(x, 25, P.lightGreen);
+  for (const x of [3, 9, 20, 25]) g.dot(x, 25, P.lightGreen);
   return g;
 }
 
@@ -427,8 +427,8 @@ export function brewCauldron(): Canvas {
   g.outline(P.grey, { around: [P.black] });
   g.outline(P.black, { around: [P.lightGreen, P.orange], keep: [P.yellow] });
   g.textCentred(16, 1, "BREW", P.lightGreen);
-  g.set(20, 10, P.white);
-  g.set(11, 10, P.white);
+  g.dot(20, 10, P.white);
+  g.dot(11, 10, P.white);
   for (const [x, y] of [
     [2, 2],
     [29, 3],

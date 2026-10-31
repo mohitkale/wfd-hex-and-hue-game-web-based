@@ -357,3 +357,33 @@ The pictures filled their whole board, so even the first levels took several min
   full random runs and simple players fit the tier (`holdsOnFine` in `tools/collect/journey.ts`).
   When no deal does, it keeps the closest one whose line wins the finer board, marked `missed`.
   The misses fell from 13 to 9; the four medium ones miss by a hair.
+
+## Round 12: a cube budget per tier (owner feedback, 2026-10-31)
+
+Witch's Hat (3,600 cubes in 116 boxes) took over 10 minutes at 1×. A level may take longer for its
+difficulty, never for its number of cubes or taps. Measured: the trays carry about 0.7 cubes a tick
+even under a perfect, eager player, so play time follows the cube count, and a human's time also
+follows the number of boxes (one tap each).
+
+- **Cube budget** (`CUBE_BUDGET` in `journey.ts`): easy 900, medium 1,300, hard 1,700, extreme 2,000.
+- **Pictures drawn to fit it.** The 2× upscale is gone. `Canvas.render(scale, draw)` rasterises a
+  picture's shapes at any scale, and its outlines are added at that resolution, so they stay one cube
+  thick. Each picture takes the largest scale (at most 2) that fits its budget: easy pictures draw
+  at about 1.6 to 2, finales at 1.35.
+- **A halo, not a full backdrop.** Medium levels get a band of backdrop about 1.5 design cells wide
+  round the art, hard levels about 3, with the stripes. The rest of the board stays empty (the
+  outer rings of cubes the owner pointed out are gone).
+- **Bigger boxes.** Deals are found on the board as played, with boxes of mostly 24 to 48 cubes
+  (`BOX_PATTERN`), a few small ones, at most 99: about 25 to 50 taps a level instead of up to 219.
+  As a result there is no scale-up between the searched board and the played one, and no
+  difficulty lost in between. A colour's leftover under 12 cubes joins the box before it
+  (`MIN_BOX`), so small boxes are only the pattern's few and the tiniest colours.
+- **Result:** all 24 levels on their tier (no `missed` deals). Taps: easy 20 to 26, medium 40 to
+  45, hard 50 to 59, finales 48 to 71.
+
+| Tier    | Cubes before   | Cubes now      |
+| ------- | -------------- | -------------- |
+| easy    | 784 to 1,792   | 687 to 893     |
+| medium  | 2,448 to 4,080 | 1,209 to 1,298 |
+| hard    | 4,608 to 5,184 | 1,609 to 1,684 |
+| extreme | 4,096          | 1,849          |

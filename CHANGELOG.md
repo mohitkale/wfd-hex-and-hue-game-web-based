@@ -21,13 +21,11 @@ A new game on the same site: the v1 track puzzle is replaced by the familiars.
   Hint. 3× speed for a level via an optional rewarded ad; nothing ever blocks play.
 - **Mobile first:** fits every phone without scrolling, 30 fps with an idle sleep, offline PWA.
 - **Site:** the landing page, gallery and share images show the journey.
-- **Smaller art:** every picture but a chapter finale sits in the middle of its board at about 55 to
-  70 % of it. Easy levels leave the rest empty (short first levels), medium levels cover about 85 %,
-  hard levels all of it, with stripes of the art's own colour.
-- **Known:** 9 of the 24 levels miss their difficulty target on the board as played. The medium
-  levels Witch's Hat, Triple Moon, Tarot Star and Raven miss by a hair. Broom (hard), Samhain and So
-  Mote It Be (extreme) play easier than their tier. Every level is proven winnable;
-  `docs/V2_PRODUCTION_REPORT.md` lists each miss for a tuning pass.
+- **Short levels:** every tier has a cube budget (easy 900, medium 1,300, hard 1,700, finales
+  2,000), and every picture is drawn at the scale that fits it, with crisp one-cube outlines. Easy
+  pictures stand alone on the board; medium and hard ones have a halo of backdrop (stripes of the
+  art's own colour on hard levels). Boxes are big (mostly 24 to 48): about 20 to 70 taps a level.
+- **Every level on its difficulty target**, and proven winnable (`docs/V2_PRODUCTION_REPORT.md`).
 - **Removed:** the v1 game (wisps, worlds, its levels and tools). Settings carry over; the new game
   has its own coins and starts every player with one of each booster.
 

@@ -136,8 +136,8 @@ export function asAbove(): Canvas {
     [8, 9],
     [24, 10],
   ] as const) {
-    g.set(x, y, P.yellow);
-    g.set(x, 31 - y + 1, P.skyBlue);
+    g.dot(x, y, P.yellow);
+    g.dot(x, 31 - y + 1, P.skyBlue);
   }
   return g;
 }
@@ -169,12 +169,12 @@ export function toad(): Canvas {
     [16, 12],
     [13, 9],
   ] as const)
-    g.set(x, y, P.darkGreen);
+    g.dot(x, y, P.darkGreen);
   line(g);
   for (const x of [8, 18]) {
-    g.set(x, 7, P.yellow);
-    g.set(x - 1, 7, P.yellow);
-    g.set(x, 6, P.black);
+    g.dot(x, 7, P.yellow);
+    g.dot(x - 1, 7, P.yellow);
+    g.dot(x, 6, P.black);
   }
   g.rect(11, 13, 15, 13, P.pink);
   g.star(2, 3, P.yellow);
@@ -212,7 +212,7 @@ export function raven(): Canvas {
   g.line(13, 18, 14, 19, P.ochre);
   g.outline(P.white, { around: [P.black], outside: true });
   g.outline(P.black, { around: [P.lightGrey, P.brown, P.grey] });
-  g.set(15, 8, P.yellow);
+  g.dot(15, 8, P.yellow);
   g.star(3, 3, P.yellow);
   g.star(23, 22, P.yellow, 0);
   return g;
@@ -248,10 +248,10 @@ export function spiderWeb(): Canvas {
   for (const s of [-1, 1])
     for (const dy of [-1, 1, 3]) g.line(22 + s * 2, 23 + dy, 22 + s * 5, 22 + dy + 1, P.black);
   g.outline(P.purple, { around: [P.black] });
-  g.set(22, 24, P.red);
-  g.set(22, 25, P.red);
-  g.set(21, 21, P.white);
-  g.set(23, 21, P.white);
+  g.dot(22, 24, P.red);
+  g.dot(22, 25, P.red);
+  g.dot(21, 21, P.white);
+  g.dot(23, 21, P.white);
   return g;
 }
 
@@ -293,11 +293,11 @@ export function samhain(): Canvas {
     [4, 9],
     [27, 11],
   ] as const) {
-    g.set(x, y, P.black);
-    g.set(x - 1, y - 1, P.black);
-    g.set(x + 1, y - 1, P.black);
-    g.set(x - 2, y, P.black);
-    g.set(x + 2, y, P.black);
+    g.dot(x, y, P.black);
+    g.dot(x - 1, y - 1, P.black);
+    g.dot(x + 1, y - 1, P.black);
+    g.dot(x - 2, y, P.black);
+    g.dot(x + 2, y, P.black);
   }
   g.star(29, 3, P.white, 0);
   g.star(2, 3, P.white, 0);
@@ -345,7 +345,7 @@ export function wheelOfYear(): Canvas {
       const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
       if (d > 13.5 || d < 4) continue;
       const a = (Math.atan2(y + 0.5 - cy, x + 0.5 - cx) + Math.PI * 2.5) % (Math.PI * 2);
-      g.set(x, y, season[Math.floor((a / (Math.PI * 2)) * 8)]!);
+      g.dot(x, y, season[Math.floor((a / (Math.PI * 2)) * 8)]!);
     }
   // The sun at the hub.
   g.disc(cx, cy, 3.5, P.yellow);
@@ -369,7 +369,7 @@ export function grimoire(): Canvas {
   g.ring(9, 21.5, 5, 1, P.purple);
   g.star5(9, 21.8, 4.2, P.purple);
   for (let y = 17; y <= 26; y += 2)
-    for (let x = 18; x <= 26; x++) if ((x * 7 + y) % 5 !== 0) g.set(x, y, P.brown);
+    for (let x = 18; x <= 26; x++) if ((x * 7 + y) % 5 !== 0) g.dot(x, y, P.brown);
   g.textCentred(16, 1, "SO MOTE", P.yellow);
   g.textCentred(16, 7, "IT BE", P.yellow);
   g.star(2, 4, P.white, 0);

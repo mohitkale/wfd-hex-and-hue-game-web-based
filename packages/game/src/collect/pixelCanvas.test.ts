@@ -65,4 +65,28 @@ describe("the drawing canvas (M15.13)", () => {
     // Unknown characters are spaces, never a crash.
     expect(() => g.text(0, 0, "@#", P.black)).not.toThrow();
   });
+
+  it("draws at any scale: shapes keep their place, outlines stay one cube thick", () => {
+    const draw = () => {
+      const g = new Canvas(10, 10);
+      g.disc(5, 5, 3, P.red);
+      g.dot(0, 0, P.yellow);
+      g.outline(P.black);
+      return g;
+    };
+    const one = draw();
+    const big = Canvas.render(1.5, draw);
+    expect([big.w, big.h]).toEqual([15, 15]);
+    // About 1.5² times the disc, and the design cell (0, 0) covers the cubes whose centres lie in it.
+    const red = (g: Canvas) => g.cells.filter((c) => c === P.red).length;
+    expect(red(big) / red(one)).toBeGreaterThan(1.8);
+    expect(big.get(0, 0)).toBe(P.yellow);
+    expect(big.get(1, 1)).not.toBe(P.yellow);
+    // Outside `render` the scale is back to 1.
+    expect(new Canvas(4, 4).w).toBe(4);
+    // A one-cube outline: no black cube has black on both its left and right along the disc's row.
+    const row = 7;
+    const blacks = [...Array(big.w).keys()].filter((x) => big.get(x, row) === P.black);
+    expect(blacks.every((x) => !(blacks.includes(x - 1) && blacks.includes(x + 1)))).toBe(true);
+  });
 });

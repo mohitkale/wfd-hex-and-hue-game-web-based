@@ -103,15 +103,14 @@ Tier targets used by the journey (`TARGET` in `tools/collect/journey.ts`):
    (`pixelCanvas.ts`): discs, rings, polygons, lines, stars, a 3×5 pixel font for words, and
    `outline()` for the bordered look. Pictures are 22–34 cells wide. A chapter finale draws its own
    background and carries a word.
-2. **Frame it and cover it by tier.** Every picture but a finale sits in the middle of a larger
+2. **Frame it and back it by tier.** Every picture but a finale sits in the middle of a larger
    board (`framed` in `journey.ts`), so the art takes about 55 to 70 % of the board and the board
-   keeps its size on screen. How much of the rest is cubes depends on the tier:
+   keeps its size on screen. Empty cells cost nothing; only cubes take time. The backdrop is a halo
+   round the art whose width depends on the tier:
    - easy: none (the art alone), so the first levels are short and teach the rules on few cubes;
-   - medium: a bright backdrop (`bg`, with a scatter of stars that never touch the art) with an
-     empty band along the edges, about 85 % covered;
-   - hard: the whole board, with stripes of the art's own main colour through the backdrop, so the
-     same colour sits in the picture and behind it and the box order matters, while the art looks
-     the same.
+   - medium: a narrow band of a bright backdrop (`bg`, with a scatter of stars);
+   - hard: a wider band, with stripes of the art's own main colour, so the same colour sits in the
+     picture and behind it and the box order matters, while the art looks the same.
      A chapter finale draws its own full scene and carries a word. Then make the board
      (`toPictureBoard`, `margin: false, scene: false`): one box per colour to start.
 3. **Shape the board** (`withSharedTrays`): trays and columns from the cube count (3–4 trays on a
@@ -123,9 +122,13 @@ Tier targets used by the journey (`TARGET` in `tools/collect/journey.ts`):
    rule to learn, so they are allowed only on hard and extreme levels **from chapter 3 on**
    (`sealsAllowed`); easy and medium levels and the first two chapters never have them. The deal is
    recorded in `journeyDeals.json`.
-5. **Play it finer** (optional): a deal found at the design size scales to a finer mosaic (every
-   cell as 2 × 2 cubes, boxes × 4, seals by block), so the search stays quick and the picture keeps
-   its size on screen with smaller cubes.
+5. **Draw it to a cube budget.** Play time follows the number of cubes (the trays carry about 0.7
+   cubes a tick, however the player plays), so every tier has a budget (`CUBE_BUDGET`: 900, 1,300,
+   1,700, 2,000). The picture is drawn as geometry (`Canvas.render(scale, draw)`: discs, polygons and
+   lines rasterised at that scale, outlines added at the end), so it can be drawn at any size and its
+   outlines stay one cube thick. Each picture takes the largest scale, up to 2 cubes a design cell,
+   that fits its budget. Boxes are cut big (`BOX_PATTERN`, mostly 24 to 48), so a level is about 25
+   to 50 taps.
 6. **Gate it** (`npm run production:check`), then review it on the art sheet (`npm run art:journey`).
 
 To add a level: draw a function, add it to a chapter in `journey.ts`, run `journey:deal` for it,
@@ -257,7 +260,7 @@ none` and `overscroll-behavior: none`.
 | Boxes behind the front row were hard to read                                          | They faded to 62 % and 42 %                                                                | Every box flat and fully opaque; the front box has a soft sheen; a working box shows a curved tray rising out of it                                              |
 | Colours looked dull                                                                   | Dark backdrops, and shading mixed toward a night purple                                    | Light, bright backdrops; shading within each colour's own hue                                                                                                    |
 | Cubes looked too big next to the familiars                                            | One cube per drawn cell                                                                    | A finer mosaic: every drawn cell as 2 × 2 cubes, deals scaled up, familiars out twice as often                                                                   |
-| The first levels took several minutes                                                 | The art and its backdrop filled every cell of the board                                    | The art framed at 55 to 70 % of the board; easy levels leave the rest empty, medium cover about 85 %, hard all of it with stripes of the art's own colour        |
+| Levels took 10 minutes or more, and 100 taps or more                                  | Up to 5,000 cubes (the art upscaled ×2 on a full backdrop) in boxes of about 30            | A cube budget per tier, the art drawn at the scale that fits it, a halo of backdrop instead of a full board, and boxes of mostly 24 to 48                        |
 | Mobile toolbars could cover the bottom of the board                                   | The game box was sized to the layout viewport                                              | `100dvh` plus `visualViewport` resize events                                                                                                                     |
 
 ---

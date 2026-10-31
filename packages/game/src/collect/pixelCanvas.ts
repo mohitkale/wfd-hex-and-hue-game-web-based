@@ -53,45 +53,84 @@ export function textWidth(text: string): number {
 }
 
 export class Canvas {
-  readonly cells: (Colour | null)[];
-  constructor(
-    readonly w: number,
-    readonly h: number,
-  ) {
-    this.cells = new Array<Colour | null>(w * h).fill(null);
+  /**
+   * The scale new canvases draw at (`Canvas.render`): a picture designed on a 32-cell grid drawn at
+   * 1.5 is 48 cubes across. Shapes are rasterised at that resolution, so a picture keeps its shapes
+   * and its one-cube outlines at any size. 1 outside `render`.
+   */
+  private static scale = 1;
+
+  /** `draw()` with every canvas it makes drawn at `scale`. */
+  static render<T>(scale: number, draw: () => T): T {
+    const was = Canvas.scale;
+    Canvas.scale = scale;
+    try {
+      return draw();
+    } finally {
+      Canvas.scale = was;
+    }
   }
+
+  readonly cells: (Colour | null)[];
+  /** Cubes per design cell. */
+  readonly s: number;
+  /** Size in cubes (the design size times `s`). */
+  readonly w: number;
+  readonly h: number;
+  constructor(w: number, h: number) {
+    this.s = Canvas.scale;
+    this.w = Math.round(w * this.s);
+    this.h = Math.round(h * this.s);
+    this.cells = new Array<Colour | null>(this.w * this.h).fill(null);
+  }
+  /** One cube (cube coordinates). */
   set(x: number, y: number, c: Colour | null): void {
     if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.cells[y * this.w + x] = c;
   }
   get(x: number, y: number): Colour | null {
     return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.cells[y * this.w + x]! : null;
   }
-  /** Every cell whose centre lies inside the ellipse (cx, cy, rx, ry). */
+  /** The design point at the centre of cube `i` along an axis. */
+  private at(i: number): number {
+    return (i + 0.5) / this.s;
+  }
+  /** The design cell cube `i` lies in, along an axis. */
+  private cellOf(i: number): number {
+    return Math.floor(this.at(i));
+  }
+  /** One design cell (design coordinates): every cube whose centre lies in it. */
+  dot(x: number, y: number, c: Colour | null): void {
+    const from = (v: number) => Math.max(0, Math.ceil(v * this.s - 0.5));
+    for (let cy = from(y); cy < from(y + 1); cy++)
+      for (let cx = from(x); cx < from(x + 1); cx++) this.set(cx, cy, c);
+  }
+  /** Every cube whose centre lies inside the ellipse (cx, cy, rx, ry), in design units. */
   disc(cx: number, cy: number, rx: number, c: Colour | null, ry = rx): void {
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
-        const dx = (x + 0.5 - cx) / rx;
-        const dy = (y + 0.5 - cy) / ry;
+        const dx = (this.at(x) - cx) / rx;
+        const dy = (this.at(y) - cy) / ry;
         if (dx * dx + dy * dy <= 1) this.set(x, y, c);
       }
   }
-  /** The cells between radius `r - width` and `r` round (cx, cy). */
+  /** The cubes between radius `r - width` and `r` round (cx, cy). */
   ring(cx: number, cy: number, r: number, width: number, c: Colour): void {
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
-        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        const d = Math.hypot(this.at(x) - cx, this.at(y) - cy);
         if (d <= r && d > r - width) this.set(x, y, c);
       }
   }
+  /** The design cells (x0, y0) to (x1, y1), inclusive. */
   rect(x0: number, y0: number, x1: number, y1: number, c: Colour | null): void {
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) this.set(x, y, c);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) this.dot(x, y, c);
   }
-  /** Every cell whose centre is inside the polygon. */
+  /** Every cube whose centre is inside the polygon (design units). */
   poly(pts: readonly (readonly [number, number])[], c: Colour | null): void {
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
-        const px = x + 0.5;
-        const py = y + 0.5;
+        const px = this.at(x);
+        const py = this.at(y);
         let inside = false;
         for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
           const [xi, yi] = pts[i]!;
@@ -102,17 +141,17 @@ export class Canvas {
         if (inside) this.set(x, y, c);
       }
   }
-  /** A straight line of cells from (x0, y0) to (x1, y1). */
+  /** A straight line of design cells from (x0, y0) to (x1, y1). */
   line(x0: number, y0: number, x1: number, y1: number, c: Colour): void {
     const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
     for (let i = 0; i <= n; i++)
-      this.set(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), c);
+      this.dot(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), c);
   }
-  /** A small four-point sparkle centred on (x, y). */
+  /** A small four-point sparkle centred on design cell (x, y). */
   star(x: number, y: number, c: Colour, arm = 1): void {
     for (let i = -arm; i <= arm; i++) {
-      this.set(x + i, y, c);
-      this.set(x, y + i, c);
+      this.dot(x + i, y, c);
+      this.dot(x, y + i, c);
     }
   }
   /** A five-point star of outer radius `r` round (cx, cy). */
@@ -125,18 +164,22 @@ export class Canvas {
     }
     this.poly(pts, c);
   }
-  /** Paints `c` over every filled cell for which `keep(x, y, was)` holds. */
+  /**
+   * Paints `c` over every filled cube for which `keep(x, y, was)` holds, with (x, y) the design cell
+   * the cube lies in.
+   */
   recolour(c: Colour, keep: (x: number, y: number, was: Colour) => boolean): void {
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
         const was = this.get(x, y);
-        if (was !== null && keep(x, y, was)) this.set(x, y, c);
+        if (was !== null && keep(this.cellOf(x), this.cellOf(y), was)) this.set(x, y, c);
       }
   }
-  /** Fills every empty cell with `c(x, y)` (a background: sky, stars, a checked floor). */
+  /** Fills every empty cube with `c(x, y)`, (x, y) its design cell (a background: sky, a floor). */
   fillEmpty(c: (x: number, y: number) => Colour): void {
     for (let y = 0; y < this.h; y++)
-      for (let x = 0; x < this.w; x++) if (this.get(x, y) === null) this.set(x, y, c(x, y));
+      for (let x = 0; x < this.w; x++)
+        if (this.get(x, y) === null) this.set(x, y, c(this.cellOf(x), this.cellOf(y)));
   }
   /** `text` in the pixel font with its top-left at (x, y); returns its width. */
   text(x: number, y: number, text: string, c: Colour): number {
@@ -146,7 +189,7 @@ export class Canvas {
       const w = ch === " " ? 2 : GLYPH_W;
       if (ch !== " ")
         glyph.forEach((row, gy) => {
-          for (let gx = 0; gx < GLYPH_W; gx++) if (row[gx] === "#") this.set(cx + gx, y + gy, c);
+          for (let gx = 0; gx < GLYPH_W; gx++) if (row[gx] === "#") this.dot(cx + gx, y + gy, c);
         });
       cx += w + 1;
     }
@@ -157,7 +200,7 @@ export class Canvas {
     this.text(Math.round(cx - textWidth(text) / 2), y, text, c);
   }
   /**
-   * The bordered look: a one-cell line of `c` round shapes and between colours.
+   * The bordered look: a one-cube line of `c` round shapes and between colours (at any scale).
    * - `outside`: empty cells touching the drawing become `c` (the silhouette grows by a cell).
    * - `between`: where two colours meet, the cells of one side only become `c` (the colour that
    *   sorts later), so the line is one cell thick.
@@ -207,14 +250,6 @@ export class Canvas {
       }
     for (const i of marks) this.cells[i] = c;
   }
-}
-
-/** `g` with every cell drawn as an `f` × `f` block (a finer mosaic of the same picture). */
-export function upscale(g: Canvas, f: number): Canvas {
-  const out = new Canvas(g.w * f, g.h * f);
-  for (let y = 0; y < out.h; y++)
-    for (let x = 0; x < out.w; x++) out.set(x, y, g.get(Math.floor(x / f), Math.floor(y / f)));
-  return out;
 }
 
 /**
