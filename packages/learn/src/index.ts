@@ -53,3 +53,18 @@ export {
   type ImportResult,
   type PracticeSave,
 } from "./practice";
+export {
+  ICONS,
+  WALKS,
+  altarState,
+  checkAltar,
+  doneActions,
+  type AltarCandle,
+  type AltarLayout,
+  type AltarSpot,
+  type AltarState,
+  type AltarTool,
+  type AltarTrace,
+  type Icon,
+  type Walk,
+} from "./altar";

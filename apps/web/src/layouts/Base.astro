@@ -101,6 +101,8 @@ const imageUrl = absolute(image, Astro.site);
     display: flex;
     align-items: center;
     gap: 10px;
+    /* Its own width, not the half screen left of a left: 50% box (it wrapped word by word). */
+    width: max-content;
     max-width: calc(100vw - 32px);
     padding: 8px 8px 8px 16px;
     border: 1px solid rgb(246 217 122 / 0.6);

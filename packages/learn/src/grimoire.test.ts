@@ -92,10 +92,19 @@ describe("checkEntry", () => {
           {
             ...lesson.steps[0]!,
             expects: [{ kind: "choose", option: "foxglove" }],
+            options: [
+              { id: "foxglove", label: "Foxglove" },
+              { id: "mint", label: "Mint" },
+            ],
           },
         ],
       },
-      safety: { herbs: [{ item: "foxglove", name: "Foxglove", safety: "do-not-use" }] },
+      safety: {
+        herbs: [
+          { item: "foxglove", name: "Foxglove", safety: "do-not-use" },
+          { item: "mint", name: "Mint", safety: "kitchen-safe" },
+        ],
+      },
     };
     expect(checkEntry(quiz)).toEqual([
       'herb "foxglove" is marked do-not-use but a step handles it',

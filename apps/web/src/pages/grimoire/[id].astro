@@ -58,7 +58,17 @@ const BADGE = {
         </aside>
       )}
 
-      <p class="altar-soon">Rehearsing at the altar is coming soon. Until then, read it through:</p>
+      {entry.altar && (
+        <div class="begin" data-begin data-entry={JSON.stringify(entry)}>
+          <button type="button" class="begin-button" data-open>
+            Rehearse at the altar
+          </button>
+          <p class="begin-note" data-resume hidden>
+            You can carry on where you left off.
+          </p>
+        </div>
+      )}
+      <h2 class="read-title">Read it through</h2>
       <ol class="steps">
         {lesson.steps.map((s) => (
           <li>
@@ -71,6 +81,37 @@ const BADGE = {
   </div>
 </Page>
 
+<script>
+  import type { GrimoireEntry } from "@hexhue/learn";
+  import { loadPractice } from "../../lib/practiceStore";
+
+  const begin = document.querySelector<HTMLElement>("[data-begin]");
+  const open = begin?.querySelector<HTMLButtonElement>("[data-open]");
+  if (begin && open) {
+    const entry = JSON.parse(begin.dataset.entry ?? "null") as GrimoireEntry | null;
+    if (entry && loadPractice().runs[entry.lesson.id]) {
+      begin.querySelector<HTMLElement>("[data-resume]")?.removeAttribute("hidden");
+      open.textContent = "Carry on at the altar";
+    }
+    open.addEventListener("click", async () => {
+      if (!entry) return;
+      open.disabled = true;
+      try {
+        // The altar loads on first use: reading a lesson never downloads it.
+        const { openAltar } = await import("../../altar/scene");
+        openAltar(entry, () => {
+          open.focus();
+          const resumable = loadPractice().runs[entry.lesson.id];
+          open.textContent = resumable ? "Carry on at the altar" : "Rehearse at the altar";
+          begin.querySelector<HTMLElement>("[data-resume]")?.toggleAttribute("hidden", !resumable);
+        });
+      } finally {
+        open.disabled = false;
+      }
+    });
+  }
+</script>
+
 <style>
   .crumb {
     color: var(--mist);
@@ -82,8 +123,37 @@ const BADGE = {
   .lede {
     font-size: 1.1rem;
   }
-  .draft-note,
-  .altar-soon {
+  .begin {
+    margin: 1.5rem 0;
+    text-align: center;
+  }
+  .begin-button {
+    min-height: 52px;
+    padding: 12px 28px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--glow);
+    color: var(--night);
+    font: inherit;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+  }
+  .begin-note {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .read-title {
+    font-size: 1.2rem;
+  }
+  @media print {
+    :global(.site-header),
+    :global(.site-footer),
+    .begin {
+      display: none;
+    }
+  }
+  .draft-note {
     padding: 14px 18px;
     border-radius: 14px;
     background: rgb(42 22 80 / 0.6);

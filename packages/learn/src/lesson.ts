@@ -42,6 +42,8 @@ export interface Step {
   readonly hint: string;
   /** Why the step matters, shown in the summary. */
   readonly why: string;
+  /** The answers offered by a step that expects a `choose` (the right ones and the others). */
+  readonly options?: readonly { readonly id: string; readonly label: string }[];
 }
 
 export interface Lesson {
@@ -210,6 +212,19 @@ export function checkLesson(lesson: Lesson): string[] {
     if (s.expects.length === 0) problems.push(`${at(s)} expects nothing`);
     if (s.expects.some((a) => a.kind === "continue") && s.expects.length > 1) {
       problems.push(`${at(s)} mixes "continue" with other actions`);
+    }
+    const offered = (s.options ?? []).map((o) => o.id);
+    for (const a of s.expects) {
+      if (a.kind === "choose" && !offered.includes(a.option)) {
+        problems.push(`${at(s)} expects "${a.option}" but does not offer it`);
+      }
+    }
+    if (offered.length > 0 && !s.expects.some((a) => a.kind === "choose")) {
+      problems.push(`${at(s)} offers options but expects no choice`);
+    }
+    if (new Set(offered).size !== offered.length) problems.push(`${at(s)} offers an option twice`);
+    if ((s.options ?? []).some((o) => !o.label.trim())) {
+      problems.push(`${at(s)} offers an option with no label`);
     }
     if (s.order !== "in-order" && s.order !== "any-order") {
       problems.push(`${at(s)} has an unknown order "${String(s.order)}"`);

@@ -26,11 +26,27 @@ export function setupPathPanel(root: HTMLElement): void {
   const days = root.querySelector<HTMLElement>("[data-days]");
   const list = root.querySelector<HTMLElement>("[data-branches]");
   const status = root.querySelector<HTMLElement>("[data-status]");
-  if (!days || !list || !status) return;
+  const done = root.querySelector<HTMLElement>("[data-done]");
+  if (!days || !list || !status || !done) return;
   root.hidden = lessons.length === 0;
 
   const render = () => {
     const save = loadPractice();
+    // What has been rehearsed: kept here, in the Grimoire, with how often and since when.
+    const rehearsed = lessons.filter((l) => save.finished[l.id]);
+    done.hidden = rehearsed.length === 0;
+    done.querySelector("ul")?.replaceChildren(
+      ...rehearsed.map((l) => {
+        const f = save.finished[l.id]!;
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = `/grimoire/${l.id}/`;
+        a.textContent = l.title;
+        const note = f.times === 1 ? `first on ${f.first}` : `${f.times} times since ${f.first}`;
+        li.append(a, document.createTextNode(` · ${note}`));
+        return li;
+      }),
+    );
     const n = practiceDays(save);
     days.textContent = n === 1 ? "1 practice day" : `${n} practice days`;
     list.replaceChildren(

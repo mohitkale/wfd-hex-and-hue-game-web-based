@@ -4,6 +4,8 @@
  * has reviewed it.
  */
 import type { GrimoireEntry } from "@hexhue/learn";
+import { candleIntention } from "./candle";
+import { castingCircle } from "./circle";
 import { elementsWelcome } from "./elements";
 
-export const GRIMOIRE: readonly GrimoireEntry[] = [elementsWelcome];
+export const GRIMOIRE: readonly GrimoireEntry[] = [elementsWelcome, castingCircle, candleIntention];

@@ -222,10 +222,10 @@ _The pieces every v3 feature stands on._
 
 ### M17 — F1 Ritual Rehearsal
 
-- [ ] **M17.1** The altar scene — Phaser scene that plays a lesson: place tools, light candles, walk or trace a path, breathe with a pulse; the familiar helps; same-frame touch, haptics. _Needs M16.2._
-- [ ] **M17.2** Demo 1: casting and closing a circle. _Needs M17.1._
-- [ ] **M17.3** Demo 2: a candle intention spell (colour, dressing, focus, safe snuffing). _Needs M17.1._
-- [ ] **M17.4** "Why" pages and the ritual card — after a run, every step explained; the ritual saved to the Spellbook as a printable and shareable card. _Needs M17.2, M16.4._
+- [x] **M17.1** The altar scene — a light full-screen scene (DOM, not Phaser, so a lesson page never downloads the game engine; the familiar is the game's own drawing) that plays a lesson: place tools, light candles, walk or trace a path, breathe with a pulse; the familiar helps; same-frame touch, haptics. _Needs M16.2._
+- [x] **M17.2** Demo 1: casting and closing a circle. _Needs M17.1._
+- [x] **M17.3** Demo 2: a candle intention spell (colour, dressing, focus, safe snuffing). _Needs M17.1._
+- [x] **M17.4** "Why" pages and the ritual card — after a run, every step explained (steps that took a retry marked ✦, never a score) and printable; the ritual kept in the Grimoire ("Your path" lists every ritual rehearsed, how often and since when; decided in M17 instead of the game's picture Spellbook, which holds only journey pictures) and a ritual card image to save or share. _Needs M17.2, M16.4._
 - [ ] **M17.5** Ritual review **(human gate V1)** — owner rehearses both rituals; practitioner review recorded on each lesson. _Needs M17.3, M17.4._ Box ticked only on the owner's approval.
 
 ### M18 — F3 Living Sky and F2 Correspondence Cards

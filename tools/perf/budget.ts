@@ -8,6 +8,8 @@ export interface BuiltFile {
   path: string;
   bytes: number;
   gzip: number;
+  /** Whether the game page can load it (scripts only; unset when not worked out). */
+  play?: boolean;
 }
 
 export interface Budget {
@@ -28,7 +30,9 @@ export const BUDGETS: Budget[] = [
     // Phaser is most of it (~390 KB gzip); the engine and scenes must stay lean around it. Since the
     // v2 switch (M15.13) the board is part of this bundle and v1 is gone.
     label: "play page JS",
-    match: (f) => f.path.startsWith("_astro/") && /\.js$/.test(f.path),
+    // Every script the game can load (check.ts marks the rest, the Grimoire's altar for one, with
+    // `play: false`); a build without that marking counts every script.
+    match: (f) => f.path.startsWith("_astro/") && /\.js$/.test(f.path) && f.play !== false,
     measure: "gzip",
     per: "total",
     max: 450 * KB,
@@ -110,18 +114,23 @@ export function pageScripts(html: string): string[] {
   return [...html.matchAll(/<script[^>]*\ssrc="\/(_astro\/[^"]+\.js)"/g)].map((m) => m[1]!);
 }
 
-/** `entries` plus every bundle they statically import (relative "./x.js" imports in _astro). */
+/**
+ * `entries` plus every bundle they statically import (relative "./x.js" imports in _astro), and
+ * with `dynamic` also those they load later with `import("./x.js")`.
+ */
 export function scriptClosure(
   entries: readonly string[],
   code: (path: string) => string,
+  dynamic = false,
 ): string[] {
   const seen = new Set<string>();
+  const pattern = dynamic
+    ? /(?:from|import)\s*\(?\s*["']\.\/([^"']+\.js)["']/g
+    : /(?:from|import)\s*["']\.\/([^"']+\.js)["']/g;
   const visit = (path: string) => {
     if (seen.has(path)) return;
     seen.add(path);
-    for (const m of code(path).matchAll(/(?:from|import)\s*["']\.\/([^"']+\.js)["']/g)) {
-      visit(`_astro/${m[1]}`);
-    }
+    for (const m of code(path).matchAll(pattern)) visit(`_astro/${m[1]}`);
   };
   entries.forEach(visit);
   return [...seen];

@@ -10,6 +10,8 @@ import {
   CONTENT_SCRIPT_MAX,
   checkBudgets,
   inlineScripts,
+  pageScripts,
+  scriptClosure,
   scriptLeaks,
   type BuiltFile,
 } from "./budget";
@@ -30,7 +32,7 @@ try {
   process.exit(1);
 }
 
-const files: BuiltFile[] = paths.map((p) => {
+const built: BuiltFile[] = paths.map((p) => {
   const data = readFileSync(p);
   return {
     path: relative(root, p).split(sep).join("/"),
@@ -38,6 +40,28 @@ const files: BuiltFile[] = paths.map((p) => {
     gzip: gzipSync(data, { level: 9 }).length,
   };
 });
+// The game's scripts: what /play loads, and everything that can load later, dynamic imports too.
+const read = (path: string) => readFileSync(join(root, path), "utf8");
+let playPage: string;
+try {
+  playPage = read("play/index.html");
+} catch {
+  console.error("No play page in the build (apps/web/dist/play/index.html).");
+  process.exit(1);
+}
+const playable = new Set(scriptClosure(pageScripts(playPage), read, true));
+// The game's largest script (Phaser and the board) must be among those counted, or the import
+// scan has missed a way the game loads code and the budget would undercount.
+const largest = built
+  .filter((f) => f.path.startsWith("_astro/") && f.path.endsWith(".js"))
+  .sort((a, b) => b.gzip - a.gzip)[0];
+if (largest && !playable.has(largest.path)) {
+  console.error(`✗ the largest script, ${largest.path}, is not reached from /play: check the scan`);
+  process.exit(1);
+}
+const files = built.map((f) =>
+  f.path.startsWith("_astro/") && f.path.endsWith(".js") ? { ...f, play: playable.has(f.path) } : f,
+);
 
 const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
 let failed = false;
