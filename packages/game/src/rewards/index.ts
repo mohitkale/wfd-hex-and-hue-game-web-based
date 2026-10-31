@@ -18,6 +18,3 @@ export type { AdResult, Placement, RewardsProvider } from "./types";
 export function getRewards(scene: Phaser.Scene): RewardsProvider {
   return (scene.registry.get("rewards") as RewardsProvider | undefined) ?? new NoneProvider();
 }
-
-/** Coins granted by the "short on coins" ad offer. */
-export const AD_COINS = 30;

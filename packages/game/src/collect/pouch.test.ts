@@ -20,7 +20,7 @@ import {
 const empty = (): Pouch => ({
   ...startingPouch(),
   coins: 0,
-  boosters: { undo: 0, extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
+  boosters: { extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
 });
 
 const store = (initial?: string) => {
@@ -45,17 +45,19 @@ describe("paying", () => {
     let p: Pouch = {
       ...empty(),
       coins: 20,
-      boosters: { undo: 1, extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
+      boosters: { extraSlot: 0, hint: 1, call: 0, sweep: 0, lantern: 0 },
     };
-    expect(paymentFor(p, "undo")).toEqual({ kind: "owned" });
-    p = pay(p, "undo", paymentFor(p, "undo"));
-    expect(p.boosters.undo).toBe(0);
+    expect(paymentFor(p, "hint")).toEqual({ kind: "owned" });
+    p = pay(p, "hint", paymentFor(p, "hint"));
+    expect(p.boosters.hint).toBe(0);
     expect(p.coins).toBe(20);
-    expect(paymentFor(p, "undo")).toEqual({ kind: "coins", price: PRICES.undo });
-    p = pay(p, "undo", paymentFor(p, "undo"));
-    expect(p.coins).toBe(20 - PRICES.undo);
-    expect(paymentFor(p, "undo")).toEqual({ kind: "short", price: PRICES.undo, missing: 10 });
-    expect(pay(p, "undo", paymentFor(p, "undo"))).toBe(p);
+    expect(paymentFor(p, "hint")).toEqual({ kind: "coins", price: PRICES.hint });
+    p = pay(p, "hint", paymentFor(p, "hint"));
+    expect(p.coins).toBe(20 - PRICES.hint);
+    expect(paymentFor(p, "hint")).toEqual({ kind: "coins", price: PRICES.hint });
+    p = pay(p, "hint", paymentFor(p, "hint"));
+    expect(paymentFor(p, "hint")).toEqual({ kind: "short", price: PRICES.hint, missing: 10 });
+    expect(pay(p, "hint", paymentFor(p, "hint"))).toBe(p);
   });
 
   it("does not mutate the pouch it was given", () => {
@@ -101,13 +103,14 @@ describe("parsing and storage", () => {
     expect(parsePouch([])).toEqual(startingPouch());
     const p = parsePouch({
       coins: -5,
-      boosters: { undo: "x", hint: -2, extraSlot: 7.9 },
+      boosters: { undo: 3, call: "x", hint: -2, extraSlot: 7.9 },
       paid: [1, "a", "a", ""],
     });
     expect(p.coins).toBe(0);
+    // An old pouch's `undo` (the game has no Undo any more) is dropped.
     expect(p.boosters).toEqual({
       ...STARTING_KIT.boosters,
-      undo: STARTING_KIT.boosters.undo,
+      call: STARTING_KIT.boosters.call,
       hint: 0,
       extraSlot: 7,
     });

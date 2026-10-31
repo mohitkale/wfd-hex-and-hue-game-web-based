@@ -7,7 +7,7 @@ import type { KeyValueStore } from "./v2Spellbook";
  * Rules and prices: docs/V2_BOOSTERS.md.
  */
 
-export const BOOSTERS = ["undo", "extraSlot", "hint", "call", "sweep", "lantern"] as const;
+export const BOOSTERS = ["extraSlot", "hint", "call", "sweep", "lantern"] as const;
 export type Booster = (typeof BOOSTERS)[number];
 
 /**
@@ -15,7 +15,6 @@ export type Booster = (typeof BOOSTERS)[number];
  * earnable, never necessary (Retry is always free).
  */
 export const PRICES: Record<Booster, number> = {
-  undo: 15,
   extraSlot: 40,
   hint: 10,
   // The power-ups (M15.13): Familiar's Call, Besom Sweep, Crystal Lantern.
@@ -34,7 +33,6 @@ export const GIFT_EVERY = 3;
 export const STARTING_KIT = {
   coins: 50,
   boosters: {
-    undo: 2,
     extraSlot: 1,
     hint: 2,
     call: 1,
@@ -66,6 +64,7 @@ const count = (v: unknown, fallback: number): number =>
 /**
  * Reads untrusted JSON: every field falls back on its own, so one bad value never wipes the rest; a
  * negative or missing count is never a free top-up (negative clamps to 0, missing keeps the default).
+ * Counts of boosters the game no longer has (an old `undo`) are dropped.
  */
 export function parsePouch(json: unknown): Pouch {
   const fresh = startingPouch();

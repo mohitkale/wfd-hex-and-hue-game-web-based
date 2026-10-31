@@ -36,10 +36,6 @@ export function countLabel(pouch: Pouch, booster: Booster): string {
   return n > 0 ? String(n) : `${PRICES[booster]}✦`;
 }
 
-/** The small count shown on the HUD's Undo button: stock, or nothing when it would be bought. */
-export const undoBadge = (pouch: Pouch): string =>
-  pouch.boosters.undo > 0 ? String(pouch.boosters.undo) : "";
-
 interface RoundButton {
   disc: Phaser.GameObjects.Image;
   glyph: Phaser.GameObjects.Text;
@@ -82,7 +78,12 @@ export class BoosterTray {
     // Six buttons right of the coins, sized to fit the narrowest phone.
     const count = TRAY_BUTTONS.length + 1;
     const step = Math.min(48 * dpr, (tray.w - 58 * dpr) / count);
-    const d = Math.round(Math.min(tray.h - 2 * dpr, 34 * dpr, step - 6 * dpr));
+    // Never below 12 css px: while a window is resized (or loads hidden) the canvas can briefly be a
+    // few px wide, and a negative size would throw while baking the discs and stop the scene.
+    const d = Math.max(
+      Math.round(12 * dpr),
+      Math.round(Math.min(tray.h - 2 * dpr, 34 * dpr, step - 6 * dpr)),
+    );
     const right = tray.x + tray.w - d / 2;
     this.button(right, cy, d, "≡", handlers.onMenu, false);
     const press: Record<Counted, () => void> = {

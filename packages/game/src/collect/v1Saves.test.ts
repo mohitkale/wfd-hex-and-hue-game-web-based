@@ -117,15 +117,15 @@ describe("the v2 board beside a v1 save", () => {
     const pouch = award(startingPouch(), "art-moon", { cubes: 400 }).pouch;
     expect(pouch.coins).toBe(startingPouch().coins + 25);
     expect(v1.coins).toBe(137);
-    // The v2 boosters only: v1's Shuffle and Wand have no v2 equivalent and never appear.
+    // The v2 boosters only: v1's Undo, Shuffle and Wand have no v2 equivalent and never appear.
     expect(Object.keys(pouch.boosters).sort()).toEqual([
       "call",
       "extraSlot",
       "hint",
       "lantern",
       "sweep",
-      "undo",
     ]);
+    expect(pouch.boosters).not.toHaveProperty("undo");
     expect(pouch.boosters).not.toHaveProperty("shuffle");
     expect(pouch.boosters).not.toHaveProperty("wand");
   });

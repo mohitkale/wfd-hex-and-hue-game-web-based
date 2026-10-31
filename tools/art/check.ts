@@ -2,11 +2,11 @@ import type { Art } from "@hexhue/core";
 import { theme } from "../../packages/game/src/theme";
 import { contrast, distance, parseHex, type Rgb } from "./color";
 
-/** The play board's panel color (from the game theme): every fragment must read against it. */
+/** The play board's panel color (from the game theme): every cube must read against it. */
 export const PANEL: Rgb = [(theme.panel >> 16) & 255, (theme.panel >> 8) & 255, theme.panel & 255];
-/** Fragments must stand out from the dark panel (a collected cell). */
+/** Cubes must stand out from the dark panel (a collected cell). */
 export const MIN_PANEL_CONTRAST = 1.6;
-/** Two colors in one artwork must be clearly different: players match wisps to fragments by color. */
+/** Two colors in one artwork must be clearly different: players match boxes to cubes by color. */
 export const MIN_COLOR_DISTANCE = 90;
 
 /**

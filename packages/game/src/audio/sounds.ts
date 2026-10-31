@@ -39,7 +39,7 @@ export const PENTATONIC = [
 ];
 
 export interface SoundOptions {
-  /** For "collect": fragments left on the collecting wisp; lower charge plays a higher note. */
+  /** For "collect": cubes left in the delivering box; a lower count plays a higher note. */
   chargeLeft?: number;
 }
 
@@ -57,7 +57,7 @@ export function soundSpec(name: SoundName, opts: SoundOptions = {}): Note[] {
     case "launch":
       return [{ freq: 330, to: 660, wave: "triangle", at: 0, dur: 0.12, gain: 0.16 }];
     case "collect": {
-      // Climbs the scale as a wisp empties, so sweeping a lane plays a little rising run.
+      // Climbs the scale as a box empties, so a run of deliveries plays a little rising run.
       const step = Math.max(
         0,
         PENTATONIC.length - 1 - Math.min(opts.chargeLeft ?? 0, PENTATONIC.length - 1),

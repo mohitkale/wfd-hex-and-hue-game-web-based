@@ -12,7 +12,7 @@ both. Code: `packages/core/src/collect/{boosters,hint}.ts` (what a booster does)
   player try each one.
 - A booster that cannot do anything, or a hint that could not decide, **costs nothing**.
 - Not enough coins is never a wall: the message says so and says Retry is free.
-- The tutorial is a lesson, not a shop: no tray, and its Undo is free.
+- The tutorial is a lesson, not a shop: its boosters are free.
 
 ## What happened to the v1 five
 
@@ -29,7 +29,8 @@ both. Code: `packages/core/src/collect/{boosters,hint}.ts` (what a booster does)
 
 There is no Undo on the v2 board: no HUD button, no "Undo last move" on the loss card and no Undo
 lesson in the tutorial. Retry is the free, instant way to start over. The engine keeps
-`CollectSession.undo()` (tests and tools use it), and old pouches keep their `undo` count, unused.
+`CollectSession.undo()` (the simulated players, tests and tools use it). The game's own Undo
+booster code was removed in M15.15: an old pouch's `undo` count is dropped when it is read.
 
 ## Power-ups (M15.13)
 
@@ -38,11 +39,11 @@ familiars still come out of a tray, fetch one cube each and carry it into the ho
 `packages/core/src/collect/powers.ts` (what they do), `boosterUse.ts` (`useCall`, `useSweep`,
 `useLantern`), the round buttons in `BoosterTray.ts`, the view in `LanternPanel.ts`.
 
-| Power-up        | Button | Price | What it does                                                                                                                                                                            |
-| --------------- | ------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Familiar's Call | 🐾     | 25 ✦  | Tap it, then a box behind a column's front: that box moves to the front. One Undo takes it back.                                                                                        |
-| Besom Sweep     | 🧹     | 40 ✦  | Tap it, then a box in a tray (with one sweepable box it applies at once): its next 6 familiars fly over the picture to cubes of its colour that other colours bury. Undo takes it back. |
-| Crystal Lantern | 🏮     | 15 ✦  | Shows every box still to come in every column, front first; play waits while it is open. Paid once per level, then free to reopen.                                                      |
+| Power-up        | Button | Price | What it does                                                                                                                                                        |
+| --------------- | ------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Familiar's Call | 🐾     | 25 ✦  | Tap it, then a box behind a column's front: that box moves to the front.                                                                                            |
+| Besom Sweep     | 🧹     | 40 ✦  | Tap it, then a box in a tray (with one sweepable box it applies at once): its next 6 familiars fly over the picture to cubes of its colour that other colours bury. |
+| Crystal Lantern | 🏮     | 15 ✦  | Shows every box still to come in every column, front first; play waits while it is open. Paid once per level, then free to reopen.                                  |
 
 - Stock first, then coins; a power-up that would do nothing costs nothing.
 - **Earnable by playing:** the starting kit has one of each (an older pouch without them gets that
@@ -54,16 +55,14 @@ familiars still come out of a tray, fetch one cube each and carry it into the ho
 
 ## Effects
 
-- **Undo.** `session.undo()`: the state returns to before the last `select`/`resume` and that action
-  leaves the log; works out of a loss. Nothing to undo → nothing happens, nothing charged.
 - **Extra Slot** (the extra tray: it adds one tray to the row, M15.9). `addSlot`: `params.slots += 1`, an empty slot, event `slotAdded`. After a
   `slotsFull` loss the stalled group parks in the new slot and the interrupted tick is finished
   (`reviveFromSlotsFull`: the same code the tick uses, the tick counter does not advance), so the
   result is exactly the state a level built with the extra slot would have reached. The session
-  patches every undo snapshot, so Undo cannot take the slot away; Retry reapplies it. Refused once
+  patches every undo snapshot (the engine's undo, used by tools), so it cannot take the slot away; Retry reapplies it. Refused once
   the game is won and beyond 2 per level.
 - **Hint.** `hintFor`: solves from the current state with the real engine and a 4,000-node budget and
-  returns `move` (a legal first move of a winning line), `doomed` (no play wins: use Undo or Retry),
+  returns `move` (a legal first move of a winning line), `doomed` (no play wins: Retry, or an Extra Tray),
   `unknown` (budget ran out: never a guess), `wait` (the first move is not legal until the board
   settles) or `over`. Only `move` and `doomed` are charged. The suggested column or slot flashes.
   Hints assume settled play (GAME_DESIGN_V2 §10).
@@ -71,14 +70,15 @@ familiars still come out of a tray, fetch one cube each and carry it into the ho
 ## Economy
 
 Stored apart from the shipped game's save, in `localStorage` key `hexhue.v2.pouch`
-(`{ version, coins, boosters: { undo, extraSlot, hint }, paid: levelIds }`). Local only.
+(`{ version, coins, boosters: { extraSlot, hint, call, sweep, lantern }, paid: levelIds }`). Local
+only.
 
 |                                              |                                                         |
 | -------------------------------------------- | ------------------------------------------------------- |
-| Starting kit                                 | 50 coins, 2 Undo, 1 Extra Slot, 2 Hint                  |
-| Prices                                       | Undo 15, Hint 10, Extra Slot 40                         |
+| Starting kit                                 | 50 coins, 1 Extra Slot, 2 Hint, 1 of each power-up      |
+| Prices                                       | Hint 10, Lantern 15, Call 25, Extra Slot 40, Sweep 40   |
 | Paying                                       | stock first, then coins; short → refused with no change |
-| First clear of a level                       | 15 + 1 per 40 cubes (max +25)                           |
+| First clear of a level                       | 15 + 1 per 40 cubes (max +25); hard +20, extreme +40    |
 | Replay of a cleared level                    | 3                                                       |
 | Daily challenge, first completion of its day | +15                                                     |
 
@@ -97,5 +97,5 @@ and `wand` have no v2 equivalent).
 
 ## Not done here
 
-- The 2× rewarded ad is the only ad (M14.3); no booster is offered for an ad.
+- The 3× rewarded ad is the only ad (M14.3, M15.6); no booster is offered for an ad.
 - Coin and booster balances are not yet part of the M14.5 events.

@@ -11,7 +11,7 @@ export const PATTERNS = {
 
 export type HapticKind = keyof typeof PATTERNS;
 
-/** Minimum gap between collect pulses; a wisp sweeping a lane would otherwise buzz constantly. */
+/** Minimum gap between collect pulses; a run of deliveries would otherwise buzz constantly. */
 export const COLLECT_THROTTLE_MS = 70;
 
 /**

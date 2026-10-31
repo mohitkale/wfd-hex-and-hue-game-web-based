@@ -27,7 +27,7 @@ export interface AudioSettings {
 }
 
 /**
- * Minimum spacing for rapid repeats (a wisp sweeping a lane would otherwise stack dozens). `collect`
+ * Minimum spacing for rapid repeats (familiars delivering cube after cube would otherwise stack dozens). `collect`
  * is shorter than a v2 tick at 2× (about 21 ms) so a rising run keeps its notes; `pickup` pops are
  * deliberately thinned to about one every other tick at 1×.
  */

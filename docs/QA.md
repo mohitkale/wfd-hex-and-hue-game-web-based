@@ -1,5 +1,8 @@
 # Launch QA (v1.0.0)
 
+> **Historical.** This is the v1.0.0 launch record (worlds, wisps, `?engine=v2`). The v2 checks are
+> in the production report (`docs/V2_PRODUCTION_REPORT.md`), `docs/V2_PERF.md` and `npm run verify`.
+
 Checked on 2026-10-23 against the production build (`npm run build`, served locally) and the dev
 build (for in-game measurements). Re-run before each release.
 

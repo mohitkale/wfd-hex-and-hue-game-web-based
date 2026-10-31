@@ -285,9 +285,9 @@ There is no timer. Actions happen between ticks.
    slot the tap fails with the usual reason. This is a player-side convenience on top of the strict
    rules; `legalActions` still lists only what can work now. A board is not a deadlock for the player while
    queueing could still expose a box that can work (docs/V2_AUTORESUME.md).
-3. **Boosters** (Undo, Extra Slot, Hint; docs/V2_BOOSTERS.md): Undo restores the state before the last
-   select/resume; Extra Slot adds a holding slot for the level (and revives a `slotsFull` loss); Hint
-   names a move that keeps the level winnable. They are not game actions: they change no rule and
+3. **Boosters** (Extra Slot, Hint and the power-ups Familiar's Call, Besom Sweep and Crystal Lantern;
+   docs/V2_BOOSTERS.md): Extra Slot adds a holding slot for the level (and revives a `slotsFull`
+   loss); Hint names a move that keeps the level winnable. Undo was removed (M15.13). They are not game actions: they change no rule and
    cost nothing unless they do something.
 
 Illegal taps do nothing to the game (the UI explains why: "no reachable cube of this colour yet", or
@@ -356,7 +356,7 @@ never decided by animation, frame rate or timing. Win is tested first.
 - Apart from `slotsFull` (§16 Q1), the game does not declare a loss early for positions that are
   merely doomed but still have legal moves; an optional "doomed" hint (M14) may use the solver.
 
-Undo and boosters can recover from a loss (M14.4). Retry is always free and instant.
+An Extra Slot can recover from a loss (M14.4). Retry is always free and instant.
 
 ## 9. Concurrency
 
@@ -416,7 +416,7 @@ timer and never artificially slow movement.
   through an optional rewarded ad (M14.3); with no working ad provider it is not offered. The last
   deliveries, once no decision is left (nothing queued or waiting), are shown at 3× for free
   (docs/V2_SPEED.md). Speed never changes outcomes.
-- Boosters are Undo, Extra Slot and Hint (docs/V2_BOOSTERS.md), each with a tested effect, paid from
+- Boosters are Extra Slot, Hint and the three power-ups (docs/V2_BOOSTERS.md), each with a tested effect, paid from
   stock or coins that winning earns. Retry is always free; there are no lives, energy or forced ads.
 
 ## 14. Worked examples (fixtures for M9.5)

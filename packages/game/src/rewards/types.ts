@@ -1,5 +1,8 @@
-/** Where a rewarded ad is offered. Providers may report fill per placement. */
-export type Placement = "speed2x" | "doubleCoins" | "coins" | "revive";
+/**
+ * Where a rewarded ad is offered. Providers may report fill per placement. The only one is the
+ * optional 3× speed for a level (its id keeps its first name, so the analytics stay comparable).
+ */
+export type Placement = "speed2x";
 
 /**
  * - `rewarded`: the ad finished; grant the reward.

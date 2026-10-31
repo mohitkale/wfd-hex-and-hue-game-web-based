@@ -22,13 +22,12 @@ const whole = (ms: number): number => Math.round(ms / 1000);
 export class GameplayTracker {
   private activeMs = 0;
   private moves = 0;
-  private undos = 0;
   private boosters = 0;
   /** An attempt is open from `start` until it is won, lost, retried or abandoned. */
   private open = false;
   private attempts = 0;
   private offered = false;
-  /** The attempt ended in a loss: an Undo or an Extra Slot can bring it back. */
+  /** The attempt ended in a loss: an Extra Slot can bring it back. */
   private lost = false;
 
   constructor(
@@ -45,7 +44,6 @@ export class GameplayTracker {
   start(): void {
     this.activeMs = 0;
     this.moves = 0;
-    this.undos = 0;
     this.boosters = 0;
     this.open = true;
     this.lost = false;
@@ -65,18 +63,12 @@ export class GameplayTracker {
       this.emit("play_first_move", { level: this.level, seconds: this.seconds });
   }
 
-  /** A booster that continues a lost attempt (Undo, Extra Slot) reopens it, so its win is counted. */
+  /** A booster that continues a lost attempt (Extra Slot) reopens it, so its win is counted. */
   private revive(): void {
     if (this.lost) {
       this.open = true;
       this.lost = false;
     }
-  }
-
-  undo(paid: PlayPaid): void {
-    this.revive();
-    this.undos++;
-    this.emit("play_undo", { level: this.level, paid });
   }
 
   booster(booster: "extraSlot" | "hint" | "call" | "sweep" | "lantern", paid: PlayPaid): void {
@@ -92,7 +84,6 @@ export class GameplayTracker {
       level: this.level,
       seconds: this.seconds,
       moves: this.moves,
-      undos: this.undos,
       boosters: this.boosters,
     });
   }
@@ -111,7 +102,7 @@ export class GameplayTracker {
     this.start();
   }
 
-  /** Once per level: whether the optional 2× ad could be offered. */
+  /** Once per level: whether the optional 3× ad could be offered. */
   adOffer(placement: string, available: boolean): void {
     if (this.offered) return;
     this.offered = true;

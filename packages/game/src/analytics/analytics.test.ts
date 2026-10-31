@@ -63,7 +63,7 @@ function posthog(consent: Consent, extra: Partial<PostHogOptions> = {}) {
 describe("PostHog over HTTP", () => {
   it("records nothing and creates no id without consent", () => {
     const t = posthog("unknown");
-    t.ph.track("level_start", { level: "moonlit-01", replay: false });
+    t.ph.track("play_start", { level: "j-candle", kind: "picture", replay: false });
     t.ph.flush();
     expect(t.fetch).not.toHaveBeenCalled();
     expect(t.storage.map.has(ANON_ID_KEY)).toBe(false);
@@ -71,16 +71,10 @@ describe("PostHog over HTTP", () => {
 
   it("batches events with an anonymous id and sends them to /batch/", () => {
     const t = posthog("granted");
-    t.ph.track("level_start", { level: "moonlit-01", replay: false });
-    t.ph.track("level_win", {
-      level: "moonlit-01",
-      stars: 3,
-      assists: 0,
-      seconds: 41,
-      recovered: false,
-    });
+    t.ph.track("play_start", { level: "j-candle", kind: "picture", replay: false });
+    t.ph.track("play_win", { level: "j-candle", seconds: 41, moves: 12, boosters: 0 });
     expect(t.fetch).not.toHaveBeenCalled();
-    t.ph.track("level_start", { level: "moonlit-02", replay: false }); // 3rd: batch full
+    t.ph.track("play_start", { level: "j-witchs-hat", kind: "picture", replay: false }); // 3rd: batch full
     expect(t.fetch).toHaveBeenCalledOnce();
     const [url, init] = t.fetch.mock.calls[0]!;
     expect(url).toBe("https://eu.i.posthog.com/batch/");
@@ -88,10 +82,10 @@ describe("PostHog over HTTP", () => {
     expect(body.api_key).toBe("phc_test");
     expect(body.batch).toHaveLength(3);
     expect(body.batch[1]).toMatchObject({
-      event: "level_win",
+      event: "play_win",
       properties: {
-        level: "moonlit-01",
-        stars: 3,
+        level: "j-candle",
+        moves: 12,
         distinct_id: "anon-1",
         $lib: "hexhue-web",
         $geoip_disable: true,
@@ -185,6 +179,8 @@ describe("provider selection", () => {
       throw new Error("boom");
     };
     const scene = { registry: { get: () => broken } };
-    expect(() => track(scene, "level_skip", { level: "x" })).not.toThrow();
+    expect(() =>
+      track(scene, "play_retry", { level: "x", after: "lost", seconds: 1 }),
+    ).not.toThrow();
   });
 });

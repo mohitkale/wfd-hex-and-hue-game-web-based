@@ -47,7 +47,7 @@ export function worldMoment(
     worldName: name,
     line,
     seal: identity.seal,
-    backdrop: identity.atmosphere.backdrop,
+    backdrop: identity.backdrop,
   };
 }
 

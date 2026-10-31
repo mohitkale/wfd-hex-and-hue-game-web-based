@@ -690,10 +690,9 @@ export class CollectScene extends Phaser.Scene {
     this.commitPouch(r.pouch);
     this.toaster.show(r.message, 2600);
     if (!r.used) return;
-    if (r.paid?.booster === "undo") this.stats.undo(r.paid.how);
-    else if (r.paid) this.stats.booster(r.paid.booster, r.paid.how);
+    if (r.paid) this.stats.booster(r.paid.booster, r.paid.how);
     if (r.suggest) this.highlight(r.suggest);
-    // The layout changes with the slot count; Undo and Retry rebuild on their own.
+    // The layout changes with the slot count; Retry rebuilds on its own.
     else if (r.relayout) this.rebuild();
   }
 
