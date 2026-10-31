@@ -1,5 +1,5 @@
 import { apply, legalActions, type Action } from "./actions";
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import type { CollectLevel } from "./level";
 import { CollectSession } from "./session";
 import { runUntilSettledAuto } from "./autoResume";

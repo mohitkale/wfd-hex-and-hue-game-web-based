@@ -1,18 +1,13 @@
 import Phaser from "phaser";
 import type { Insets } from "./layout";
-import { BootScene } from "./scenes/BootScene";
-import { SpellbookScene } from "./scenes/SpellbookScene";
-import { WorldMapScene } from "./scenes/WorldMapScene";
-import { PlayScene } from "./scenes/PlayScene";
-import { SettingsScene } from "./scenes/SettingsScene";
+import { CollectScene } from "./collect/CollectScene";
 import { AudioEngine, audioSettings } from "./audio";
 import { reducedMotion } from "./a11y";
-import { nextRenderDpr, renderDpr } from "./display";
+import { nextRenderDpr, renderDpr, V2_BUDGET, V2_FPS } from "./display";
 import { CONSENT_EVENT, createAnalytics, readConsent, safeFlush, track } from "./analytics";
 import { createRewards } from "./rewards";
 import { loadSave } from "./save";
 import { defaultSave } from "./save/schema";
-import { v2Requested } from "./collect/engineFlag";
 import { theme } from "./theme";
 
 /** MediaQueryList change listeners (Safari before 14 only has the old addListener API). */
@@ -53,7 +48,9 @@ function readInsets(dpr: number): Insets {
  * browser zoom, a much bigger window), the game re-renders at the new one.
  */
 export function mountGame(parent: HTMLElement): Phaser.Game {
-  let dpr = renderDpr(window.devicePixelRatio, parent.clientWidth, parent.clientHeight);
+  // The board is fill-rate bound: a modest pixel budget and no multisampling (see V2_BUDGET).
+  const budget = V2_BUDGET;
+  let dpr = renderDpr(window.devicePixelRatio, parent.clientWidth, parent.clientHeight, budget);
   const size = () => ({
     w: Math.max(1, Math.round(parent.clientWidth * dpr)),
     h: Math.max(1, Math.round(parent.clientHeight * dpr)),
@@ -68,32 +65,18 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     height: h,
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr },
     input: { activePointers: 2 },
+    // Everything on the board is baked into textures, so 4× MSAA would only cost fill rate.
+    render: { antialiasGL: false },
+    // Drawn at most V2_FPS frames a second (owner request, M15.13); a still screen draws nothing.
+    fps: { limit: V2_FPS },
     // All sound comes from our own Web Audio engine; Phaser's would be a second, unused context.
     audio: { noAudio: true },
     disableContextMenu: true,
-    scene: [BootScene, WorldMapScene, SpellbookScene, SettingsScene, PlayScene],
+    // The board opens first; it shows the home map (or the tutorial on a first visit) by itself.
+    scene: [CollectScene],
   });
   game.registry.set("dpr", dpr);
   game.registry.set("insets", readInsets(dpr));
-  // The v2 board (`?engine=v2`, review builds only) is a separate chunk, loaded only when asked for;
-  // without the flag nothing of it is requested and the game below is exactly the shipped one.
-  if (v2Requested(window.location.search, import.meta.env?.PUBLIC_ENGINE)) {
-    void import("./collect/CollectScene")
-      .then(({ CollectScene }) => {
-        const start = () => {
-          game.scene.stop("boot");
-          game.scene.add("collect", CollectScene, true);
-        };
-        // The scene manager boots on READY (after the game object reports `isBooted`): adding a
-        // scene earlier would start it alongside the title screen.
-        if (game.scene.isBooted) start();
-        else game.events.once(Phaser.Core.Events.READY, start);
-      })
-      .catch((error: unknown) => {
-        // Offline, or a stale/removed review chunk: stay on the title screen and say why.
-        console.error("The v2 board could not be loaded (review build only).", error);
-      });
-  }
   // Audio stays silent until the first tap or key (browser rule), then follows the saved settings.
   const audio = new AudioEngine(audioSettings(defaultSave().settings));
   game.registry.set("audio", audio);
@@ -179,6 +162,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
         window.devicePixelRatio,
         parent.clientWidth,
         parent.clientHeight,
+        budget,
       );
       if (nextDpr !== dpr) {
         const oldDpr = dpr;
@@ -207,6 +191,9 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
     });
   };
   window.addEventListener("resize", onResize);
+  // Mobile browsers resize the visible area (toolbars sliding in and out) without always firing a
+  // window resize: follow it too, so the board always fits what can be seen, with nothing to scroll.
+  window.visualViewport?.addEventListener("resize", onResize);
   // A device-ratio change without a resize (window dragged to another screen, browser zoom on
   // some platforms) fires this media query instead; re-armed for each new ratio.
   let dprQuery: MediaQueryList | null = null;
@@ -222,6 +209,7 @@ export function mountGame(parent: HTMLElement): Phaser.Game {
   if (import.meta.env?.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
   game.events.once(Phaser.Core.Events.DESTROY, () => {
     window.removeEventListener("resize", onResize);
+    window.visualViewport?.removeEventListener("resize", onResize);
     unlisten(dprQuery, onResize);
   });
   return game;

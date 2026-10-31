@@ -34,7 +34,7 @@ It does **not** mean they are good. The checks cannot tell you that, which is wh
 ## How they were made (and what that means)
 
 Original work, drawn in this repository as text; no reference sprites, no image models, nothing
-from Food Hunt. Each silhouette and its base shading was **blocked in with geometric drafting aids**
+from the reference game. Each silhouette and its base shading was **blocked in with geometric drafting aids**
 (discs, ellipses, polygons, a light-from-the-upper-left shader), then details were placed cell by
 cell: the craters, the Libra gem, the cat's striped tail, the crystal facet seams. The recorded
 workflow is in each piece's `provenance.notes`. If you think that is too mechanical to count as

@@ -1,4 +1,4 @@
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { computeDist, padCells, paddedIndex, topologyFor, type Topology } from "./grid";
 import { defaultPortalX, type CollectLevel, type SealSpec } from "./level";
 
@@ -14,6 +14,18 @@ export interface CollectParams {
   squad: number;
   spawnGap: number;
   fieldCap: number;
+  /** Every tray works (M15.13): see `CollectLevel.sharedTrays`. Absent on levels with the original rule. */
+  sharedTrays?: boolean;
+  /** Ticks at the portal end of every trip (see `CollectLevel.gate`); absent when none. */
+  gate?: number;
+  /** Familiars enter and leave anywhere along the bottom edge (see `CollectLevel.edgeGate`). */
+  edgeGate?: boolean;
+  /** What a step inside the picture costs against 1 on the margin (see `CollectLevel.edgeBias`). */
+  edgeBias?: number;
+  /** Targets by row, from the centre out (see `CollectLevel.rowTargets`). */
+  rowTargets?: boolean;
+  /** Ticks a newly chosen box's tray takes to open (see `CollectLevel.openDelay`). */
+  openDelay?: number;
   /** Sealed cubes (M13.4) as padded cell indices; absent on levels without any, so older states are unchanged. */
   seals?: SealSpec[];
 }
@@ -30,6 +42,8 @@ export interface GroupState {
   status: GroupStatus;
   /** First tick at which the group may spawn a familiar. */
   nextSpawn: number;
+  /** Besom Sweep (M15.13): how many of its next familiars fly over the picture; absent when none. */
+  flying?: number;
 }
 
 export type FamiliarStatus = "toCube" | "pickup" | "carrying" | "deliver" | "idle";
@@ -107,6 +121,12 @@ export function createCollectState(level: CollectLevel): CollectState {
       squad: level.squad,
       spawnGap: level.spawnGap,
       fieldCap: level.fieldCap,
+      ...(level.sharedTrays ? { sharedTrays: true } : {}),
+      ...(level.gate ? { gate: level.gate } : {}),
+      ...(level.edgeGate ? { edgeGate: true } : {}),
+      ...(level.edgeBias && level.edgeBias > 1 ? { edgeBias: level.edgeBias } : {}),
+      ...(level.rowTargets ? { rowTargets: true } : {}),
+      ...(level.openDelay ? { openDelay: level.openDelay } : {}),
       ...(level.seals && level.seals.length > 0
         ? {
             seals: level.seals.map((s) => ({
@@ -120,7 +140,13 @@ export function createCollectState(level: CollectLevel): CollectState {
     status: "playing",
     lossReason: null,
     grid,
-    dist: computeDist(t, grid, portal),
+    dist: computeDist(
+      t,
+      grid,
+      portal,
+      level.edgeGate === true,
+      level.edgeBias && level.edgeBias > 1 ? level.edgeBias : 1,
+    ),
     reserved: new Array<number>(grid.length).fill(0),
     groups,
     columns,
@@ -217,6 +243,10 @@ function checkShape(s: CollectState): void {
     if (!isInt(p[k]) || p[k] < 1) fail(`params.${k} must be an integer ≥ 1`);
   }
   if (p.width > 40 || p.height > 40) fail("params.width/height exceed 40");
+  if (p.gate !== undefined && (!isInt(p.gate) || p.gate < 1))
+    fail("params.gate must be an integer ≥ 1");
+  if (p.sharedTrays !== undefined && p.sharedTrays !== true)
+    fail("params.sharedTrays must be true or absent");
   if (p.seals !== undefined) {
     if (
       !Array.isArray(p.seals) ||
@@ -253,6 +283,8 @@ function checkShape(s: CollectState): void {
       if (!isInt(g[k]) || g[k] < 0) fail(`groups[${i}].${k} must be an integer ≥ 0`);
     }
     if (g.capacity < 1) fail(`groups[${i}].capacity must be ≥ 1`);
+    if (g.flying !== undefined && (!isInt(g.flying) || g.flying < 0))
+      fail(`groups[${i}].flying must be an integer ≥ 0`);
     if (!GROUP_STATUSES.includes(g.status)) fail(`groups[${i}].status is invalid`);
   });
   const groupAt = (id: unknown, what: string): number => {
@@ -291,8 +323,13 @@ function checkShape(s: CollectState): void {
         fail(`familiars[${i}] is idle but still holds a route or cube`);
       return;
     }
-    if (f.route.length === 0 || f.route[0] !== p.portal)
-      fail(`familiars[${i}].route must start at the portal`);
+    const bottom = (p.height + 1) * p.stride;
+    const start = f.route[0];
+    const way = p.edgeGate
+      ? isInt(start) && start >= bottom && start < bottom + p.stride
+      : start === p.portal;
+    if (f.route.length === 0 || !way)
+      fail(`familiars[${i}].route must start at the portal${p.edgeGate ? " row" : ""}`);
     if (f.at < 0 || f.at >= f.route.length) fail(`familiars[${i}].at is outside its route`);
     if (f.route.some((c) => !isInt(c) || c < 0 || c >= cells))
       fail(`familiars[${i}].route leaves the grid`);
@@ -330,7 +367,13 @@ export function fromJSON(json: unknown): CollectState {
   s.lossReason = s.lossReason ?? null;
   checkShape(s);
   const t = topologyFor(s.params.width, s.params.height);
-  s.dist = computeDist(t, s.grid, s.params.portal);
+  s.dist = computeDist(
+    t,
+    s.grid,
+    s.params.portal,
+    s.params.edgeGate === true,
+    s.params.edgeBias ?? 1,
+  );
   s.reserved = new Array<number>(s.grid.length).fill(0);
   // A carried cube has left the board: only cubes still in place are reserved.
   for (const f of s.familiars) if (f.cube >= 0 && s.grid[f.cube] !== EMPTY) s.reserved[f.cube] = 1;
@@ -389,7 +432,7 @@ export function stateKey(s: CollectState): string {
   for (const id of s.slots) {
     if (id === null) continue;
     const g = s.groups[id]!;
-    waiting.push(`${g.color}:${g.capacity - g.delivered}`);
+    waiting.push(`${g.color}:${g.capacity - g.delivered}${g.flying ? `f${g.flying}` : ""}`);
   }
   waiting.sort();
   k += waiting.join(",") + "|";

@@ -79,7 +79,7 @@ export class GameplayTracker {
     this.emit("play_undo", { level: this.level, paid });
   }
 
-  booster(booster: "extraSlot" | "hint", paid: PlayPaid): void {
+  booster(booster: "extraSlot" | "hint" | "call" | "sweep" | "lantern", paid: PlayPaid): void {
     this.revive();
     this.boosters++;
     this.emit("play_booster", { level: this.level, booster, paid });

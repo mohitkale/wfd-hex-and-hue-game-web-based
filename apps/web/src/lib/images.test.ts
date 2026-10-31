@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PNG } from "pngjs";
-import { worlds } from "@hexhue/game/levels";
+import { CHAPTERS } from "@hexhue/game/journey";
+import { gallery, journeyPictures } from "./site";
 import { OG_HEIGHT, OG_WIDTH, artPng, ogPng } from "./images";
 import { textPixels } from "./pixelFont";
 
@@ -15,15 +16,18 @@ describe("site images", () => {
     expect(at(15, 5)[3]).toBe(0);
   });
 
-  it("renders every shipped artwork", () => {
-    for (const w of worlds) {
-      for (const l of w.levels) expect(artPng(l.level, 4).length).toBeGreaterThan(100);
-    }
+  it("renders every journey picture, and the gallery lists all 24 by chapter", () => {
+    const all = journeyPictures();
+    expect(all).toHaveLength(24);
+    for (const p of all) expect(artPng(p.art, 4).length).toBeGreaterThan(100);
+    expect(gallery().map((c) => c.items.length)).toEqual(CHAPTERS.map(() => 4));
   });
 
-  it("makes a 1200×630 share image", () => {
-    const png = PNG.sync.read(ogPng(worlds.map((w) => w.levels[0]!.level)));
+  it("makes a 1200×630 share image, titled with any chapter's name", () => {
+    const finales = journeyPictures().filter((p) => p.entry.tier === "extreme");
+    const png = PNG.sync.read(ogPng(finales.slice(0, 4).map((p) => p.art)));
     expect([png.width, png.height]).toEqual([OG_WIDTH, OG_HEIGHT]);
+    for (const name of CHAPTERS) expect(() => ogPng([finales[0]!.art], name)).not.toThrow();
   });
 
   it("the pixel font covers the share card's text and rejects unknown glyphs", () => {

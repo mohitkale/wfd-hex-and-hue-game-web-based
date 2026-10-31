@@ -12,32 +12,51 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import * as collect from "@hexhue/core/collect";
 import { TIERS, tiersSatisfied, type Tier } from "../../content/difficulty";
 import { SHIPPED, pieces } from "../../content/v2art";
-import { ART_LEVELS } from "../../packages/game/src/collect/artLevels";
-import { moonlitHat } from "../../packages/game/src/collect/slice";
 import { TUTORIAL } from "../../packages/game/src/collect/tutorialLevels";
+import {
+  JOURNEY,
+  dealLine,
+  dealMissed,
+  type Tier as JourneyTier,
+} from "../../packages/game/src/collect/journey";
+import { tierMisses } from "./journey";
 
 export const REPORT = new URL("../../docs/V2_PRODUCTION_REPORT.md", import.meta.url);
 
-export type Kind = "tutorial" | "slice" | "art";
+/** A level's role: the tutorial, a journey level of a tier, or (older content, dev only) the slice or an art piece. */
+export type Kind = "tutorial" | "slice" | "art" | "easy" | "medium" | "hard" | "extreme";
 
-/** The lowest tier of cheap-play resistance a kind of level must show (tutorials need none). */
+/**
+ * The lowest tier of cheap-play resistance a kind of level must show (tutorials need none). A
+ * journey level is held to its own tier's targets instead: the band its simple players must fit and
+ * the share of random games it may let win (`TARGET` in `tools/collect/journey.ts`, M15.13).
+ */
 export const REQUIRED_TIER: Record<Kind, Tier | null> = {
   tutorial: null,
   slice: "medium",
   art: "easy",
+  // Journey levels are checked against their own tier instead (`tierMisses`).
+  easy: null,
+  medium: null,
+  hard: null,
+  extreme: null,
 };
+
+const JOURNEY_KINDS: readonly Kind[] = ["easy", "medium", "hard", "extreme"];
 
 export interface Entry {
   kind: Kind;
   level: collect.CollectLevel;
 }
 
-/** Every level a player can reach in v2 without a dev flag: the tutorial, the slice, the art pieces (= the daily pool). */
+/**
+ * Every level a player can reach without a dev flag: the tutorial and the witch's journey (the level
+ * map and the daily pool), checked as the board plays them, with their recorded deals (M15.13).
+ */
 export function inventory(): Entry[] {
   return [
     ...TUTORIAL.map((t): Entry => ({ kind: "tutorial", level: t.make() })),
-    { kind: "slice", level: moonlitHat() },
-    ...Object.values(ART_LEVELS).map((make): Entry => ({ kind: "art", level: make() })),
+    ...JOURNEY.map((e): Entry => ({ kind: e.tier, level: e.make() })),
   ];
 }
 
@@ -46,18 +65,7 @@ export function inventory(): Entry[] {
  * issue that is not listed fails the gate; a listed one that no longer occurs fails it too (so the
  * debt can only shrink in the open).
  */
-export const KNOWN: Record<string, string> = Object.fromEntries(
-  [
-    "art-crescent-moon",
-    "art-triple-moon",
-    "art-witchs-cauldron",
-    "art-amethyst-cluster",
-    "art-libra-scales",
-  ].map((id) => [
-    `${id}: trivial: only the tutorial tier fits (needs easy)`,
-    "Single-layer picture: every cheap player wins (docs/V2_MEASURES.md). Needs a layered redesign before it counts as daily or world content.",
-  ]),
-);
+export const KNOWN: Record<string, string> = {};
 
 export interface Row {
   id: string;
@@ -81,6 +89,15 @@ export interface Row {
 }
 
 const tierIndex = (t: Tier): number => TIERS.indexOf(t);
+
+/** Whether `line` wins `level` in the live session (a line the game refuses part-way does not). */
+function replayWins(level: collect.CollectLevel, line: readonly collect.Action[]): boolean {
+  try {
+    return collect.replayLine(level, line, true).state.status === "won";
+  } catch {
+    return false;
+  }
+}
 
 /** Validates, solves and plays one level, and lists what is wrong with it. */
 export function check(entry: Entry): Row {
@@ -112,17 +129,27 @@ export function check(entry: Entry): Row {
 
   // The game's own policy: a pending box resumes by itself (docs/V2_AUTORESUME.md), so a level must be
   // winnable that way, not only with free choice.
-  const solved = collect.solve(level, undefined, true);
-  if (solved.status !== "solved" || !solved.line) {
-    issues.push(`unsolvable: the solver says ${solved.status}`);
-  } else {
-    // The line must win when replayed in the live session (with auto-resume), not only in the solver's search.
-    const session = collect.replayLine(level, solved.line, true);
-    if (session.state.status !== "won") issues.push("unsolvable: the solver's line does not win");
-    else {
-      row.solved = true;
-      row.lineLength = solved.line.length;
-      row.minSlots = collect.minSlots(level).slots;
+  // A journey level carries the winning line found at its design size: replayed in the live session
+  // on the board as played (the finer mosaic), a win proves it winnable, and the solver is not needed
+  // (on the finer board its search can run out of budget, M15.14).
+  const recorded = JOURNEY_KINDS.includes(kind) ? dealLine(level.id) : null;
+  if (recorded && replayWins(level, recorded)) {
+    row.solved = true;
+    row.lineLength = recorded.length;
+  }
+  if (!row.solved) {
+    const solved = collect.solve(level, undefined, true);
+    if (solved.status !== "solved" || !solved.line) {
+      issues.push(`unsolvable: the solver says ${solved.status}`);
+    } else {
+      // The line must win when replayed in the live session (with auto-resume), not only in the solver's search.
+      const session = collect.replayLine(level, solved.line, true);
+      if (session.state.status !== "won") issues.push("unsolvable: the solver's line does not win");
+      else {
+        row.solved = true;
+        row.lineLength = solved.line.length;
+        row.minSlots = collect.minSlots(level).slots;
+      }
     }
   }
 
@@ -133,14 +160,31 @@ export function check(entry: Entry): Row {
     if (level.subject && level.id !== `art-${level.subject.id}`)
       issues.push("inconsistent: the level id does not follow its piece id");
   }
-  if (level.width > 40 || level.height > 40) issues.push("inconsistent: board larger than 40×40");
+  if (JOURNEY_KINDS.includes(kind)) {
+    if (!level.subject) issues.push("inconsistent: a journey level has no subject");
+    if (!level.shades) issues.push("inconsistent: a journey level has no shades");
+    if (level.subject && level.id !== `j-${level.subject.id}`)
+      issues.push("inconsistent: the level id does not follow its picture id");
+  }
+  const max = collect.COLLECT_LIMITS.maxSize;
+  if (level.width > max || level.height > max)
+    issues.push(`inconsistent: board larger than ${max}×${max}`);
 
   const report = collect.strategyReport(level);
   row.simpleWins = report.simpleWins;
   row.randomRate = report.randomRate;
   row.tiers = tiersSatisfied(report) as Tier[];
+  // A journey level is held to its own tier (the dealing tool's targets, `tools/collect/journey.ts`).
+  if (JOURNEY_KINDS.includes(kind) && row.solved) {
+    const misses = tierMisses(report, kind as JourneyTier);
+    // A level whose dealing reached only a closest deal (recorded as missed) is listed, not failed:
+    // it is proven winnable, and its difficulty is below its tier's target until it is dealt again.
+    if (dealMissed(level.id) !== null)
+      for (const miss of misses) row.human.push(`Below its tier's target (closest deal): ${miss}.`);
+    else for (const miss of misses) issues.push(`off its tier: ${miss}`);
+  }
   const need = REQUIRED_TIER[kind];
-  if (need !== null && row.solved) {
+  if (need !== null && row.solved && !JOURNEY_KINDS.includes(kind)) {
     const best = Math.max(-1, ...row.tiers.map(tierIndex));
     if (best < tierIndex(need)) {
       const fits = row.tiers.length === 0 ? "no tier fits" : `only the ${TIERS[best]} tier fits`;
@@ -165,6 +209,22 @@ export function check(entry: Entry): Row {
   return row;
 }
 
+/**
+ * `check` remembered per level within a run: solving and playing a 40×40 picture board takes seconds,
+ * and the gate and its tests look at the same unchanged levels several times. A copy is returned, as
+ * `checkAll` edits the rows.
+ */
+const checked = new Map<string, Row>();
+function checkOnce(entry: Entry): Row {
+  const key = `${entry.kind}:${JSON.stringify(entry.level)}`;
+  let row = checked.get(key);
+  if (!row) {
+    row = check(entry);
+    checked.set(key, row);
+  }
+  return structuredClone(row);
+}
+
 export interface Result {
   rows: Row[];
   failures: string[];
@@ -176,7 +236,7 @@ export function checkAll(
   known: Record<string, string> = KNOWN,
   shipped: readonly string[] = SHIPPED,
 ): Result {
-  const rows = entries.map(check);
+  const rows = entries.map(checkOnce);
   const failures: string[] = [];
   const seen = new Set<string>();
   const cells = new Map<string, string>();

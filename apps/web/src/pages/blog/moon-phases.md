@@ -3,7 +3,7 @@ layout: ../../layouts/BlogPost.astro
 title: The eight moon phases behind Moonlit Beginnings
 description: What each phase of the moon traditionally stands for, and how they shaped the first world of Hex & Hue.
 date: 2026-10-20
-art: moonlit-01
+art: j-crescent
 ---
 
 The first world of Hex & Hue, **Moonlit Beginnings**, follows the moon through its cycle. Many

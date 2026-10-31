@@ -7,7 +7,7 @@ import { violation } from "./invariants";
 import type { CollectLevel } from "./level";
 import { CollectSession, replay } from "./session";
 import { isSettled, step } from "./sim";
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { cloneState, createCollectState, fromJSON, hashState, type CollectState } from "./state";
 
 /**

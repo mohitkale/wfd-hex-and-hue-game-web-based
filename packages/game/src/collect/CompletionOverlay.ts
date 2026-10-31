@@ -34,6 +34,12 @@ export interface CompletionOptions {
   instant: boolean;
   onSpellbook: () => void;
   onAgain: () => void;
+  /** The way on after a win (M15.13): "Continue" home. When given, Spellbook and Play again are not shown. */
+  next?: { label: string; onPress: () => void };
+  /** Coins this win paid, shown with the Spellbook line; null when it paid none. */
+  coins?: number | null;
+  /** The power-up this win gave, by name, or null. */
+  gift?: string | null;
 }
 
 /** Soft edge of the reveal, as a share of the whole reveal. */
@@ -147,13 +153,16 @@ export class CompletionOverlay {
       this.later.push(this.dailyLine);
       belowLore += this.dailyLine.height + 8 * dpr;
     }
+    const bookLine = !o.saved
+      ? "Could not be saved on this device"
+      : o.isNew
+        ? "Added to your Spellbook"
+        : "Already in your Spellbook";
     const book = text(
       belowLore,
-      !o.saved
-        ? "Could not be saved on this device"
-        : o.isNew
-          ? "Added to your Spellbook"
-          : "Already in your Spellbook",
+      [bookLine, o.coins ? `+${o.coins} ✦` : "", o.gift ? `+1 ${o.gift}` : ""]
+        .filter(Boolean)
+        .join("  ·  "),
       13,
       o.isNew && o.saved ? "#f6d97a" : theme.textDim,
       o.isNew && o.saved,
@@ -163,42 +172,37 @@ export class CompletionOverlay {
       l.frame.y + l.frame.h - 70 * dpr,
       book.y + book.height + 24 * dpr + 24 * dpr,
     );
-    // On a daily the Spellbook button shares its row with Share.
-    const half = o.daily?.shareText ? Math.min(l.frame.w * 0.84, 340 * dpr) / 2 - 5 * dpr : bw;
-    const spellbook = new Button(
-      scene,
-      o.daily?.shareText ? cx - half / 2 - 5 * dpr : cx,
-      by,
-      half,
-      "Spellbook",
-      { dpr, onPress: o.onSpellbook },
-    )
-      .setDepth(54)
-      .setAlpha(0);
+    // After a win the way on is home (`next`): the reward is on the card, and the Spellbook and
+    // replays are a tap away there. Without it (dev boards) Spellbook and Play again stay.
+    const half = Math.min(l.frame.w * 0.84, 340 * dpr) / 2 - 5 * dpr;
+    const pair = Boolean(o.daily?.shareText) && !o.next;
     // A practice run has nothing to share.
     const share = o.daily?.shareText
-      ? new Button(scene, cx + half / 2 + 5 * dpr, by, half, "Share", {
+      ? new Button(scene, pair ? cx + half / 2 + 5 * dpr : cx, by, pair ? half : bw, "Share", {
           dpr,
           onPress: () => o.onShare(o.daily!.shareText!),
         })
-          .setDepth(54)
-          .setAlpha(0)
       : null;
-    const again = new Button(scene, cx, by + 58 * dpr, bw, "Play again", {
-      dpr,
-      primary: true,
-      onPress: o.onAgain,
-    })
-      .setDepth(54)
-      .setAlpha(0);
-    scene.add.existing(spellbook);
-    scene.add.existing(again);
-    if (share) scene.add.existing(share);
-    this.later.push(name, caption, lore, book, spellbook, again, ...(share ? [share] : []));
+    const spellbook = o.next
+      ? null
+      : new Button(scene, pair ? cx - half / 2 - 5 * dpr : cx, by, pair ? half : bw, "Spellbook", {
+          dpr,
+          onPress: o.onSpellbook,
+        });
+    const lower = o.next && !share ? by : by + 58 * dpr;
+    const main = o.next
+      ? new Button(scene, cx, lower, bw, o.next.label, {
+          dpr,
+          primary: true,
+          onPress: o.next.onPress,
+        })
+      : new Button(scene, cx, lower, bw, "Play again", { dpr, primary: true, onPress: o.onAgain });
+    const all = [spellbook, share, main].filter((b): b is Button => b !== null);
+    for (const b of all) scene.add.existing(b.setDepth(54).setAlpha(0));
+    this.later.push(name, caption, lore, book, ...all);
     this.objects.push(...this.later);
 
     // Disabled until the reveal is done so a stray tap cannot press them while they fade in.
-    const all = share ? [spellbook, share, again] : [spellbook, again];
     for (const b of all) b.disableInteractive();
     const zone = scene.add
       .zone(l.frame.x + l.frame.w / 2, l.frame.y + l.frame.h / 2, l.frame.w, l.frame.h)

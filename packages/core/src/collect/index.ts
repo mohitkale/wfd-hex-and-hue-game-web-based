@@ -43,9 +43,10 @@ export {
 } from "./actions";
 export { isSettled, runUntilSettled, step } from "./sim";
 export { addSlot, canAddSlot } from "./boosters";
+export { callForward, canCall, canSweep, canWork, reachTarget, sweep, SWEEP_CUBES } from "./powers";
 export { autoResume, runUntilSettledAuto } from "./autoResume";
 export { HINT_BUDGET, hintFor, type Hint } from "./hint";
-export { nearestTarget, hasAssignable, type Target } from "./targeting";
+export { nearestTarget, rowTarget, hasAssignable, type Target } from "./targeting";
 export { computeDist, paddedIndex, topologyFor } from "./grid";
 export type { CollectEvent, LossReason, TickBatch } from "./events";
 export { groupViews, remaining, uncommitted, type GroupView } from "./groups";

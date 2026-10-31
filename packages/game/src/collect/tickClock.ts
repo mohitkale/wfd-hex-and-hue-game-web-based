@@ -5,11 +5,24 @@
  * logical time simply runs slower than wall time; ticks are never skipped or merged.
  */
 /**
- * How many ticks the board shows a second at 1× (the owner found 24 "pretty fast": the familiars ran
- * too quickly to follow). One tick is one cell, so a 14-cell route takes about a second. The rules never
- * read this; the speed-up multiplies it.
+ * How many ticks the board shows a second at 1×. One tick is one cell. The owner found 24 and 14 too
+ * fast, and 5 far too slow ("like 0.25×"); 8 was judged on a build that only reached 30 fps. The rules
+ * never read this; 3× multiplies it.
  */
-export const SHOWN_TICKS_PER_SECOND = 14;
+export const SHOWN_TICKS_PER_SECOND = 8;
+
+/**
+ * How fast a familiar walks on screen at 1×, in css px a second (M15.13). Speed used to be cells a
+ * second, so the same setting looked fast on a 14-wide picture (22 px cells) and crawled on a 32-wide
+ * one (10 px cells): the owner saw both "already 3×" and "like 0.25×". It is now the same on every board.
+ */
+export const WALK_CSS_PER_SECOND = 150;
+
+/** Ticks a second at 1× for a board whose cells are `cellCss` css px: a steady on-screen walk. */
+export function ticksPerSecondFor(cellCss: number): number {
+  // Up to 36 a second: the journey's finer mosaic has cubes of about 5 css px (M15.14).
+  return Math.max(4, Math.min(36, WALK_CSS_PER_SECOND / Math.max(1, cellCss)));
+}
 
 export class TickClock {
   private acc = 0;
@@ -17,7 +30,8 @@ export class TickClock {
   constructor(
     /** Ticks per second at 1×. */
     readonly ticksPerSecond = 24,
-    readonly maxPerFrame = 4,
+    /** Enough for 3× of the fastest board at 14 frames a second (about 4.3 ticks a frame), if a slow device drops that low. */
+    readonly maxPerFrame = 6,
   ) {}
 
   get tickMs(): number {

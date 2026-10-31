@@ -4,15 +4,15 @@ import {
   FAMILIAR_W,
   FIXED,
   FRAME_NAMES,
-  MIN_OUTLINE_CONTRAST,
-  PANEL,
   SPECIES,
   SS,
   badgeRect,
   contrast,
+  mix,
   palette,
   parseHex,
   speciesFor,
+  type Rgb,
 } from "../../packages/game/src/collect/familiarArt";
 import {
   MAX_ATLAS_COLORS,
@@ -31,8 +31,7 @@ import {
   type Gradient,
   type Painter,
 } from "../../packages/game/src/collect/familiarDraw";
-import { parseAsciiArt } from "@hexhue/core";
-import { worlds } from "../../content/worlds";
+import { PICTURE_PALETTE } from "../../packages/game/src/collect/pictureBoard";
 import { distance, parseHex as parseRgb } from "../art/color";
 
 const SHEET_COLORS = ["#e24a4a", "#4ae26b", "#4a6be2", "#f2c94c", "#b44ae2", "#4ae2d8"];
@@ -106,12 +105,20 @@ describe("familiar frames (vector bats and cats)", () => {
       "idle1",
       "walk0",
       "walk1",
+      "walk2",
+      "walk3",
+      "walk4",
+      "walk5",
       "carry0",
       "carry1",
+      "carry2",
+      "carry3",
+      "carry4",
+      "carry5",
       "pickup",
       "deliver",
     ]);
-    expect([...SPECIES]).toEqual(["bat", "cat"]);
+    expect([...SPECIES]).toEqual(["bat", "cat", "ant", "owl", "frog", "spider"]);
     expect(FRAME_W).toBe(FAMILIAR_W * SS);
     expect(FRAME_H).toBe(FAMILIAR_H * SS);
     expect(Object.keys(POSES).sort()).toEqual([...FRAME_NAMES].sort());
@@ -211,19 +218,16 @@ describe("familiar colour", () => {
     expect(parseHex("#e24a4a")).toEqual([226, 74, 74]);
   });
 
-  it("every colour used by the shipped world art reads on the board: outline lighter than the panel, body distinct from its outline", () => {
-    const colors = new Set<string>();
-    for (const world of worlds) {
-      for (const level of world.levels)
-        for (const c of parseAsciiArt(level.art).palette) colors.add(c.toLowerCase());
-    }
-    expect(colors.size).toBeGreaterThan(30);
+  it("every colour a level is played in reads on the light board and the wooden table: the outline stands out", () => {
+    const colors = new Set(Object.values(PICTURE_PALETTE).map((c) => c.toLowerCase()));
+    expect(colors.size).toBe(19);
+    // The picture's tray (frosted white over the wood) and the bare table round it (M15.7 look).
+    const wood: Rgb = [0xeb, 0xbf, 0x91];
+    const board = mix(wood, [0xfa, 0xf4, 0xec], 0.55);
     for (const color of colors) {
       const p = palette(color);
-      expect(contrast(p.outline, PANEL), `${color} outline`).toBeGreaterThanOrEqual(
-        MIN_OUTLINE_CONTRAST - 0.01,
-      );
-      expect(contrast(p.mid, PANEL), `${color} body`).toBeGreaterThanOrEqual(1.5);
+      expect(contrast(p.outline, board), `${color} outline on the board`).toBeGreaterThanOrEqual(2);
+      expect(contrast(p.outline, wood), `${color} outline on the table`).toBeGreaterThanOrEqual(2);
       // The face is carried by the dark pupils inside the white of the eyes, whatever the body
       // colour (white eyes alone are weak on pale bodies such as yellow, so the pupils matter).
       expect(contrast(FIXED.pupil, FIXED.eyeWhite), `${color} pupil`).toBeGreaterThanOrEqual(7);

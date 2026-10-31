@@ -12,7 +12,9 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The production gate plays every journey level on its finer board (about 9 minutes, twice: in the
+    # tests and on its own), so the job needs more than the old 15.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

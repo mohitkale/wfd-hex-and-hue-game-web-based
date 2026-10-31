@@ -14,7 +14,7 @@ The v1.0.0 build is technically complete (60 levels, solver-verified, offline PW
 deployment) but a first-hand play test found the core loop unsatisfying: wisps circle the outside of
 the mosaic, fragments just vanish, numbers feel like counters, the same few taps clear most levels,
 and the art is simple geometry. Those are product-design failures, not polish gaps. The reference
-feel is "creatures that go and fetch things" (Food Hunt-style pixel puzzles); v1's track is a
+feel is "creatures that go and fetch things" (pixel puzzles like the reference game); v1's track is a
 different mechanic wearing similar clothes.
 
 ## 2. Verified baseline (v1.0.0)

@@ -18,7 +18,6 @@ describe("v2 renderer boundaries", () => {
       "profile.ts",
       "swarm.ts",
       "particles.ts",
-      "engineFlag.ts",
     ]) {
       const imports = importsOf(read(file));
       expect(
@@ -28,14 +27,14 @@ describe("v2 renderer boundaries", () => {
     }
   });
 
-  it("the shipped game's entry point reads only the flag module (no v2 code on the v1 path)", () => {
+  it("the game's entry point mounts the board directly (v2 only since M15.13; v1 is gone)", () => {
     const index = readFileSync(
       new URL("../../packages/game/src/index.ts", import.meta.url),
       "utf8",
     );
     const staticImports = importsOf(index).filter((i) => i.includes("collect"));
-    expect(staticImports).toEqual(["./collect/engineFlag"]);
-    expect(index).toMatch(/import\("\.\/collect\/CollectScene"\)/);
+    expect(staticImports).toEqual(["./collect/CollectScene"]);
+    expect(index).not.toMatch(/scenes\//);
   });
 
   it("the engine is only imported by the renderer as types or through the collect subpath", () => {

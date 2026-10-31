@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { absolute, gallery, sitemapPaths } from "./site";
 
 describe("site helpers", () => {
+  it("keeps the board designs review page out of the sitemap", () => {
+    expect(sitemapPaths(["./designs.astro", "./faq.astro"])).toEqual(["/faq/"]);
+  });
+
   it("lists pages in canonical directory form, without 404 or dynamic routes", () => {
     expect(
       sitemapPaths([
@@ -20,14 +24,14 @@ describe("site helpers", () => {
     expect(absolute("/og.png", undefined)).toBe("https://hexandhue.example/og.png");
   });
 
-  it("the gallery lists all 60 mosaics by world, numbered from 1", () => {
-    const worlds = gallery();
-    expect(worlds.map((w) => w.items.length)).toEqual([20, 20, 20]);
-    expect(worlds[0]!.items[0]).toMatchObject({
-      id: "moonlit-01",
+  it("the gallery lists the journey's 24 pictures by chapter, numbered from 1", () => {
+    const chapters = gallery();
+    expect(chapters.map((c) => c.items.length)).toEqual([4, 4, 4, 4, 4, 4]);
+    expect(chapters[0]!.items[0]).toMatchObject({
+      id: "j-candle",
       number: 1,
-      world: "Moonlit Beginnings",
+      world: "The Calling",
     });
-    expect(new Set(worlds.flatMap((w) => w.items.map((i) => i.id))).size).toBe(60);
+    expect(new Set(chapters.flatMap((c) => c.items.map((i) => i.id))).size).toBe(24);
   });
 });

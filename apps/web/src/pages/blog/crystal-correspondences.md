@@ -3,7 +3,7 @@ layout: ../../layouts/BlogPost.astro
 title: Crystal correspondences in the Crystal Garden
 description: Amethyst, rose quartz, citrine and friends. The traditional meanings behind the stones of Hex & Hue's second world.
 date: 2026-10-21
-art: crystal-05
+art: j-amethyst
 ---
 
 The second world, **Crystal Garden**, is a collection of stones, tools and garden corners. Each

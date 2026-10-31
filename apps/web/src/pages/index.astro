@@ -2,18 +2,22 @@
 import Page from "../layouts/Page.astro";
 import { SITE, absolute, artUrl, gallery } from "../lib/site";
 
-const worlds = gallery();
+const chapters = gallery();
 const blurbs: Record<string, string> = {
-  moonlit: "Crescents, candles and starlit spells: a gentle start under the moon.",
-  crystal: "Amethyst, quartz and pendulums, with layered colors to untangle.",
-  zodiac: "All twelve signs and the constellations, for seasoned witches.",
+  "chapter-1": "A first candle, a hat that does not fit yet, a broom and a black cat.",
+  "chapter-2": "Lavender, mortar and pestle, a mandrake and your first brew.",
+  "chapter-3": "Quartz and amethyst, a crystal ball and a grid to charge them.",
+  "chapter-4": "A crescent, the triple moon, an owl and the sky in still water.",
+  "chapter-5": "A toad, a raven, a spider's web and the lantern of Samhain.",
+  "chapter-6": "The pentacle, the Star, the turning year and your own grimoire.",
 };
+// The last picture of every other chapter, then the first: a taste of the whole journey.
 const strip = [
-  worlds[0]!.items[0]!,
-  worlds[1]!.items[4]!,
-  worlds[2]!.items[0]!,
-  worlds[0]!.items[2]!,
-  worlds[1]!.items[0]!,
+  chapters[0]!.items[3]!,
+  chapters[2]!.items[3]!,
+  chapters[4]!.items[3]!,
+  chapters[3]!.items[1]!,
+  chapters[5]!.items[3]!,
 ];
 const jsonLd = {
   "@context": "https://schema.org",
@@ -36,8 +40,9 @@ const jsonLd = {
     <h1>Hex &amp; Hue</h1>
     <p class="tagline">{SITE.tagline}</p>
     <p class="lede">
-      Summon glowing wisps, collect every fragment of a magical mosaic and fill your Spellbook with
-      moon, crystal and zodiac art. A cozy color-sorting puzzle you can play anywhere, for free.
+      Pick a box and your familiars set off to fetch every cube of its colour, one by one, until the
+      picture is revealed. Walk a witch's journey of 24 pictures, from a first candle to your own
+      grimoire. A cozy pixel puzzle you can play anywhere, for free.
     </p>
     <div class="ctas">
       <a class="cta" href="/play/">
@@ -47,7 +52,7 @@ const jsonLd = {
         Browse the Spellbook
       </a>
     </div>
-    <ul class="strip" aria-label="Some of the mosaics you will reveal">
+    <ul class="strip" aria-label="Some of the pictures you will reveal">
       {strip.map((item) => (
         <li>
           <img class="pixel" src={artUrl(item.id)} alt={item.name} width="96" height="96" />
@@ -60,21 +65,24 @@ const jsonLd = {
     <h2>How to play</h2>
     <ol class="steps">
       <li>
-        <strong>Tap a column</strong>
-        <span>Its front wisp flies around the board, collecting fragments as it goes.</span>
+        <strong>Pick a box</strong>
+        <span>
+          It moves into a tray, and your familiars (a bat, a cat, an owl…) come out of it.
+        </span>
       </li>
       <li>
-        <strong>Match the colors</strong>
+        <strong>Watch them fetch</strong>
         <span>
-          A wisp collects the first fragment it sees when it is the wisp's own color. Spent wisps
-          leave through the portal; others rest in a slot.
+          Each familiar fetches one cube of the box's colour from the edge of the picture and
+          carries it into the hole. Choose well: a box whose colour is still buried waits, and when
+          every tray waits, you are stuck.
         </span>
       </li>
       <li>
         <strong>Reveal the art</strong>
         <span>
-          Clear every fragment and the finished illustration blooms into your Spellbook, with a
-          little lore to keep.
+          Clear every cube and the finished picture blooms into your Spellbook, with a little lore
+          to keep.
         </span>
       </li>
     </ol>
@@ -103,9 +111,9 @@ const jsonLd = {
   </section>
 
   <section>
-    <h2>Three worlds to explore</h2>
+    <h2>Six chapters of a witch's journey</h2>
     <div class="worlds">
-      {worlds.map((w) => (
+      {chapters.map((w) => (
         <article class="world">
           <div class="thumbs">
             {w.items.slice(0, 3).map((item) => (
@@ -121,7 +129,7 @@ const jsonLd = {
           </div>
           <h3>{w.name}</h3>
           <p>{blurbs[w.id]}</p>
-          <p class="count">{w.items.length} mosaics</p>
+          <p class="count">{w.items.length} pictures, easy to extreme</p>
         </article>
       ))}
     </div>

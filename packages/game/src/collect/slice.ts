@@ -53,6 +53,13 @@ export function moonlitHat(): collect.CollectLevel {
     squad: 3,
     spawnGap: 2,
     fieldCap: 2,
+    // Shown with the finished picture when the level is won (M15.13: the first level had no reveal).
+    subject: {
+      id: "moonlit-hat",
+      name: "Moonlit Hat",
+      theme: "moon",
+      lore: "A witch's hat left out under the full moon, so it can soak up a little silver for tomorrow.",
+    },
   };
 }
 

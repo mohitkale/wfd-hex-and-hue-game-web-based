@@ -2,8 +2,9 @@ import { openCell, routeTo } from "./grid";
 import { legalActions, queueCanProgress } from "./actions";
 import type { CollectEvent } from "./events";
 import { cachesOf, topologyOf, type CollectState, type Familiar } from "./state";
-import { hasAssignable, nearestTarget } from "./targeting";
-import { EMPTY } from "../level";
+import { nearestTarget, rowTarget } from "./targeting";
+import { canWork, reachTarget } from "./powers";
+import { EMPTY } from "../cells";
 import { remaining, uncommitted } from "./groups";
 
 /** True when no familiar exists and no group is working (GAME_DESIGN_V2 §2). */
@@ -29,6 +30,7 @@ function act(s: CollectState, f: Familiar, events: CollectEvent[]): void {
         from,
         to: f.route[f.at]!,
         carrying: false,
+        at: f.at,
       });
       if (f.at === f.route.length - 1) f.status = "pickup";
       return;
@@ -41,9 +43,18 @@ function act(s: CollectState, f: Familiar, events: CollectEvent[]): void {
       s.grid[cell] = EMPTY;
       s.reserved[cell] = 0;
       caches.accessible[color]!.delete(cell);
+      // A swept familiar may lift a buried cube: its cell becomes an enclosed pocket, which joins the
+      // walkway once a neighbour opens (M15.13).
+      let reachable = false;
+      for (let k = 0; k < 4; k++) {
+        const n = t.neighbors[cell * 4 + k]!;
+        if (n >= 0 && s.dist[n]! >= 0) reachable = true;
+      }
       // The cell is open now: distances shrink, sealed pockets may join, and cubes next to any
       // newly reachable cell become accessible.
-      for (const reached of openCell(t, s.grid, s.dist, cell)) {
+      for (const reached of reachable
+        ? openCell(t, s.grid, s.dist, cell, s.params.edgeBias ?? 1)
+        : []) {
         for (let k = 0; k < 4; k++) {
           const n = t.neighbors[reached * 4 + k]!;
           if (n >= 0 && s.grid[n]! !== EMPTY) caches.accessible[s.grid[n]!]!.add(n);
@@ -62,6 +73,7 @@ function act(s: CollectState, f: Familiar, events: CollectEvent[]): void {
         from,
         to: f.route[f.at]!,
         carrying: true,
+        at: f.at,
       });
       if (f.at === 0) f.status = "deliver";
       return;
@@ -89,14 +101,35 @@ function act(s: CollectState, f: Familiar, events: CollectEvent[]): void {
   }
 }
 
+/** A group's next target: a swept box flies (M15.13), otherwise the nearest reachable cube. */
+function nextTarget(
+  s: CollectState,
+  groupId: number,
+): { cube: number; standing: number; swept?: true } | null {
+  const g = s.groups[groupId]!;
+  if ((g.flying ?? 0) > 0) return reachTarget(s, g.color);
+  // Row order: bottom row first, from the centre out, the sides taking turns (M15.13).
+  if (s.params.rowTargets) return rowTarget(s, g.color, g.delivered + g.committed);
+  return nearestTarget(s, g.color);
+}
+
 /** Reserves `target` for `f` and sets it walking (or picking up, for a zero-move route). */
 function assign(
   s: CollectState,
   f: Familiar,
-  target: { cube: number; standing: number },
+  target: { cube: number; standing: number; swept?: true },
   events: CollectEvent[],
 ): number {
-  f.route = routeTo(topologyOf(s), s.dist, target.standing);
+  const g = s.groups[f.group]!;
+  if ("swept" in target) {
+    g.flying = (g.flying ?? 1) - 1;
+    if (g.flying <= 0) delete g.flying;
+  }
+  const route = routeTo(topologyOf(s), s.dist, target.standing, s.params.edgeBias ?? 1);
+  // The gate (M15.13): the familiar spends `gate` more ticks at the portal end of its route, coming
+  // out of its tray on the way there and going down the hole on the way back.
+  const gate = s.params.gate ?? 0;
+  f.route = gate > 0 ? [...new Array<number>(gate).fill(route[0]!), ...route] : route;
   f.at = 0;
   f.cube = target.cube;
   f.status = f.route.length === 1 ? "pickup" : "toCube";
@@ -111,7 +144,9 @@ function dispatch(s: CollectState, groupId: number, events: CollectEvent[]): voi
   const g = s.groups[groupId]!;
 
   for (const f of s.familiars.filter((x) => x.group === groupId && x.status === "idle")) {
-    const target = uncommitted(g) > 0 ? nearestTarget(s, g.color) : null;
+    // Shared trays (M15.13): a familiar fetches one cube and goes down the hole with it; the next cube
+    // is fetched by a new familiar out of the tray, so the tray's count is what is still inside it.
+    const target = uncommitted(g) > 0 && !s.params.sharedTrays ? nextTarget(s, groupId) : null;
     if (target) {
       assign(s, f, target, events);
     } else {
@@ -121,7 +156,7 @@ function dispatch(s: CollectState, groupId: number, events: CollectEvent[]): voi
   }
 
   if (s.tick >= g.nextSpawn && familiarCount(s, groupId) < s.params.squad && uncommitted(g) > 0) {
-    const target = nearestTarget(s, g.color);
+    const target = nextTarget(s, groupId);
     if (target) {
       const f: Familiar = {
         id: s.nextFamiliarId++,
@@ -153,7 +188,7 @@ function dispatch(s: CollectState, groupId: number, events: CollectEvent[]): voi
 function stall(s: CollectState, events: CollectEvent[]): boolean {
   for (const g of s.groups) {
     if (g.status !== "working") continue;
-    if (familiarCount(s, g.id) > 0 || hasAssignable(s, g.color)) continue;
+    if (familiarCount(s, g.id) > 0 || canWork(s, g)) continue;
     const slot = s.slots.indexOf(null);
     if (slot === -1) {
       s.status = "lost";

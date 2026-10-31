@@ -301,11 +301,13 @@ describe("visual model", () => {
       delivered: null,
       target: null,
       since: 0,
+      atFrom: 0,
+      atTo: 1,
     });
     expect(frameFor(v("walk"), 0)).toBe("walk0");
-    expect(frameFor(v("walk"), 1)).toBe("walk1");
+    expect(frameFor(v("walk"), 7, 3)).toBe("walk3");
     expect(frameFor(v("carry"), 0)).toBe("carry0");
-    expect(frameFor(v("carry"), 1)).toBe("carry1");
+    expect(frameFor(v("carry"), 1, 5)).toBe("carry5");
     expect(frameFor(v("pickup"), 5)).toBe("pickup");
     expect(frameFor(v("deliver"), 5)).toBe("deliver");
     expect(frameFor(v("idle"), 0)).toBe("idle0");
@@ -358,23 +360,22 @@ describe("visual model stays consistent through mid-flight taps, undo and restar
 });
 
 describe("review-build level and demo wiring", () => {
-  it("opens the vertical slice by default and still honours ?level=", async () => {
+  it("opens the journey's first level by default and still honours ?level=", async () => {
     const { levelFromSearch } = await import("./levels");
-    expect(levelFromSearch("?engine=v2").id).toBe("slice-moonlit-hat");
-    expect(levelFromSearch("?engine=v2&level=parking").id).toBe("dev-parking");
-    expect(levelFromSearch("?engine=v2&level=nope").id).toBe("slice-moonlit-hat");
+    expect(levelFromSearch("").id).toBe("j-candle");
+    expect(levelFromSearch("?level=parking").id).toBe("dev-parking");
+    expect(levelFromSearch("?level=nope").id).toBe("j-candle");
   });
 
-  it("?demo= picks the recorded line it names, and only on the slice level", async () => {
+  it("?demo=win plays the solver's winning line for the board as played", async () => {
     const { demoLineFromSearch, levelFromSearch } = await import("./levels");
-    const { DEMO_WIN_LINE, LOSE_LINES } = await import("./slice");
     const slice = levelFromSearch("");
-    expect(demoLineFromSearch("?demo=win", slice)).toBe(DEMO_WIN_LINE);
-    expect(demoLineFromSearch("?demo=slots", slice)).toBe(LOSE_LINES.deadlock);
-    expect(demoLineFromSearch("?demo=lose", slice)).toBe(LOSE_LINES.deadlock);
-    expect(demoLineFromSearch("?demo=deadlock", slice)).toBe(LOSE_LINES.deadlock);
+    // The winning demo is the solver's line for the board as played; there is no losing demo.
+    const line = demoLineFromSearch("?demo=win", slice)!;
+    expect(line.length).toBeGreaterThan(0);
+    expect(collect.replayLine(slice, line as collect.Action[], true).state.status).toBe("won");
+    expect(demoLineFromSearch("?demo=lose", slice)).toBeNull();
     expect(demoLineFromSearch("?demo=other", slice)).toBeNull();
     expect(demoLineFromSearch("", slice)).toBeNull();
-    expect(demoLineFromSearch("?demo=win", levelFromSearch("?level=parking"))).toBeNull();
   });
 });

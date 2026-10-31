@@ -10,5 +10,10 @@ export function endCardText(o: {
   if (o.won) return { title: "Every cube collected!", detail: `Delivered ${o.delivered} cubes` };
   if (o.lossReason === "slotsFull")
     return { title: "Out of slots", detail: "A group ran out of cubes with every slot full" };
-  return { title: "Stuck", detail: "No group can reach the cubes that are left" };
+  // With shared trays a deadlock is every tray holding a box whose colour is still buried.
+  return {
+    title: "Stuck",
+    detail:
+      "Every tray holds a box whose cubes are still buried.\nAn extra tray or a free Retry gets you going",
+  };
 }

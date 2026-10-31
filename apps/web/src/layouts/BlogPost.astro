@@ -8,7 +8,7 @@ interface Props {
     description: string;
     /** YAML gives unquoted dates as Date objects. */
     date: string | Date;
-    /** A mosaic id whose artwork illustrates the post. */
+    /** A journey level id whose picture illustrates the post. */
     art?: string;
   };
 }
@@ -32,7 +32,7 @@ const jsonLd = {
   description={frontmatter.description}
   type="article"
   image={frontmatter.art ? ogCardUrl(frontmatter.art) : undefined}
-  imageAlt={`${frontmatter.title}: a Hex & Hue pixel mosaic`}
+  imageAlt={`${frontmatter.title}: a Hex & Hue pixel picture`}
   jsonLd={jsonLd}
 >
   <article class="prose">
@@ -48,7 +48,7 @@ const jsonLd = {
     )}
     <slot />
     <p class="cta-line">
-      <a href="/play/">Play Hex &amp; Hue</a>, free, and collect the mosaics yourself.
+      <a href="/play/">Play Hex &amp; Hue</a>, free, and collect the pictures yourself.
     </p>
   </article>
 </Page>

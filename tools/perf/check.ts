@@ -11,7 +11,6 @@ import {
   checkBudgets,
   inlineScripts,
   scriptLeaks,
-  v2ChunkProblems,
   type BuiltFile,
 } from "./budget";
 
@@ -40,14 +39,6 @@ const files: BuiltFile[] = paths.map((p) => {
   };
 });
 
-const v2Problems = v2ChunkProblems(
-  files.map((f) => f.path),
-  paths
-    .filter((p) => /_astro\/.*\.js$/.test(p.split(sep).join("/")))
-    .map((p) => ({ path: relative(root, p), text: readFileSync(p, "utf8") })),
-);
-for (const problem of v2Problems) console.log(`✗ ${problem}`);
-
 const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
 let failed = false;
 for (const r of checkBudgets(files)) {
@@ -74,7 +65,6 @@ for (const l of leaks) {
   );
 }
 failed ||= leaks.length > 0;
-failed ||= v2Problems.length > 0;
 if (failed) {
   console.error("Performance budget exceeded.");
   process.exit(1);

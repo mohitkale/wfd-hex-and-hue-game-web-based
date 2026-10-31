@@ -6,15 +6,14 @@ tap, and is finished by something the player did.
 
 ## What it teaches, in order
 
-| Level (`?level=`)  | The lesson                                                                                 | Hints                                                                                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `tutorial-summon`  | Summon, watch them carry cubes home, watch the number count down                           | "Tap a group to summon it", "Watch the number count down", "Tap the next group"                                          |
-| `tutorial-blocked` | A buried colour cannot be reached: the refused tap says why, then clear what is in the way | "Red is buried. Tap it", "Clear the blue around it", "Now red is free: tap it"                                           |
-| `tutorial-slots`   | A group with nothing left to reach waits in a slot; send it again when it can              | "Tap the red group", "It waits. Clear the blue first", "Tap the waiting group"                                           |
-| `tutorial-undo`    | A bad choice can lose (one slot): Undo takes it back                                       | "Tap the red group", "Now tap the green group", "Out of slots. Tap Undo", "Clear the blue first", "Wake red, then green" |
+| Level (`?level=`)  | The lesson                                                                                 | Hints                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `tutorial-summon`  | Summon, watch them carry cubes home, watch the number count down                           | "Tap a group to summon it", "Watch the number count down", "Tap the next group" |
+| `tutorial-blocked` | A buried colour cannot be reached: the refused tap says why, then clear what is in the way | "Red is buried. Tap it", "Clear the blue around it", "Now red is free: tap it"  |
+| `tutorial-slots`   | A group with nothing left to reach waits in a slot; send it again when it can              | "Tap the red group", "It waits. Clear the blue first", "Tap the waiting group"  |
 
-Each level is at most 5×5 cubes and is verified by the solver. The undo level really does lose when its
-hints are followed to the mistake, and Undo really does recover (both tested).
+Each level is at most 5×5 cubes and is verified by the solver. Since M15.13 the lessons play by the
+game's rules (every tray works) and there is no Undo lesson: the owner removed Undo from v2.
 
 ## How it behaves
 

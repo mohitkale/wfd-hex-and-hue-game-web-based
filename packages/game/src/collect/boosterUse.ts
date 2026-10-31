@@ -59,7 +59,10 @@ export function useUndo(pouch: Pouch, session: collect.CollectSession, free: boo
   };
 }
 
-/** Extra Slot: one more holding slot for this level; after a slots-full loss it revives the game. */
+/**
+ * Extra Slot: one more holding slot for this level; after a slots-full loss (or, with shared trays, a
+ * deadlock a new tray opens up) it revives the game.
+ */
 export function useExtraSlot(
   pouch: Pouch,
   session: collect.CollectSession,
@@ -70,7 +73,7 @@ export function useExtraSlot(
       pouch,
       session.state.status === "won"
         ? "The level is already won"
-        : "A slot can't undo a deadlock. Undo or Retry",
+        : "A tray can't free a stuck board. Retry is free",
     );
   }
   if (session.extraSlots >= MAX_EXTRA_SLOTS) {
@@ -78,7 +81,7 @@ export function useExtraSlot(
   }
   const short = affordable(pouch, "extraSlot", free);
   if (short) return nothing(pouch, short);
-  const revived = session.state.lossReason === "slotsFull";
+  const revived = session.state.status === "lost";
   session.addSlot();
   return {
     paid: { booster: "extraSlot", how: howPaid(pouch, "extraSlot", free) },
@@ -115,7 +118,7 @@ export function useHint(pouch: Pouch, session: collect.CollectSession, free: boo
         pouch: charge(pouch, "hint", free),
         used: true,
         paid: { booster: "hint", how: howPaid(pouch, "hint", free) },
-        message: "No play wins from here. Undo, or Retry (free)",
+        message: "No play wins from here. Retry is free",
       };
     case "wait":
       return nothing(pouch, "Let the board settle, then ask again");
@@ -124,4 +127,71 @@ export function useHint(pouch: Pouch, session: collect.CollectSession, free: boo
     case "over":
       return nothing(pouch, "The game is over");
   }
+}
+
+/** The power-up names a player reads. */
+export const POWER_NAMES = {
+  call: "Familiar's Call",
+  sweep: "Besom Sweep",
+  lantern: "Crystal Lantern",
+} as const;
+
+/** Whether a power-up can be paid for now (stock or coins), with the reason when it cannot. */
+export function canAfford(pouch: Pouch, booster: Booster): string | null {
+  return affordable(pouch, booster, false);
+}
+
+/**
+ * Familiar's Call (M15.13): the box at `depth` (behind the front) of `column` comes to the front.
+ * Charged only when it moved a box.
+ */
+export function useCall(
+  pouch: Pouch,
+  session: collect.CollectSession,
+  column: number,
+  depth: number,
+): UseResult {
+  if (session.state.status !== "playing") return nothing(pouch, "The game is over");
+  const short = affordable(pouch, "call", false);
+  if (short) return nothing(pouch, short);
+  if (!session.callForward(column, depth)) return nothing(pouch, "Tap a box behind the front row");
+  return {
+    paid: { booster: "call", how: howPaid(pouch, "call", false) },
+    pouch: charge(pouch, "call", false),
+    used: true,
+    message: "Called to the front",
+  };
+}
+
+/**
+ * Besom Sweep (M15.13): the next familiars of box `group` (in a tray) fly over the picture to its
+ * buried cubes. Charged only when it was cast.
+ */
+export function useSweep(pouch: Pouch, session: collect.CollectSession, group: number): UseResult {
+  if (session.state.status !== "playing") return nothing(pouch, "The game is over");
+  const short = affordable(pouch, "sweep", false);
+  if (short) return nothing(pouch, short);
+  if (!session.sweep(group)) return nothing(pouch, "Tap a box in a tray that still has familiars");
+  return {
+    paid: { booster: "sweep", how: howPaid(pouch, "sweep", false) },
+    pouch: charge(pouch, "sweep", false),
+    used: true,
+    message: `Its next ${collect.SWEEP_CUBES} fly over the picture`,
+  };
+}
+
+/**
+ * Crystal Lantern (M15.13): every box of every column shows for the rest of the level. Lighting it
+ * costs once; the scene remembers it is lit, so reopening it is free.
+ */
+export function useLantern(pouch: Pouch, session: collect.CollectSession): UseResult {
+  if (session.state.status !== "playing") return nothing(pouch, "The game is over");
+  const short = affordable(pouch, "lantern", false);
+  if (short) return nothing(pouch, short);
+  return {
+    paid: { booster: "lantern", how: howPaid(pouch, "lantern", false) },
+    pouch: charge(pouch, "lantern", false),
+    used: true,
+    message: "",
+  };
 }

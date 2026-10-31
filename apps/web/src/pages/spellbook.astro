@@ -8,20 +8,20 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "CollectionPage",
   name: "The Hex & Hue Spellbook",
-  description: `All ${total} mosaics of ${SITE.name}, with their lore.`,
+  description: `All ${total} pictures of ${SITE.name}'s witch's journey, with their lore.`,
   url: absolute(Astro.url.pathname, Astro.site),
 };
 ---
 
 <Page
-  title="The Spellbook: every Hex & Hue mosaic"
-  description={`Browse all ${total} magical pixel mosaics of Hex & Hue (moon phases, crystals and the zodiac), each with its own bit of lore.`}
+  title="The Spellbook: every Hex & Hue picture"
+  description={`Browse all ${total} pictures of Hex & Hue's witch's journey, in six chapters, each with its own bit of lore.`}
   jsonLd={jsonLd}
 >
   <h1>The Spellbook</h1>
   <p class="lede">
-    Every mosaic you can reveal in Hex &amp; Hue, with the lore it adds to your own Spellbook. In
-    the game, each one blooms in as you clear its last fragment.
+    Every picture you can reveal in Hex &amp; Hue, with the lore it adds to your own Spellbook. In
+    the game, each one blooms in as you clear its last cube.
   </p>
   <nav class="jump" aria-label="Worlds">
     {worlds.map((w) => (
@@ -37,7 +37,7 @@ const jsonLd = {
             <img
               class="pixel"
               src={artUrl(item.id)}
-              alt={`${item.name}, a pixel mosaic`}
+              alt={`${item.name}, a pixel picture`}
               width={item.width * 8}
               height={item.height * 8}
               loading="lazy"

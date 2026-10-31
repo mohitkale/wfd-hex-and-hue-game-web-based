@@ -12,7 +12,7 @@ import { createRng } from "@hexhue/core";
  */
 
 /** Bump whenever the pool or the schedule below changes (a test pins the pool to force this). */
-export const DAILY_VERSION = 1;
+export const DAILY_VERSION = 2;
 
 const DAY_MS = 86_400_000;
 

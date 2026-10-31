@@ -2,8 +2,8 @@ import type { AdResult } from "../rewards/types";
 
 /**
  * The v2 speed rule (M14.3, docs/V2_SPEED.md): 1× is always free; the speed-up (3×) unlocks for the
- * **current level only**, through an optional rewarded ad; and the last deliveries sprint at 3× for
- * free (`sprinting`). Pure and free of Phaser, so every branch is tested.
+ * **current level only**, through an optional rewarded ad. It changes only when the player chooses (the free end-game
+ * sprint was removed in M15.13). Pure and free of Phaser, so every branch is tested.
  *
  * - No working provider: **no 3× offer is shown** (never an ad that cannot play).
  * - A completed ad unlocks 3× for this level; closing it early changes nothing (it may be tried again);
@@ -12,7 +12,7 @@ import type { AdResult } from "../rewards/types";
  *   outcome of a given action log is the same at 1× and 3× (tested).
  */
 
-/** The speed the optional ad unlocks (and the free end-game sprint uses). */
+/** The speed the optional ad unlocks. */
 export const BOOST = 3;
 export type Speed = 1 | typeof BOOST;
 
@@ -112,26 +112,3 @@ export function restoreSpeed(
   }
   return { state, speed };
 }
-
-/**
- * The free end-game sprint: once no player decision is left (nothing queued in a column and nothing
- * waiting in a slot), every remaining cube belongs to a group that is already working, so the rest of
- * the level plays itself and is shown at 3× without an ad. It changes how fast ticks are shown, never
- * what happens (a group that runs dry parks, which ends the sprint by itself).
- */
-export function sprinting(s: {
-  status: string;
-  columns: readonly (readonly number[])[];
-  slots: readonly (number | null)[];
-  groups: readonly { status: string }[];
-}): boolean {
-  return (
-    s.status === "playing" &&
-    s.columns.every((c) => c.length === 0) &&
-    s.slots.every((x) => x === null) &&
-    s.groups.some((g) => g.status === "working")
-  );
-}
-
-/** The speed to show now: the chosen one, or 3× while the level is finishing by itself. */
-export const effectiveSpeed = (chosen: Speed, sprint: boolean): Speed => (sprint ? BOOST : chosen);

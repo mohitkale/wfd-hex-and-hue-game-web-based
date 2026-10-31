@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY } from "../level";
+import { EMPTY } from "../cells";
 import { board, randomLevel } from "./fixtures";
 import {
   PROFILES,

@@ -1,14 +1,12 @@
 import type { APIRoute, GetStaticPaths } from "astro";
-import { worlds } from "@hexhue/game/levels";
+import { journeyPictures } from "../../lib/site";
 import { artPng } from "../../lib/images";
 
-/** One PNG per mosaic, built at build time from the shipped level data. */
+/** One PNG per journey picture, built at build time from the picture as drawn. */
 export const getStaticPaths: GetStaticPaths = () =>
-  worlds.flatMap((w) =>
-    w.levels.map((l) => ({ params: { id: l.level.id }, props: { level: l.level } })),
-  );
+  journeyPictures().map((p) => ({ params: { id: p.entry.id }, props: { art: p.art } }));
 
 export const GET: APIRoute = ({ props }) => {
-  const png = artPng(props.level as Parameters<typeof artPng>[0], 16);
+  const png = artPng(props.art as Parameters<typeof artPng>[0], 8);
   return new Response(new Uint8Array(png), { headers: { "Content-Type": "image/png" } });
 };

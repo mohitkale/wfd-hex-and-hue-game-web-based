@@ -6,8 +6,12 @@
  * `fieldCap + slots` and there is always one free for a group that starts or resumes. Pure.
  */
 
-/** How many trays a level shows: the working limit plus the waiting limit (the Extra Slot booster adds one). */
-export const trayCount = (fieldCap: number, slots: number): number => fieldCap + slots;
+/**
+ * How many trays a level shows: the working limit plus the waiting limit (the Extra Slot booster adds
+ * one), or, with shared trays (M15.13), the trays themselves, where every box works.
+ */
+export const trayCount = (fieldCap: number, slots: number, shared = false): number =>
+  shared ? slots : fieldCap + slots;
 
 interface Occupant {
   id: number;

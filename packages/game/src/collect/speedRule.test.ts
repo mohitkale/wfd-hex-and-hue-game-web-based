@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import { createRewards, MockProvider, NoneProvider } from "../rewards";
 import {
   applyAdResult,
-  effectiveSpeed,
-  sprinting,
   enterLevel,
   initialSpeedState,
   restoreSpeed,
@@ -277,62 +275,5 @@ describe("the tutorial's ring points at the tray a waiting box sits in", () => {
     const r = targetRect(l, { kind: "slot", index: 0 }, 3, undefined, () => l.trays[2] ?? null);
     expect(r).toEqual(l.trays[2]);
     expect(targetRect(l, { kind: "slot", index: 1 }, 3, undefined, () => null)).toBeNull();
-  });
-});
-
-describe("the free end-game sprint", () => {
-  const state = (o: Partial<Parameters<typeof sprinting>[0]> = {}) => ({
-    status: "playing",
-    columns: [[], []],
-    slots: [null, null],
-    groups: [{ status: "working" }, { status: "completed" }],
-    ...o,
-  });
-
-  it("starts when nothing is queued or waiting and a group is still working", () => {
-    expect(sprinting(state())).toBe(true);
-    expect(effectiveSpeed(1, true)).toBe(3);
-    expect(effectiveSpeed(1, false)).toBe(1);
-    expect(effectiveSpeed(3, false)).toBe(3);
-  });
-
-  it("does not while a decision is left: a queued group, a waiting group, or nobody working", () => {
-    expect(sprinting(state({ columns: [[4], []] }))).toBe(false);
-    expect(sprinting(state({ slots: [2, null] }))).toBe(false);
-    expect(sprinting(state({ groups: [{ status: "completed" }] }))).toBe(false);
-  });
-
-  it("never once the game is over", () => {
-    expect(sprinting(state({ status: "won" }))).toBe(false);
-    expect(sprinting(state({ status: "lost" }))).toBe(false);
-  });
-
-  it("is only about speed: a real game finished at the sprint's speed matches one at 1×, and the sprint really engaged", () => {
-    let engaged = 0;
-    for (const level of [moonlitHat(), ...TUTORIAL.map((t) => t.make())]) {
-      const line = collect.solve(level, 200_000).line!;
-      const run = (speedAt: (s: collect.CollectState) => 1 | 3) => {
-        const session = new collect.CollectSession(level);
-        const clock = new TickClock(SHOWN_TICKS_PER_SECOND);
-        let next = 0;
-        let frames = 0;
-        let sprintFrames = 0;
-        for (; frames < 400_000 && session.state.status === "playing"; frames++) {
-          if (next < line.length && collect.isSettled(session.state)) session.tap(line[next++]!);
-          if (sprinting(session.state)) sprintFrames++;
-          stepFrame(session, clock, 1000 / 60, speedAt(session.state));
-        }
-        return { hash: collect.hashState(session.state), frames, sprintFrames };
-      };
-      const sprint = run((s) => effectiveSpeed(1, sprinting(s)));
-      const plain = run(() => 1);
-      expect(sprint.hash).toBe(plain.hash);
-      if (sprint.sprintFrames > 0) {
-        engaged++;
-        // It is faster: the same game takes fewer frames.
-        expect(sprint.frames).toBeLessThan(plain.frames);
-      }
-    }
-    expect(engaged).toBeGreaterThan(0);
   });
 });

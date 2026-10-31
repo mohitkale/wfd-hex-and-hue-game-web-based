@@ -1,7 +1,13 @@
 import type Phaser from "phaser";
 import type { CollectLayout } from "./collectLayout";
 import { bake } from "./bake";
-import { paintCube, paintSeal, tonesFor, type CubeTones } from "./cubePaint";
+import { mixTone, paintCube, paintSeal, tonesFor, type CubeTones } from "./cubePaint";
+
+/** A cube's front face, as a share of its cell's height. */
+const CUBE_DEPTH = 0.28;
+
+/** Whether cubes being fetched get a thin ring in their familiar's colour. */
+const SHOW_MARKS = false;
 
 /**
  * Draws every cube on the board. The cubes are painted once into a RenderTexture (one textured quad
@@ -19,6 +25,10 @@ export class CubeLayer {
   private readonly ringG: Phaser.GameObjects.Graphics;
   private readonly size: number;
   private readonly gap: number;
+  /** How tall a cube's front face is, in device pixels. */
+  private readonly depth: number;
+  /** Front faces to draw at the next flush (a cube whose neighbour below was just taken). */
+  private pendingSides: { owner: number; x: number; y: number; key: string }[] = [];
   private readonly tones: CubeTones[];
   private editsPending = false;
   private ringsDirty = true;
@@ -36,12 +46,15 @@ export class CubeLayer {
   ) {
     this.tones = palette.map((hex) => tonesFor(hex));
     const { cell, boardRect, stride } = layout;
-    // A clear gap between rounded tiles (the picture still reads as one image).
-    this.gap = Math.max(1, Math.floor(cell / 8));
+    // No gap: square cubes edge to edge, told apart by a thin darker edge (owner feedback, M15.13).
+    this.gap = 0;
     this.size = cell - this.gap;
-    // The texture covers the mosaic only (the ring is never filled with cubes).
+    // Each cube has depth (owner feedback, after the reference): a darker front face shows below it
+    // wherever the cell below is open, so open edges look like stacked blocks.
+    this.depth = Math.max(1, Math.round(cell * CUBE_DEPTH));
+    // The texture covers the mosaic, plus the margin row under it (the front faces of the bottom row).
     const mosaicW = (stride - 2) * cell;
-    const mosaicH = boardRect.h - 2 * cell;
+    const mosaicH = boardRect.h - 2 * cell + cell;
     this.rt = scene.add
       .renderTexture(boardRect.x + cell, boardRect.y + cell, mosaicW, mosaicH)
       .setOrigin(0, 0)
@@ -70,12 +83,16 @@ export class CubeLayer {
       // Mosaic-local pixel position (the ring cell at index 0 of each padded row/column is skipped).
       const x = ((i % stride) - 1) * cell + Math.floor(this.gap / 2);
       const y = (Math.floor(i / stride) - 1) * cell + Math.floor(this.gap / 2);
-      stamps.push(
-        scene.make
-          .image({ x, y }, false)
-          .setTexture(keyFor(this.lookTones?.[i] ?? this.tones[color]!))
-          .setOrigin(0, 0),
-      );
+      const tone = this.lookTones?.[i] ?? this.tones[color]!;
+      stamps.push(scene.make.image({ x, y }, false).setTexture(keyFor(tone)).setOrigin(0, 0));
+      // The front face shows where the cell below is open (drawn into that cell's top).
+      if (this.grid[i + stride] === undefined || this.grid[i + stride]! < 0)
+        stamps.push(
+          scene.make
+            .image({ x, y: y + cell }, false)
+            .setTexture(this.sideKey(tone))
+            .setOrigin(0, 0),
+        );
     }
     this.rt.draw(stamps);
     this.rt.render();
@@ -122,12 +139,34 @@ export class CubeLayer {
     }
   }
 
+  /** The baked front face of a cube of tone `t`: its colour, darker, with a shade toward the bottom. */
+  private sideKey(t: CubeTones): string {
+    const w = this.size;
+    const d = this.depth;
+    return bake(this.scene, `side:${t.base}:${t.dark}:${w}x${d}`, w, d, (g) => {
+      g.fillStyle(mixTone(t.base, t.dark, 0.55));
+      g.fillRect(0, 0, w, d);
+      g.fillStyle(t.dark, 0.35);
+      g.fillRect(0, Math.ceil(d / 2), w, Math.floor(d / 2));
+    });
+  }
+
   /** A cube left the board (picked up): clear its cell in the texture (flushed next frame). */
   remove(cell: number): void {
     if (this.grid[cell] === -1) return;
     this.grid[cell] = -1;
     const { cell: c, stride } = this.layout;
-    this.rt.clear(((cell % stride) - 1) * c, (Math.floor(cell / stride) - 1) * c, c, c);
+    const x = ((cell % stride) - 1) * c;
+    const y = (Math.floor(cell / stride) - 1) * c;
+    this.rt.clear(x, y, c, c);
+    // Its own front face, if it showed in the open cell below, goes with it.
+    if ((this.grid[cell + stride] ?? -1) < 0) this.rt.clear(x, y + c, c, this.depth);
+    // The cube above now shows its front face in this cell.
+    const above = this.grid[cell - stride] ?? -1;
+    if (above >= 0) {
+      const tone = this.lookTones?.[cell - stride] ?? this.tones[above]!;
+      this.pendingSides.push({ owner: cell - stride, x, y, key: this.sideKey(tone) });
+    }
     this.editsPending = true;
     this.stats.clears++;
     if (this.marks.delete(cell)) this.ringsDirty = true;
@@ -135,6 +174,9 @@ export class CubeLayer {
 
   /** Cells currently being fetched, with the palette index of their colour. Redraws only on change. */
   setMarks(marks: ReadonlyMap<number, number>): void {
+    // Rings on reserved cubes are off since M15.13 (the reference has none, and redrawing them as
+    // vector shapes every frame cost GPU time on integrated graphics).
+    if (!SHOW_MARKS) return;
     if (marks.size === this.marks.size) {
       let same = true;
       for (const [k, v] of marks) {
@@ -153,7 +195,21 @@ export class CubeLayer {
   flush(): void {
     if (this.editsPending) {
       this.editsPending = false;
-      this.rt.render();
+      // Only front faces still true now: their cube is there and the cell below it is still open
+      // (both may have changed since they were queued this frame).
+      const stride = this.layout.stride;
+      const sides = this.pendingSides.filter(
+        (p) => this.grid[p.owner]! >= 0 && (this.grid[p.owner + stride] ?? -1) < 0,
+      );
+      this.pendingSides = [];
+      if (sides.length > 0) {
+        const imgs = sides.map((p) =>
+          this.scene.make.image({ x: p.x, y: p.y }, false).setTexture(p.key).setOrigin(0, 0),
+        );
+        this.rt.draw(imgs);
+        this.rt.render();
+        for (const img of imgs) img.destroy();
+      } else this.rt.render();
       this.stats.flushes++;
     }
     if (this.ringsDirty) {

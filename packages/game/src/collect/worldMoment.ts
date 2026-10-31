@@ -1,6 +1,6 @@
 import { buildGallery } from "./gallery";
-import { artLevelForPiece } from "./artLevels";
-import { WORLD_IDENTITIES, worldForTheme, type SealKind } from "./worldIdentity";
+import { JOURNEY, pictureLevel } from "./journey";
+import { WORLD_IDENTITIES, WORLD_IDS, worldForTheme, type SealKind } from "./worldIdentity";
 import type { V2Spellbook } from "./v2Spellbook";
 
 /**
@@ -20,30 +20,31 @@ export interface WorldMoment {
 
 /**
  * The moment for a win of `pieceId`, given the Spellbook *after* it was recorded and whether this win
- * collected the picture. Null for a picture no world claims. "Every page so far" is deliberate: the
- * worlds are not filled yet, so it never claims a world is finished.
+ * collected the picture: its chapter of the journey and how far you are through it. The seal and
+ * backdrop come from the picture's theme. Null for a picture that is not on the journey.
  */
 export function worldMoment(
   book: V2Spellbook,
   pieceId: string,
   wasNew: boolean,
 ): WorldMoment | null {
-  const subject = artLevelForPiece(pieceId)?.subject;
-  const id = subject ? worldForTheme(subject.theme) : null;
-  if (!id) return null;
-  const identity = WORLD_IDENTITIES[id];
-  const section = buildGallery(book).sections.find((s) => s.world === id);
+  const level = pictureLevel(pieceId);
+  const entry = JOURNEY.find((e) => e.id === level?.id);
+  if (!level || !entry) return null;
+  const identity = WORLD_IDENTITIES[worldForTheme(level.subject?.theme ?? "") ?? WORLD_IDS[0]!];
+  const section = buildGallery(book).sections.find((s) => s.chapter === entry.chapter);
   if (!section) return null;
   const { collected } = section;
   const total = section.cards.length;
+  const name = entry.chapterName;
   const line =
     wasNew && total > 1 && collected === total
-      ? `${identity.name}: every page so far`
+      ? `${name}: every page collected`
       : wasNew && collected === 1
-        ? `First page of ${identity.name}`
-        : `${identity.name} · ${collected} of ${total} ${total === 1 ? "page" : "pages"} so far`;
+        ? `First page of ${name}`
+        : `${name} · ${collected} of ${total} ${total === 1 ? "page" : "pages"}`;
   return {
-    worldName: identity.name,
+    worldName: name,
     line,
     seal: identity.seal,
     backdrop: identity.atmosphere.backdrop,

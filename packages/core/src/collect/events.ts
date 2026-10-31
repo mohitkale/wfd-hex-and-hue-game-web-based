@@ -12,7 +12,15 @@ export type CollectEvent =
   | { type: "familiarSpawned"; familiar: number; group: number; routeLength: number }
   /** After a spawn, and whenever an idle familiar is given a new target. */
   | { type: "cubeReserved"; familiar: number; cube: number }
-  | { type: "familiarMoved"; familiar: number; from: number; to: number; carrying: boolean }
+  /** `at` is the familiar's index along its route after the move (0 = the portal end). */
+  | {
+      type: "familiarMoved";
+      familiar: number;
+      from: number;
+      to: number;
+      carrying: boolean;
+      at: number;
+    }
   | { type: "cubePickedUp"; familiar: number; cube: number; color: number }
   | { type: "cubeDelivered"; familiar: number; group: number; color: number; remaining: number }
   | { type: "familiarRetired"; familiar: number }
@@ -22,6 +30,10 @@ export type CollectEvent =
   /** The Extra Slot booster added holding slot `slot` (docs/V2_BOOSTERS.md). */
   | { type: "slotAdded"; slot: number }
   | { type: "groupCompleted"; group: number }
+  /** Familiar's Call (M15.13): box `group` moved from `from` (its depth) to the front of `column`. */
+  | { type: "boxCalled"; group: number; column: number; from: number }
+  /** Besom Sweep (M15.13): the next `cubes` familiars of `group` fly over the picture. */
+  | { type: "boxSwept"; group: number; cubes: number }
   | { type: "won" }
   /** `group` is the group that ran dry for `slotsFull`, otherwise `null`. */
   | { type: "lost"; reason: LossReason; group: number | null };

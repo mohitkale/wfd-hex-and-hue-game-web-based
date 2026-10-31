@@ -75,7 +75,7 @@ The owner played the release-candidate build on desktop (the tutorial, then the 
 screenshots with this feedback. It is one person who knows the game, so it counts as owner review, not
 as the G3 evidence; it is recorded here as it was said.
 
-1. **Look.** "Does not look aesthetically great", compared with Food Hunt; wants the puzzle boxes
+1. **Look.** "Does not look aesthetically great", compared with the reference game; wants the puzzle boxes
    "more colorful and clean", "more visually stunning" and "the latest hyper-casual fun game for the
    witch community rather than an 8-bit game".
 2. **Group boxes.** The numbered coloured boxes are "not of consistent shape and size"; the pixel
@@ -100,7 +100,7 @@ A second round, after the M15.6 and M15.7 build (2026-10-28):
 12. Tapping a box still showed the WORKING box separately from the PENDING one. Wanted one place: the
     box goes into a bordered active area (as many places as may be active at once, always shown), a tray
     opens, the characters come out of the box and go to their coloured cubes while the number updates,
-    and at zero the tray closes before the box disappears (as in Food Hunt).
+    and at zero the tray closes before the box disappears (as in the reference game).
 13. Bats and cats a little smaller and monocoloured; only the eyes may contrast.
 
 A third round (2026-10-28):
@@ -124,7 +124,27 @@ A fifth round (2026-10-29):
     trays are `fieldCap + slots`, so some of them are reserved for waiting boxes and looked free
     while the working limit was reached.
 
-Items 8 to 13 are tracked as M15.8 item 14 as M15.9 and items 15 to 17 as M15.10 and item 18 as M15.11. Items 1 to 7 are tracked as M15.6 (#151: items 2 to 5) and M15.7 (#152: items 1 and 6). Item 5's free end-game 3×
+A sixth round (2026-10-29):
+
+19. The characters are still too fast by default, so 3× feels pointless.
+20. A tray sometimes "does not work" although its colour is reachable (a box sleeping with "zz").
+21. After Undo from a loss, tapping other boxes with the trays occupied ends the game again with
+    "Out of slots".
+22. Play feels sluggish (suspected re-rendering or a memory leak).
+23. The board, trays and boxes should look and behave like the reference game: its arrangement,
+    warm colours and the trays sending the characters out.
+24. Keep the hole between the picture and the trays: characters carry their cube into the hole. A
+    tray opens, its characters come out, and its number drops only as each one leaves; at 0 the box
+    leaves the tray (no 0, no faded box). One cube per character. Box columns are plain blocks (the
+    tray look is for the tray row only). 1× felt like 3× on one board and 0.25× on another.
+25. After a win: the reward, then home to choose the next level; no Retry or Undo on the win card.
+    Booster shortcuts at the top like the reference. Cubes nearly touching; trays and box columns
+    sized by the picture.
+
+26. The Undo feature is not needed at all (header, loss card, tutorial). The tutorial still played by
+    the old tray rule and lost with "Out of slots"; its cubes were giant.
+
+Items 8 to 13 are tracked as M15.8 item 14 as M15.9 and items 15 to 17 as M15.10 and item 18 as M15.11 and items 19 to 26 as M15.13. Items 1 to 7 are tracked as M15.6 (#151: items 2 to 5) and M15.7 (#152: items 1 and 6). Item 5's free end-game 3×
 changes the rule in CLAUDE.md ("1× is free; 2× only through an optional rewarded ad"): the owner
 asked for it, so the rule is updated to match (docs/V2_SPEED.md).
 
