@@ -86,11 +86,13 @@ export function redeal(
  */
 export const paceScale = (level: { width: number }): number => Math.max(1, (level.width + 2) / 16);
 
-export function withSharedTrays(level: collect.CollectLevel): collect.CollectLevel {
+export function withSharedTrays(
+  level: collect.CollectLevel,
+  cubes = level.cells.filter((c) => c >= 0).length,
+): collect.CollectLevel {
   if (level.sharedTrays) return level;
   const k = paceScale(level);
   const L = collect.COLLECT_LIMITS;
-  const cubes = level.cells.filter((c) => c >= 0).length;
   const shape = boardShape(cubes, level.columns.flat().length);
   const trays = Math.min(L.maxSlots, L.maxFieldCap, shape.trays);
   return {

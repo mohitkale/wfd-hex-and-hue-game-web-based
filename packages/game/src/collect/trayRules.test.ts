@@ -113,14 +113,17 @@ describe("the home screen's level line (M15.13)", () => {
     expect(mid / all.length).toBeGreaterThan(0.5);
   });
 
-  it("every journey picture fills its whole board: the art sits on a full canvas", async () => {
+  it("journey boards are covered by tier: easy leaves room, medium most, hard and finales all", async () => {
     const { JOURNEY } = await import("./journey");
     for (const e of JOURNEY) {
       const level = e.base();
-      expect(
-        level.cells.every((c) => c >= 0),
-        e.id,
-      ).toBe(true);
+      const covered = level.cells.filter((c) => c >= 0).length / level.cells.length;
+      if (e.tier === "easy") expect(covered, e.id).toBeLessThan(0.6);
+      if (e.tier === "medium") {
+        expect(covered, e.id).toBeGreaterThan(0.75);
+        expect(covered, e.id).toBeLessThan(1);
+      }
+      if (e.tier === "hard" || e.tier === "extreme") expect(covered, e.id).toBe(1);
     }
   });
 

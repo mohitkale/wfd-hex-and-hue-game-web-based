@@ -337,3 +337,23 @@ journey:deal`, recorded in `journeyDeals.json`). The production gate holds each 
   (not as a failure), because every one of them is proven winnable by its replayed line. Most miss by
   one rule. Wheel of the Year (hard), Samhain and So Mote It Be (extreme) play easier than their
   tier. Tuning them on the finer board itself is the follow-up.
+
+## Round 11: smaller art, coverage by tier (owner feedback, 2026-10-31)
+
+The pictures filled their whole board, so even the first levels took several minutes. Now:
+
+- **The art is smaller on the same board.** Every non-finale picture sits in the middle of a larger
+  board (`framed` in `journey.ts`: a margin of about an eighth of each side, boards at most 72 cubes
+  across), so the art takes about 55 to 70 % of it. Cubes stay the same size.
+- **Coverage by tier:**
+  - easy: the art alone, the rest of the board empty (about 20 to 50 % of the cells are cubes);
+  - medium: a backdrop with an empty band along the edges (about 85 to 90 % covered);
+  - hard: the whole board, with diagonal stripes of the art's most used colour through the backdrop.
+    The same colour in the picture and behind it makes the order of the boxes matter, and the art
+    looks the same, with no new colour added.
+  - extreme finales: unchanged, full scenes of their own.
+- The 18 framed levels were dealt again (`npm run journey:deal -- <id>`). The search now keeps a
+  deal only if it also holds on the finer board as played: its recorded line wins there and the
+  full random runs and simple players fit the tier (`holdsOnFine` in `tools/collect/journey.ts`).
+  When no deal does, it keeps the closest one whose line wins the finer board, marked `missed`.
+  The misses fell from 13 to 9; the four medium ones miss by a hair.

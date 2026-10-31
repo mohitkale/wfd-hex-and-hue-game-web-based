@@ -21,9 +21,13 @@ A new game on the same site: the v1 track puzzle is replaced by the familiars.
   Hint. 3× speed for a level via an optional rewarded ad; nothing ever blocks play.
 - **Mobile first:** fits every phone without scrolling, 30 fps with an idle sleep, offline PWA.
 - **Site:** the landing page, gallery and share images show the journey.
-- **Known:** 13 of the 24 levels miss their difficulty target on the finer board (most by one rule;
-  Wheel of the Year, Samhain and So Mote It Be play easier than their tier). Every level is proven
-  winnable; `docs/V2_PRODUCTION_REPORT.md` lists each miss for a tuning pass.
+- **Smaller art:** every picture but a chapter finale sits in the middle of its board at about 55 to
+  70 % of it. Easy levels leave the rest empty (short first levels), medium levels cover about 85 %,
+  hard levels all of it, with stripes of the art's own colour.
+- **Known:** 9 of the 24 levels miss their difficulty target on the board as played. The medium
+  levels Witch's Hat, Triple Moon, Tarot Star and Raven miss by a hair. Broom (hard), Samhain and So
+  Mote It Be (extreme) play easier than their tier. Every level is proven winnable;
+  `docs/V2_PRODUCTION_REPORT.md` lists each miss for a tuning pass.
 - **Removed:** the v1 game (wisps, worlds, its levels and tools). Settings carry over; the new game
   has its own coins and starts every player with one of each booster.
 

@@ -103,12 +103,17 @@ Tier targets used by the journey (`TARGET` in `tools/collect/journey.ts`):
    (`pixelCanvas.ts`): discs, rings, polygons, lines, stars, a 3×5 pixel font for words, and
    `outline()` for the bordered look. Pictures are 22–34 cells wide. A chapter finale draws its own
    background and carries a word.
-2. **Give it a canvas.** Every other picture gets a background (`bg` in `journey.ts`: night navy,
-   sky blue, parchment, deep purple) with a scatter of stars that never touch the art. **Every cell
-   of every board is a cube**, so the board looks like the finished picture in the win reveal and the
-   art pops out of it. The background is also the outermost layer to clear, so it buries the art a
-   little: part of the difficulty comes for free. Then make the board (`toPictureBoard`, `margin: false, scene: false`): one box
-   per colour to start.
+2. **Frame it and cover it by tier.** Every picture but a finale sits in the middle of a larger
+   board (`framed` in `journey.ts`), so the art takes about 55 to 70 % of the board and the board
+   keeps its size on screen. How much of the rest is cubes depends on the tier:
+   - easy: none (the art alone), so the first levels are short and teach the rules on few cubes;
+   - medium: a bright backdrop (`bg`, with a scatter of stars that never touch the art) with an
+     empty band along the edges, about 85 % covered;
+   - hard: the whole board, with stripes of the art's own main colour through the backdrop, so the
+     same colour sits in the picture and behind it and the box order matters, while the art looks
+     the same.
+     A chapter finale draws its own full scene and carries a word. Then make the board
+     (`toPictureBoard`, `margin: false, scene: false`): one box per colour to start.
 3. **Shape the board** (`withSharedTrays`): trays and columns from the cube count (3–4 trays on a
    small picture, 5 on a large one). **Difficulty never comes from fewer trays.**
 4. **Deal it** (`npm run journey:deal`): cut the boxes to a size (smaller boxes mean more choices),
@@ -252,6 +257,7 @@ none` and `overscroll-behavior: none`.
 | Boxes behind the front row were hard to read                                          | They faded to 62 % and 42 %                                                                | Every box flat and fully opaque; the front box has a soft sheen; a working box shows a curved tray rising out of it                                              |
 | Colours looked dull                                                                   | Dark backdrops, and shading mixed toward a night purple                                    | Light, bright backdrops; shading within each colour's own hue                                                                                                    |
 | Cubes looked too big next to the familiars                                            | One cube per drawn cell                                                                    | A finer mosaic: every drawn cell as 2 × 2 cubes, deals scaled up, familiars out twice as often                                                                   |
+| The first levels took several minutes                                                 | The art and its backdrop filled every cell of the board                                    | The art framed at 55 to 70 % of the board; easy levels leave the rest empty, medium cover about 85 %, hard all of it with stripes of the art's own colour        |
 | Mobile toolbars could cover the bottom of the board                                   | The game box was sized to the layout viewport                                              | `100dvh` plus `visualViewport` resize events                                                                                                                     |
 
 ---

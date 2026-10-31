@@ -1,7 +1,7 @@
 import type * as collect from "@hexhue/core/collect";
 import * as A from "./journeyArtA";
 import * as B from "./journeyArtB";
-import { asLevel, upscale, type Canvas } from "./pixelCanvas";
+import { asLevel, Canvas, upscale } from "./pixelCanvas";
 import { PICTURE_PALETTE as P, toPictureBoard } from "./pictureBoard";
 import { withSharedTrays } from "./trayRules";
 import deals from "./journeyDeals.json";
@@ -48,8 +48,10 @@ export interface JourneyDeal {
 const DEALS = deals as Record<string, JourneyDeal>;
 
 /** `level` with the deal recorded for it, if any (trays stay the board's own). */
-export function dealt(level: collect.CollectLevel): collect.CollectLevel {
-  const deal = DEALS[level.id];
+export function dealt(
+  level: collect.CollectLevel,
+  deal: JourneyDeal | undefined = DEALS[level.id],
+): collect.CollectLevel {
   if (!deal) return level;
   // A deal is recorded at the design size; on the finer board every cell is FINE × FINE cubes, so
   // every box holds FINE² times the cubes and every sealed cell seals its whole block.
@@ -329,32 +331,84 @@ const SPECS: readonly Spec[][] = [
 ];
 
 /**
- * Fills every empty cell of `g` with `colour`, and puts a `star` on a sparse, fixed scatter of cells
- * that touch nothing but the background (so a star never sits against the art).
+ * Fills the empty cells of `g` with `colour`, a `star` on a sparse, fixed scatter of cells that touch
+ * nothing but the background (so a star never sits against the art). `band` cells along the board's
+ * edges stay empty (a medium level is covered to about 85 %), and `stripe` lays diagonal bands of one of
+ * the art's own colours through the backdrop (a hard level: the same colour in the picture and behind
+ * it makes the order of the boxes matter, and the art looks the same).
  */
-function backdrop(g: Canvas, colour: string, star: string): void {
+function backdrop(
+  g: Canvas,
+  colour: string,
+  star: string,
+  o: { band?: number; stripe?: string | null } = {},
+): void {
+  const band = o.band ?? 0;
+  const inBand = (x: number, y: number) =>
+    x < band || y < band || x >= g.w - band || y >= g.h - band;
   const empty = (x: number, y: number) =>
     x < 0 || y < 0 || x >= g.w || y >= g.h || g.get(x, y) === null;
   const stars: [number, number][] = [];
+  const stripes: [number, number][] = [];
   for (let y = 0; y < g.h; y++)
-    for (let x = 0; x < g.w; x++)
-      if (
+    for (let x = 0; x < g.w; x++) {
+      if (!empty(x, y) || inBand(x, y)) continue;
+      if (o.stripe && (x + y) % 7 < 2) stripes.push([x, y]);
+      else if (
         (x * 7 + y * 13 + ((x * y) % 5)) % 23 === 0 &&
-        empty(x, y) &&
         empty(x + 1, y) &&
         empty(x - 1, y) &&
         empty(x, y + 1) &&
         empty(x, y - 1)
       )
         stars.push([x, y]);
-  g.fillEmpty(() => colour);
+    }
+  for (let y = 0; y < g.h; y++)
+    for (let x = 0; x < g.w; x++) if (empty(x, y) && !inBand(x, y)) g.set(x, y, colour);
   for (const [x, y] of stars) g.set(x, y, star);
+  for (const [x, y] of stripes) g.set(x, y, o.stripe!);
 }
 
-/** The board a picture plays on: the picture exactly as drawn, edge to edge (the walkway rings it). */
-function board(spec: Spec, fine = 1): collect.CollectLevel {
-  const drawn = spec.draw();
-  if (spec.bg) backdrop(drawn, spec.bg.colour, spec.bg.star);
+/** The largest board side at the design size (the finer board is FINE times this, at most 72). */
+const MAX_DESIGN = 36;
+
+/**
+ * The art centred on a larger board (owner feedback: the art takes about 55 to 70 % of the board, as
+ * the board stays the same size on screen), with a margin of about an eighth of each side.
+ */
+function framed(drawn: Canvas): Canvas {
+  const room = (n: number) =>
+    Math.max(0, Math.min(Math.round(n * 0.13), Math.floor((MAX_DESIGN - n) / 2)));
+  const mx = room(drawn.w);
+  const my = room(drawn.h);
+  const g = new Canvas(drawn.w + 2 * mx, drawn.h + 2 * my);
+  for (let y = 0; y < drawn.h; y++)
+    for (let x = 0; x < drawn.w; x++) g.set(x + mx, y + my, drawn.get(x, y));
+  return g;
+}
+
+/** The art's most used colour that is neither its outline (black) nor `not`: the hard backdrop's stripe. */
+function mainColour(g: Canvas, not: string): string | null {
+  const count = new Map<string, number>();
+  for (const c of g.cells)
+    if (c && c !== P.black && c !== not) count.set(c, (count.get(c) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+
+/**
+ * The board a picture plays on. A finale fills its board with its own scene. Every other picture sits
+ * in the middle of a larger board, covered by tier (owner feedback: the first levels teach the game
+ * on few cubes): easy, the art alone on an empty board; medium, a backdrop with an empty band along
+ * the edges (about 85 % covered); hard, the whole board, with stripes of one of the art's colours.
+ */
+function board(spec: Spec, tier: Tier, fine = 1): collect.CollectLevel {
+  let drawn = spec.draw();
+  if (spec.bg) {
+    const stripe = tier === "hard" ? mainColour(drawn, spec.bg.colour) : null;
+    drawn = framed(drawn);
+    if (tier === "medium") backdrop(drawn, spec.bg.colour, spec.bg.star, { band: 1 });
+    if (tier === "hard") backdrop(drawn, spec.bg.colour, spec.bg.star, { stripe });
+  }
   designSize.set(`j-${spec.picture}`, drawn.w * drawn.h);
   const g = fine > 1 ? upscale(drawn, fine) : drawn;
   const level = asLevel(`j-${spec.picture}`, g, {
@@ -363,7 +417,9 @@ function board(spec: Spec, fine = 1): collect.CollectLevel {
     theme: spec.theme,
     lore: spec.lore,
   });
-  const out = withSharedTrays(toPictureBoard(level, { margin: false, scene: false }));
+  // Trays and columns as on the finer board as played, also at the design size, where deals are found.
+  const played = drawn.cells.filter((c) => c !== null).length * FINE * FINE;
+  const out = withSharedTrays(toPictureBoard(level, { margin: false, scene: false }), played);
   // Four times the cubes: familiars leave their bottle twice as often, so a level takes about twice
   // as long, not four times.
   return fine > 1 ? { ...out, spawnGap: Math.max(1, Math.round(out.spawnGap / fine)) } : out;
@@ -378,9 +434,9 @@ export const JOURNEY: readonly JourneyEntry[] = SPECS.flatMap((chapter, ci) =>
       chapter: ci + 1,
       chapterName: CHAPTERS[ci]!,
       tier,
-      design: () => board(spec),
-      base: () => board(spec, FINE),
-      make: () => dealt(board(spec, FINE)),
+      design: () => board(spec, tier),
+      base: () => board(spec, tier, FINE),
+      make: () => dealt(board(spec, tier, FINE)),
     };
   }),
 );

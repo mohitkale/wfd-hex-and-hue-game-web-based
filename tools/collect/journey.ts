@@ -3,6 +3,7 @@ import * as collect from "@hexhue/core/collect";
 import { createRng } from "../../packages/core/src/rng";
 import { checkStrategies, type Tier as Band } from "../../content/difficulty";
 import {
+  dealt,
   JOURNEY,
   type JourneyDeal,
   type JourneyEntry,
@@ -170,12 +171,40 @@ export const sealsAllowed = (entry: Pick<JourneyEntry, "tier" | "chapter">): boo
 /** The first chapter whose hard and extreme levels may use wax seals. */
 export const SEALS_FROM_CHAPTER = 3;
 
+/**
+ * Whether a deal found at the design size holds on the finer board as played: its recorded line
+ * wins there, and (with `tier`) the full random runs and simple players still fit the tier. The
+ * scale-up keeps neither for sure, so the search checks both before it keeps a deal.
+ */
+function holdsOnFine(entry: JourneyEntry, found: JourneyDeal, tier?: Tier): boolean {
+  const fine = dealt(entry.base(), found);
+  try {
+    if (
+      collect.replayLine(fine, (found.line ?? []) as collect.Action[], true).state.status !== "won"
+    )
+      return false;
+  } catch {
+    return false;
+  }
+  return !tier || tierMisses(collect.strategyReport(fine), tier).length === 0;
+}
+
 export function findDeal(
   entry: JourneyEntry,
   log: (s: string) => void = () => undefined,
 ): JourneyDeal | null {
   const base = entry.design();
-  let closest: { level: collect.CollectLevel; distance: number } | null = null;
+  const near: { level: collect.CollectLevel; distance: number }[] = [];
+  // A deal at the tier on both boards ends the search; one off the tier is kept to fall back on.
+  const accept = (found: { level: collect.CollectLevel; distance: number }) => {
+    near.push(found);
+    if (found.distance > 0 || distance(found.level, entry.tier, collect.RANDOM_RUNS) > 0)
+      return null;
+    const d = deal(found.level);
+    const ok = holdsOnFine(entry, d, entry.tier);
+    log(`  ${entry.id}: at the tier at the design size; on the finer board ${ok ? "too" : "not"}`);
+    return ok ? d : null;
+  };
   for (const max of TARGET[entry.tier].boxes) {
     const start = cut(base, max);
     if (!solved(start)) {
@@ -189,9 +218,8 @@ export function findDeal(
       if (again.distance < found.distance) found = again;
     }
     log(`  ${entry.id} box≤${max} trays=${base.slots}: ${found.distance.toFixed(2)}`);
-    if (!closest || found.distance < closest.distance) closest = found;
-    if (found.distance === 0 && distance(found.level, entry.tier, collect.RANDOM_RUNS) === 0)
-      return deal(found.level);
+    const kept = accept(found);
+    if (kept) return kept;
   }
   // Wax seals are an extra rule to learn: only for hard and extreme levels, and never in the first two
   // chapters (owner feedback: no such complexity while a player is still learning the game).
@@ -203,7 +231,6 @@ export function findDeal(
       log(
         `  ${entry.id} sealed (colour ${sealed.cells[sealed.seals![0]!.cells[0]!]} by ${sealed.seals![0]!.key}): ${found.distance.toFixed(2)}`,
       );
-      if (!closest || found.distance < closest.distance) closest = found;
       if (found.distance === 0 && distance(found.level, entry.tier, collect.RANDOM_RUNS) === 0)
         return deal(found.level);
     }
@@ -218,13 +245,17 @@ export function findDeal(
     }
     const found = climb(start, entry.tier, 211 + max * 7);
     log(`  ${entry.id} even box≤${max}: ${found.distance.toFixed(2)}`);
-    if (!closest || found.distance < closest.distance) closest = found;
-    if (found.distance === 0 && distance(found.level, entry.tier, collect.RANDOM_RUNS) === 0)
-      return deal(found.level);
+    const kept = accept(found);
+    if (kept) return kept;
   }
-  // Nothing reached the tier: keep the closest winnable deal, marked as a miss (the production gate
-  // lists it), so the level is never left without a proven deal.
-  return closest ? { ...deal(closest.level), missed: Number(closest.distance.toFixed(2)) } : null;
+  // Nothing reached the tier on both boards: keep the closest deal whose line wins the finer board,
+  // marked as a miss (the production gate lists it), so the level is never left without a proven deal.
+  for (const n of near.sort((a, b) => a.distance - b.distance)) {
+    const d = deal(n.level);
+    if (holdsOnFine(entry, d))
+      return { ...d, missed: Number(Math.max(n.distance, 0.01).toFixed(2)) };
+  }
+  return null;
 }
 
 /** Every box cut into boxes of at most `max`, in the order the board shows them, dealt round again. */
