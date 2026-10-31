@@ -66,7 +66,7 @@ html.altar-open body {
   outline-offset: 2px;
 }
 .altar-icon-button {
-  min-height: 40px;
+  min-height: 44px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid rgb(201 184 255 / 0.4);
@@ -91,6 +91,24 @@ html.altar-open body {
   border-radius: 999px;
   border: 1px solid rgb(201 184 255 / 0.5);
   background: rgb(42 22 80 / 0.7);
+}
+
+/* Read out by screen readers, not shown: the familiar's words, kept across redraws. */
+.altar-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.altar-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.altar-prompt:focus {
+  outline: none;
 }
 
 /* The familiar and what it says. */
@@ -242,6 +260,15 @@ html.altar-open body {
   user-select: none;
   -webkit-user-select: none;
 }
+.altar-tool.placed {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.altar-tool em {
+  font-style: normal;
+  font-size: 0.65rem;
+  color: var(--mist, #c9b8ff);
+}
 .altar-tool[aria-pressed="true"] {
   border-color: var(--glow, #f6d97a);
   box-shadow: 0 0 0 2px var(--glow, #f6d97a);
@@ -266,6 +293,10 @@ html.altar-open body {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+}
+/* A long hold must never turn into a scroll that cancels the breath. */
+.altar-breathe {
+  touch-action: none !important;
 }
 .altar-breath {
   display: grid;
@@ -370,12 +401,31 @@ html.altar-open body {
   }
 }
 
+/* Printing from the "why" page prints that page alone; any other time, the lesson page. */
 @media print {
-  .altar-layer {
+  .altar-layer:not(.printable) {
     display: none;
   }
   html.altar-open,
   html.altar-open body {
     overflow: visible;
+  }
+  html.altar-open body > :not(.altar-layer) {
+    display: none !important;
+  }
+  .altar-layer.printable {
+    position: static;
+    overflow: visible;
+    background: none;
+    color: #000;
+  }
+  .altar-layer.printable .altar-bar,
+  .altar-layer.printable .altar-end-actions,
+  .altar-layer.printable .altar-status {
+    display: none;
+  }
+  .altar-layer.printable .altar-why-text,
+  .altar-layer.printable .altar-intro-text {
+    color: #333;
   }
 }

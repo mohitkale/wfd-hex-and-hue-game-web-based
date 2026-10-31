@@ -29,6 +29,7 @@ import { circleDirection, isTap, strokeDirection, type Point } from "./gestures"
 import { iconSvg } from "./icons";
 import { loadPractice, localDay, storePractice } from "../lib/practiceStore";
 import { cardFileName, drawRitualCard } from "./card";
+import { gestureAction, safetyFirst, tapAction } from "./logic";
 
 /**
  * The altar (F1, Ritual Rehearsal): a full-screen layer over a lesson page where the learner does
@@ -36,6 +37,10 @@ import { cardFileName, drawRitualCard } from "./card";
  * only shows the answer: a glow and a light buzz when right, the familiar's gentle hint when not.
  * The altar is redrawn from the lesson and the run (`altarState`), and the run is saved after every
  * move, so leaving and coming back resumes exactly where the learner was.
+ *
+ * Only one altar is open at a time. While it is, the page behind is inert, focus stays on the same
+ * control across redraws, and what the familiar says is announced through one live region that
+ * outlives every redraw.
  */
 
 const VIBRATION_KEY = "hexhue.v3.vibration";
@@ -46,8 +51,13 @@ interface Ctx {
   altar: AltarLayout;
   run: LessonRun;
   root: HTMLElement;
+  /** Redrawn on every move; `root` keeps it and the live region. */
+  stage: HTMLElement;
+  live: HTMLElement;
   selected: string | null;
   breath: BreathState;
+  closed: boolean;
+  timers: number[];
   onClose: () => void;
 }
 
@@ -88,6 +98,8 @@ function buzz(kind: HapticKind): void {
   }
 }
 
+const canVibrate = () => typeof navigator.vibrate === "function";
+
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function toolOf(ctx: Ctx, id: string): AltarTool | undefined {
@@ -97,19 +109,42 @@ function toolOf(ctx: Ctx, id: string): AltarTool | undefined {
 /** Opens the altar for `entry`, resuming a saved run of it if there is one. */
 export function openAltar(entry: GrimoireEntry, onClose: () => void = () => {}): () => void {
   const altar = entry.altar;
-  if (!altar) return () => {};
+  if (!altar || document.querySelector(".altar-layer")) return () => {};
   const saved = loadPractice().runs[entry.lesson.id];
   const run = saved ? resumeLesson(entry.lesson, saved) : startLesson(entry.lesson);
   const root = el("div", "altar-layer");
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-modal", "true");
   root.setAttribute("aria-label", `${entry.lesson.title}: the altar`);
-  const ctx: Ctx = { entry, altar, run, root, selected: null, breath: startBreaths(), onClose };
+  const stage = el("div", "altar-stage");
+  const live = el("p", "altar-live");
+  live.setAttribute("aria-live", "polite");
+  root.append(stage, live);
+  const ctx: Ctx = {
+    entry,
+    altar,
+    run,
+    root,
+    stage,
+    live,
+    selected: null,
+    breath: startBreaths(),
+    closed: false,
+    timers: [],
+    onClose,
+  };
+  // Everything behind the altar is out of reach (focus, clicks, screen readers) while it is open.
+  const behind = [...document.body.children].filter((n) => !n.hasAttribute("inert"));
+  for (const n of behind) n.setAttribute("inert", "");
   document.body.append(root);
   document.documentElement.classList.add("altar-open");
   const close = () => {
+    if (ctx.closed) return;
+    ctx.closed = true;
+    for (const t of ctx.timers) window.clearTimeout(t);
     stopFamiliar();
     root.remove();
+    for (const n of behind) n.removeAttribute("inert");
     document.documentElement.classList.remove("altar-open");
     document.removeEventListener("keydown", onKey);
     onClose();
@@ -119,9 +154,27 @@ export function openAltar(entry: GrimoireEntry, onClose: () => void = () => {}):
   };
   document.addEventListener("keydown", onKey);
   ctx.onClose = close;
-  if (run.step === 0 && run.doneInStep.length === 0 && entry.safety.fire) showSafety(ctx);
+  if (safetyFirst(entry, run)) showSafety(ctx);
   else render(ctx);
   return close;
+}
+
+/** Says `text` through the live region (cleared first, so a repeated hint is announced again). */
+function announce(ctx: Ctx, text: string): void {
+  ctx.live.textContent = "";
+  ctx.timers.push(window.setTimeout(() => (ctx.live.textContent = text), 60));
+}
+
+/** A key naming the focused control, to find its twin after a redraw. */
+function focusKey(ctx: Ctx): string | null {
+  const a = document.activeElement as HTMLElement | null;
+  if (!a || !ctx.stage.contains(a)) return null;
+  return a.dataset.key ?? null;
+}
+
+function restoreFocus(ctx: Ctx, key: string | null): void {
+  const twin = key ? ctx.stage.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`) : null;
+  (twin ?? ctx.stage.querySelector<HTMLElement>(".altar-prompt"))?.focus({ preventScroll: true });
 }
 
 /** Before a lesson with a flame: the fire safety, read before the first step. */
@@ -138,7 +191,7 @@ function showSafety(ctx: Ctx): void {
   go.type = "button";
   go.addEventListener("click", () => render(ctx));
   box.append(safety, go);
-  ctx.root.replaceChildren(header(ctx), box);
+  ctx.stage.replaceChildren(header(ctx), box);
   go.focus();
 }
 
@@ -155,6 +208,8 @@ function header(ctx: Ctx): HTMLElement {
   progress.style.setProperty("--p", `${pct}%`);
   const vib = el("button", "altar-icon-button");
   vib.type = "button";
+  vib.dataset.key = "vibration";
+  vib.hidden = !canVibrate(); // iOS and desktops cannot vibrate: no switch to offer
   const setVib = () => {
     const on = vibrationOn();
     vib.textContent = on ? "Vibration on" : "Vibration off";
@@ -171,6 +226,7 @@ function header(ctx: Ctx): HTMLElement {
   });
   const close = el("button", "altar-icon-button", "Close");
   close.type = "button";
+  close.dataset.key = "close";
   close.addEventListener("click", () => ctx.onClose());
   bar.append(title, vib, close, progress);
   return bar;
@@ -216,14 +272,18 @@ function render(ctx: Ctx, said?: { text: string; tone: "hint" | "right" | "note"
     finish(ctx);
     return;
   }
+  const key = focusKey(ctx);
   const guide = el("div", "altar-guide");
   const bubble = el("p", `altar-bubble ${said?.tone ?? "prompt"}`);
-  bubble.setAttribute("aria-live", "polite");
   const total = ctx.entry.lesson.steps.length;
   bubble.textContent = said?.text ?? `Step ${ctx.run.step + 1} of ${total}. I'm right here.`;
   guide.append(familiar(), bubble);
   const prompt = el("p", "altar-prompt", step.prompt);
-  ctx.root.replaceChildren(header(ctx), guide, prompt, board(ctx, step), controls(ctx, step));
+  prompt.tabIndex = -1;
+  ctx.stage.replaceChildren(header(ctx), guide, prompt, board(ctx, step), controls(ctx, step));
+  // A new step is announced by its prompt; a reply within a step by what the familiar says.
+  announce(ctx, said?.text ?? `Step ${ctx.run.step + 1} of ${total}. ${step.prompt}`);
+  restoreFocus(ctx, said ? key : null);
 }
 
 function board(ctx: Ctx, step: Step): HTMLElement {
@@ -241,6 +301,7 @@ function board(ctx: Ctx, step: Step): HTMLElement {
     const b = el("button", "altar-spot");
     b.type = "button";
     b.dataset.spot = spot.id;
+    b.dataset.key = `spot:${spot.id}`;
     b.style.left = `${spot.x * 100}%`;
     b.style.top = `${spot.y * 100}%`;
     const standing = candles.find((c) => c.spot === spot.id);
@@ -268,16 +329,19 @@ function board(ctx: Ctx, step: Step): HTMLElement {
   wrap.append(cloth);
   attachCloth(ctx, cloth, step);
 
-  // The tray: tools not standing on the altar, ready to drag or tap.
+  // The tray: every tool, ready to drag or tap. One already on the cloth stays listed (marked), so
+  // it can be picked up again and moved, as a candle is from the dressing cloth to its holder.
   const onAltar = new Set(Object.values(state.placed));
   const tray = el("div", "altar-tray");
   tray.setAttribute("aria-label", "Your tools");
   for (const tool of ctx.altar.tools) {
-    if (onAltar.has(tool.id)) continue;
-    const b = el("button", "altar-tool");
+    const placed = onAltar.has(tool.id);
+    const b = el("button", placed ? "altar-tool placed" : "altar-tool");
     b.type = "button";
     b.dataset.tool = tool.id;
-    b.innerHTML = `${iconSvg(tool.icon, 40, tool.color, tool.icon !== "candle")}<span>${tool.label}</span>`;
+    b.dataset.key = `tool:${tool.id}`;
+    const where = placed ? `<em>on the cloth</em>` : "";
+    b.innerHTML = `${iconSvg(tool.icon, 40, tool.color, tool.icon !== "candle")}<span>${tool.label}</span>${where}`;
     b.setAttribute("aria-pressed", String(ctx.selected === tool.id));
     attachTool(ctx, b, tool, cloth);
     tray.append(b);
@@ -290,7 +354,12 @@ function board(ctx: Ctx, step: Step): HTMLElement {
 
 /** Drag a tool onto a spot, or tap it and then tap a spot (also the keyboard way). */
 function attachTool(ctx: Ctx, b: HTMLButtonElement, tool: AltarTool, cloth: HTMLElement): void {
+  let dragged = false;
   b.addEventListener("click", () => {
+    if (dragged) {
+      dragged = false; // the end of a drag, not a tap
+      return;
+    }
     ctx.selected = ctx.selected === tool.id ? null : tool.id;
     render(
       ctx,
@@ -309,13 +378,17 @@ function attachTool(ctx: Ctx, b: HTMLButtonElement, tool: AltarTool, cloth: HTML
       ghost.style.top = `${e.clientY}px`;
     };
     const move = (e: PointerEvent) => {
+      if (e.pointerId !== down.pointerId) return;
       if (!moved && Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) > 8) {
         moved = true;
+        dragged = true;
+        ctx.selected = null;
         document.body.append(ghost);
       }
       if (moved) at(e);
     };
     const up = (e: PointerEvent) => {
+      if (e.pointerId !== down.pointerId) return;
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
@@ -346,8 +419,10 @@ function spotAt(cloth: HTMLElement, x: number, y: number): string | null {
 function attachCloth(ctx: Ctx, cloth: HTMLElement, step: Step): void {
   let points: Point[] = [];
   let start: string | null = null;
+  let finger: number | null = null; // one finger draws; a second one is ignored
   cloth.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || finger !== null) return;
+    finger = e.pointerId;
     points = [{ x: e.clientX, y: e.clientY }];
     start = (e.target as HTMLElement).closest<HTMLElement>(".altar-spot")?.dataset.spot ?? null;
     try {
@@ -357,9 +432,11 @@ function attachCloth(ctx: Ctx, cloth: HTMLElement, step: Step): void {
     }
   });
   cloth.addEventListener("pointermove", (e) => {
-    if (points.length > 0) points.push({ x: e.clientX, y: e.clientY });
+    if (e.pointerId === finger) points.push({ x: e.clientX, y: e.clientY });
   });
-  const end = () => {
+  const end = (e: PointerEvent) => {
+    if (e.pointerId !== finger) return;
+    finger = null;
     const pts = points;
     points = [];
     if (pts.length === 0) return;
@@ -369,15 +446,14 @@ function attachCloth(ctx: Ctx, cloth: HTMLElement, step: Step): void {
     }
     const r = cloth.getBoundingClientRect();
     const centre = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    const walk = circleDirection(pts, centre, r.width * 0.15);
-    if (walk) {
-      apply(ctx, { kind: "walk", path: walk });
-      return;
-    }
-    const dir = strokeDirection(pts);
-    const trace = (ctx.altar.traces ?? []).find((t) => t.spot === start && t.direction === dir);
-    if (trace) {
-      apply(ctx, { kind: "trace", shape: trace.id });
+    const drawn = gestureAction(
+      ctx.altar,
+      circleDirection(pts, centre, r.width * 0.15),
+      start,
+      strokeDirection(pts),
+    );
+    if (drawn) {
+      apply(ctx, drawn);
       return;
     }
     const wantsWalk = step.expects.some((a) => a.kind === "walk");
@@ -389,7 +465,11 @@ function attachCloth(ctx: Ctx, cloth: HTMLElement, step: Step): void {
     });
   };
   cloth.addEventListener("pointerup", end);
-  cloth.addEventListener("pointercancel", () => (points = []));
+  cloth.addEventListener("pointercancel", (e) => {
+    if (e.pointerId !== finger) return;
+    finger = null;
+    points = [];
+  });
   // Keyboard and screen readers: Enter or Space on a spot is a tap.
   cloth.addEventListener("click", (e) => {
     if (e.detail !== 0) return; // pointer clicks are handled above
@@ -399,29 +479,16 @@ function attachCloth(ctx: Ctx, cloth: HTMLElement, step: Step): void {
 }
 
 function tapSpot(ctx: Ctx, spot: string): void {
-  if (ctx.selected) {
-    const item = ctx.selected;
-    ctx.selected = null;
-    apply(ctx, { kind: "place", item, spot });
-    return;
-  }
   const state = altarState(ctx.entry.lesson, ctx.run);
-  const lit = new Set(state.lit);
-  const flames = [
-    ...(ctx.altar.candles ?? []).filter((c) => c.spot === spot).map((c) => c.id),
-    ...[state.placed[spot]].filter(
-      (id): id is string => !!id && toolOf(ctx, id)?.icon === "candle",
-    ),
-  ];
-  const flame = flames[0];
-  if (!flame) {
+  const action = tapAction(ctx.altar, state, spot, ctx.selected);
+  if (!action) {
     render(ctx, {
       text: "Nothing to light there. Drag a tool from the tray onto the cloth.",
       tone: "note",
     });
     return;
   }
-  apply(ctx, lit.has(flame) ? { kind: "snuff", item: flame } : { kind: "light", item: flame });
+  apply(ctx, action);
 }
 
 // --- the controls under the board ---------------------------------------------------------------
@@ -436,6 +503,7 @@ function controls(ctx: Ctx, step: Step): HTMLElement {
     for (const o of step.options ?? []) {
       const b = el("button", "altar-option", o.label);
       b.type = "button";
+      b.dataset.key = `option:${o.id}`;
       b.addEventListener("click", () => apply(ctx, { kind: "choose", option: o.id }));
       group.append(b);
     }
@@ -445,6 +513,7 @@ function controls(ctx: Ctx, step: Step): HTMLElement {
   if (kinds.has("continue")) {
     const b = el("button", "altar-primary", "Continue");
     b.type = "button";
+    b.dataset.key = "continue";
     b.addEventListener("click", () => apply(ctx, { kind: "continue" }));
     box.append(b);
   }
@@ -460,6 +529,7 @@ function controls(ctx: Ctx, step: Step): HTMLElement {
       ] as const) {
         const b = el("button", "altar-option", label);
         b.type = "button";
+        b.dataset.key = `walk:${path}`;
         b.addEventListener("click", () => apply(ctx, { kind: "walk", path }));
         row.append(b);
       }
@@ -468,6 +538,7 @@ function controls(ctx: Ctx, step: Step): HTMLElement {
       for (const t of ctx.altar.traces ?? []) {
         const b = el("button", "altar-option", t.label);
         b.type = "button";
+        b.dataset.key = `trace:${t.id}`;
         b.addEventListener("click", () => apply(ctx, { kind: "trace", shape: t.id }));
         row.append(b);
       }
@@ -485,9 +556,9 @@ function breathControl(ctx: Ctx, step: Step): HTMLElement {
   const orb = el("div", "altar-orb");
   orb.setAttribute("aria-hidden", "true");
   const count = el("p", "altar-breath-count", `${ctx.breath.count} of ${need} breaths`);
-  count.setAttribute("aria-live", "polite");
-  const b = el("button", "altar-primary", "Hold to breathe in");
+  const b = el("button", "altar-primary altar-breathe", "Hold to breathe in");
   b.type = "button";
+  b.dataset.key = "breathe";
   const press = (e: Event) => {
     e.preventDefault();
     ctx.breath = pressBreath(ctx.breath, performance.now());
@@ -502,14 +573,16 @@ function breathControl(ctx: Ctx, step: Step): HTMLElement {
     b.textContent = "Hold to breathe in";
     if (!out.counted) {
       count.textContent = `A little longer. ${ctx.breath.count} of ${need} breaths`;
+      announce(ctx, count.textContent);
       return;
     }
     buzz("collect");
     count.textContent = `${ctx.breath.count} of ${need} breaths`;
+    announce(ctx, count.textContent);
     if (ctx.breath.count >= need) {
       const breaths = ctx.breath.count;
       ctx.breath = startBreaths();
-      window.setTimeout(() => apply(ctx, { kind: "breathe", breaths }), 300);
+      ctx.timers.push(window.setTimeout(() => apply(ctx, { kind: "breathe", breaths }), 300));
     }
   };
   b.addEventListener("pointerdown", press);
@@ -530,6 +603,9 @@ function breathControl(ctx: Ctx, step: Step): HTMLElement {
 // --- answering a move ---------------------------------------------------------------------------
 
 function apply(ctx: Ctx, action: Action): void {
+  if (ctx.closed) return;
+  // A tool picked up is put down by any move, so it never lands on a spot in a later step.
+  ctx.selected = null;
   const out = act(ctx.entry.lesson, ctx.run, action);
   ctx.run = out.run;
   persist(ctx);
@@ -557,7 +633,7 @@ function answer(ctx: Ctx, reply: Reply): void {
     case "try-again":
       buzz("invalid");
       render(ctx, { text: reply.hint, tone: "hint" });
-      if (!reducedMotion()) ctx.root.querySelector(".altar-cloth")?.classList.add("nudge");
+      if (!reducedMotion()) ctx.stage.querySelector(".altar-cloth")?.classList.add("nudge");
       return;
     case "done":
       buzz("win");
@@ -568,7 +644,7 @@ function answer(ctx: Ctx, reply: Reply): void {
 
 function glow(ctx: Ctx): void {
   if (reducedMotion()) return;
-  ctx.root.querySelector(".altar-cloth")?.classList.add("glow");
+  ctx.stage.querySelector(".altar-cloth")?.classList.add("glow");
 }
 
 // --- the end: the "why" page and the ritual card (M17.4) ----------------------------------------
@@ -603,7 +679,7 @@ function finish(ctx: Ctx): void {
   const card = el("button", "altar-primary", "Save ritual card");
   card.type = "button";
   card.addEventListener("click", () => void saveCard(ctx, card));
-  const print = el("button", "altar-option", "Print the steps");
+  const print = el("button", "altar-option", "Print this page");
   print.type = "button";
   print.addEventListener("click", () => window.print());
   const again = el("button", "altar-option", "Rehearse again");
@@ -611,7 +687,9 @@ function finish(ctx: Ctx): void {
   again.addEventListener("click", () => {
     ctx.run = startLesson(lesson);
     ctx.breath = startBreaths();
-    render(ctx);
+    ctx.root.classList.remove("printable");
+    if (safetyFirst(ctx.entry, ctx.run)) showSafety(ctx);
+    else render(ctx);
   });
   const back = el("button", "altar-option", "Back to the lesson");
   back.type = "button";
@@ -622,7 +700,9 @@ function finish(ctx: Ctx): void {
   status.setAttribute("role", "status");
   page.append(status);
   stopFamiliar();
-  ctx.root.replaceChildren(header(ctx), page);
+  ctx.stage.replaceChildren(header(ctx), page);
+  ctx.root.classList.add("printable");
+  announce(ctx, `Ritual rehearsed: ${lesson.title}.`);
   card.focus();
 }
 

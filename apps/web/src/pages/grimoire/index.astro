@@ -56,6 +56,10 @@ const branchNames = JSON.stringify(
       <h2 id="path-title">Your path</h2>
       <p class="days" data-days></p>
       <ul class="path-branches" data-branches></ul>
+      <div class="rehearsed" data-done hidden>
+        <h3>Rituals you have rehearsed</h3>
+        <ul></ul>
+      </div>
       <p class="private">
         Your practice is kept on this device only. Save it as a file to keep a copy or move it to
         another device.
@@ -205,6 +209,15 @@ const branchNames = JSON.stringify(
     background: var(--glow);
     border-color: var(--glow);
     box-shadow: 0 0 8px var(--glow);
+  }
+  .rehearsed h3 {
+    margin: 1rem 0 0.4rem;
+    font-size: 1rem;
+  }
+  .rehearsed ul {
+    margin: 0;
+    padding-left: 1.2em;
+    color: var(--mist);
   }
   .private {
     color: var(--mist);

@@ -35,11 +35,12 @@ export const castingCircle: GrimoireEntry = {
       },
       {
         id: "cast",
-        prompt: "Cast the circle: trace it once sunwise round the altar with your finger.",
+        prompt:
+          "Cast the circle: trace it once sunwise round the altar with your finger (clockwise on this cloth, as the sun moves in the northern hemisphere).",
         expects: [{ kind: "walk", path: "sunwise" }],
         order: "in-order",
         hint: "Sunwise goes the way the sun moves: north, east, south, west, like a clock.",
-        why: "Moving sunwise (deosil) is the common way to build or bless. Many witches walk the circle, others point a finger or a wand; some cast it three times.",
+        why: "Moving sunwise (deosil) is the common way to build or bless. In the northern hemisphere the sun moves clockwise; many southern-hemisphere witches cast anticlockwise, following their own sun. Many walk the circle, others point a finger or a wand; some cast it three times.",
       },
       {
         id: "call",
@@ -83,7 +84,7 @@ export const castingCircle: GrimoireEntry = {
         expects: [{ kind: "walk", path: "widdershins" }],
         order: "in-order",
         hint: "Widdershins goes the other way: north, west, south, east.",
-        why: "Moving widdershins undoes what was built sunwise, so the space returns to everyday use.",
+        why: "Moving widdershins, against the sun, undoes what was built sunwise, so the space returns to everyday use. In the southern hemisphere the two directions swap.",
       },
       {
         id: "return",

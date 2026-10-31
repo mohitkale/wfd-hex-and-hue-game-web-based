@@ -1,6 +1,7 @@
 import { FRAME_W, drawFrame, type Species } from "@hexhue/game/familiar";
 import type { GrimoireEntry } from "@hexhue/learn";
 import { iconSvg } from "./icons";
+import { usedTools } from "./logic";
 
 /**
  * The ritual card (M17.4): a portrait image of a rehearsed ritual to keep or share: its title, the
@@ -95,12 +96,12 @@ export async function drawRitualCard(
   y += 80;
   g.font = `400 38px ${font}`;
   entry.lesson.steps.forEach((s, i) => {
-    if (y > CARD_H - 200) return;
+    if (y > CARD_H - 280) return;
     g.fillStyle = "#f6d97a";
     g.fillText(`${i + 1}`, 90, y);
     g.fillStyle = "#f5efff";
     for (const line of wrapText((t) => g.measureText(t).width, shortStep(s.prompt), CARD_W - 260)) {
-      if (y > CARD_H - 200) break;
+      if (y > CARD_H - 280) break;
       g.fillText(line, 150, y);
       y += 50;
     }
@@ -111,8 +112,8 @@ export async function drawRitualCard(
   g.font = `400 30px ${font}`;
   g.fillText(`Learn by doing, free and private: ${opts.site}/grimoire`, 90, CARD_H - 90);
 
-  // Tool icons along the bottom (best effort: the card is whole without them).
-  const tools = entry.altar?.tools.slice(0, 6) ?? [];
+  // The tools it used along the bottom (best effort: the card is whole without them).
+  const tools = usedTools(entry).slice(0, 7);
   const images = await Promise.allSettled(
     tools.map((t) => iconImage(iconSvg(t.icon, 96, t.color, true))),
   );
