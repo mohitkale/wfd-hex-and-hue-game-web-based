@@ -14,6 +14,7 @@
  * Drafts are built only into development and preview builds (`GRIMOIRE_PREVIEW=1`, set for Netlify
  * deploy previews); a production build contains reviewed lessons only.
  */
+import { checkAltar, type AltarLayout } from "./altar";
 import { checkLesson, type Action, type Lesson } from "./lesson";
 
 export const TOPICS = [
@@ -70,6 +71,8 @@ export interface GrimoireEntry {
     readonly tools?: readonly string[];
   };
   readonly review: Review;
+  /** The altar the lesson is rehearsed on (F1); a lesson without one is read through only. */
+  readonly altar?: AltarLayout;
 }
 
 /**
@@ -141,6 +144,10 @@ export function entryText(entry: GrimoireEntry): string {
     entry.safety.fire ?? "",
     ...(entry.safety.herbs ?? []).flatMap((h) => [h.name, h.item]),
     ...(entry.safety.tools ?? []),
+    ...l.steps.flatMap((s) => (s.options ?? []).map((o) => o.label)),
+    ...(entry.altar?.tools ?? []).map((t) => t.label),
+    ...(entry.altar?.spots ?? []).map((t) => t.label),
+    ...(entry.altar?.traces ?? []).map((t) => t.label),
   ].join("\n");
 }
 
@@ -173,6 +180,7 @@ export function hasFlame(entry: GrimoireEntry): boolean {
 /** Content-rule problems for one entry (lesson structure included); empty when it may ship. */
 export function checkEntry(entry: GrimoireEntry): string[] {
   const problems = checkLesson(entry.lesson);
+  if (entry.altar) problems.push(...checkAltar(entry.lesson, entry.altar));
   for (const t of entry.topics) {
     if (!TOPICS.includes(t)) problems.push(`unknown topic "${t}"`);
   }

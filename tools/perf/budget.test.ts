@@ -31,6 +31,28 @@ describe("performance budget", () => {
     expect(js).toMatchObject({ label: "play page JS", value: 480_000, ok: false });
   });
 
+  it("counts only the game's scripts once they are marked", () => {
+    const js = checkBudgets([
+      { ...file("_astro/play.abc.js", 400_000), play: true },
+      { ...file("_astro/altar.js", 80_000), play: false },
+    ]).find((r) => r.label === "play page JS")!;
+    expect(js).toMatchObject({ value: 400_000, ok: true });
+  });
+
+  it("follows dynamic imports when asked", () => {
+    const code: Record<string, string> = {
+      "_astro/a.js": 'import "./b.js"; const c = () => import("./c.js");',
+      "_astro/b.js": "",
+      "_astro/c.js": "",
+    };
+    expect(scriptClosure(["_astro/a.js"], (p) => code[p]!)).toEqual(["_astro/a.js", "_astro/b.js"]);
+    expect(scriptClosure(["_astro/a.js"], (p) => code[p]!, true)).toEqual([
+      "_astro/a.js",
+      "_astro/b.js",
+      "_astro/c.js",
+    ]);
+  });
+
   it("names the worst file for per-file budgets", () => {
     const html = checkBudgets([file("a.html", 1_000), file("blog/big/index.html", 30_000)]).find(
       (r) => r.label === "each HTML page",

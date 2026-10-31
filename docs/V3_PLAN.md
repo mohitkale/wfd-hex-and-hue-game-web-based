@@ -128,8 +128,10 @@ A community feature that works before accounts exist, then grows.
   `grimoire:check` (every herb has a safety badge, every candle lesson has fire safety, every lesson
   has a reviewer record), like `art:check`.
 - **UI**: the reading-heavy parts (lessons, cards, journal) as Astro pages with small, accessible DOM
-  islands; the hands-on scenes (altar, sigil tracing, constellation) in Phaser, reusing the pixel
-  canvas, familiars, haptics and audio. All offline in the PWA.
+  islands. The hands-on scenes are light DOM scenes too (decided in M17.1: the altar is about 6 KB
+  gzip and loads on first use, where Phaser would add about 400 KB to every lesson page); they
+  reuse the game's familiar drawing and vibration patterns (`@hexhue/game/familiar`). Every gesture
+  has a button twin for people who cannot draw on a screen. All offline in the PWA.
 - **Site**: a new `/grimoire` hub next to `/play`; the home map gets a door to it.
 - **Save**: the existing local save, extended; journal export and import as a file.
 
