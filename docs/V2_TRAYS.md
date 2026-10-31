@@ -281,3 +281,22 @@ journey:deal`, recorded in `journeyDeals.json`). The production gate holds each 
   extra rule. They are now used only on hard and extreme levels from chapter 3 on (`sealsAllowed` in
   `tools/collect/journey.ts`); a test fails if an easy or medium level, or any level in the first two
   chapters, has one.
+
+## Round 9 (owner feedback): real creatures from above, buttons, open trays
+
+- **Familiars drawn from above** (`familiarDraw.ts`): every species is seen from above, head leading,
+  so it never looks out at the player while it walks, and the renderer turns it to its heading.
+  - Each has its own anatomy: the ant's head, thorax and striped abdomen, six legs in tripods and
+    elbowed antennae; the spider's eight thin jointed legs with high knees and its marked abdomen; the
+    cat's four paws stepping in diagonal pairs and swishing tail; the bat's spread, ribbed wings,
+    foreshortened through each beat; the owl's wings opening as it hops and its fanned tail; the
+    frog's kicking hind legs and bulging eyes.
+  - The ant and the spider no longer have anything that reads as wings.
+- **Dust, not cubes, at the hole**: the puff is five soft, see-through clouds that billow up and
+  fade, instead of solid specks that looked like cubes popping out.
+- **The map's stops show the hand cursor** over any level that can be played.
+- **Boxes**: the front box of each column (and every box in a tray) is a raised 3D button, with a
+  glossy face, a deep side and a soft shadow, like the cubes. The boxes behind are flat tiles,
+  **fully opaque** (they used to fade to 62 % and 42 %, which made their colours hard to read).
+- **Trays**: a working box opens like a box with its lid up. The lid swings up behind it on its hinge
+  and the inside shows in the box's own colour, in place of the black slot and dark handle.

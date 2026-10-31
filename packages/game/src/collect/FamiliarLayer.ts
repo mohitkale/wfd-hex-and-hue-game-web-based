@@ -77,8 +77,8 @@ interface Entry {
 
 // Above the group boxes (depth 10 to 12), so familiars fly out of and into their open tray in front of them.
 const D = { sprite: 14, cube: 15, effect: 16 } as const;
-/** Specks in the dust puff at the hole when a familiar dives in. */
-const DUST_SPECKS = 4;
+/** Soft clouds in the dust puff at the hole when a familiar dives in. */
+const DUST_PUFFS = 5;
 /** How long a tapped familiar's jump for joy lasts. */
 const JOY_MS = 520;
 /** How far (css px) from a familiar a tap may land and still reach it. */
@@ -685,28 +685,32 @@ export class FamiliarLayer {
   private dust(x: number, y: number): void {
     if (this.reduced) return;
     const hole = this.layout.hole;
-    const size = Math.max(3, Math.round(hole.ry * 0.45));
-    const key = bake(this.scene, `dust:${size}`, size, size, (g) => {
-      g.fillStyle(0xe6c79c, 1);
-      g.fillCircle(size / 2, size / 2, size / 2);
+    // A soft, see-through cloud (owner feedback: solid specks read as cubes popping out of the hole).
+    const r = Math.max(4, Math.round(hole.ry * 0.9));
+    const key = bake(this.scene, `dust-cloud:${r}`, 2 * r, 2 * r, (g) => {
+      for (let k = 6; k >= 1; k--) {
+        g.fillStyle(0xd9c4a0, 0.13);
+        g.fillCircle(r, r, (r * k) / 6);
+      }
     });
-    const ms = Math.max(120, 360 * (this.tickMs / 70));
-    for (let i = 0; i < DUST_SPECKS; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const spread = 0.5 + (0.5 * ((i * 37) % 10)) / 10;
+    const ms = Math.max(260, 620 * (this.tickMs / 70));
+    for (let i = 0; i < DUST_PUFFS; i++) {
+      // Spread over the hole's rim, drifting up and out.
+      const a = Math.PI + ((i + 0.5) / DUST_PUFFS) * Math.PI;
+      const dx = Math.cos(a) * hole.rx;
       const puff = this.scene.add
-        .image(x + side * hole.rx * 0.5, y, key)
+        .image(x + dx * 0.4, y, key)
         .setDepth(D.effect)
-        .setAlpha(0.85)
-        .setScale(0.5);
+        .setAlpha(0.75)
+        .setScale(0.45);
       this.scene.tweens.add({
         targets: puff,
-        x: x + side * hole.rx * (0.9 + spread),
-        y: y - hole.ry * (0.8 + spread),
-        scale: 1.3,
+        x: x + dx * 1.1,
+        y: y + Math.sin(a) * hole.ry * 1.6 - hole.ry * 0.4,
+        scale: 1.5,
         alpha: 0,
         duration: ms,
-        ease: "Sine.easeOut",
+        ease: "Quad.easeOut",
         onComplete: () => puff.destroy(),
       });
     }

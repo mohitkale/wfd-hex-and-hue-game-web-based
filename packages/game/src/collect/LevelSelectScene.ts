@@ -97,6 +97,7 @@ export class LevelSelectScene extends Phaser.Scene {
     this.events.once("shutdown", () => {
       this.idle?.destroy();
       this.idle = null;
+      this.input.setDefaultCursor("default");
     });
   }
 
@@ -137,7 +138,10 @@ export class LevelSelectScene extends Phaser.Scene {
 
   private onMove(p: Phaser.Input.Pointer): void {
     const d = this.drag;
-    if (!d || !p.isDown) return;
+    if (!d || !p.isDown) {
+      this.hover(p);
+      return;
+    }
     this.ambientUntil = this.time.now + AMBIENT_MS;
     d.moved = Math.max(d.moved, Math.abs(p.y - d.startY));
     this.setScroll(d.startScroll - (p.y - d.startY));
@@ -169,6 +173,22 @@ export class LevelSelectScene extends Phaser.Scene {
     if (i < 0) return;
     if (this.map.status[i] === "locked") this.nudge(i);
     else this.play(this.map.line[i]!.key);
+  }
+
+  /** A pointer over a stop that can be played shows the hand cursor (owner feedback). */
+  private hover(p: Phaser.Input.Pointer): void {
+    let playable = false;
+    if (this.map && this.inMap(p)) {
+      const dpr = (this.registry.get("dpr") as number | undefined) ?? 1;
+      const { geo, view, status } = this.map;
+      const i = stopAt(
+        geo,
+        { x: p.x - view.x, y: p.y - view.y + this.scrollY },
+        STOP_R_CSS * dpr * 1.6,
+      );
+      playable = i >= 0 && status[i] !== "locked";
+    }
+    this.input.setDefaultCursor(playable ? "pointer" : "default");
   }
 
   private onWheel(_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number): void {

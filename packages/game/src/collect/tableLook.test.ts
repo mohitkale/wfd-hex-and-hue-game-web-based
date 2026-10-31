@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnAlpha, paintBoard, paintPlate, paintTable, plankWidth, TABLE } from "./tableLook";
+import { paintBoard, paintPlate, paintTable, plankWidth, TABLE } from "./tableLook";
 import { contrast, luminance } from "../theme";
 
 const recorder = () => {
@@ -21,12 +21,6 @@ const recorder = () => {
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 
 describe("the table look (M15.13)", () => {
-  it("the front box is bright and the ones behind it fade", () => {
-    expect(columnAlpha(0)).toBe(1);
-    expect(columnAlpha(1)).toBeLessThan(1);
-    expect(columnAlpha(2)).toBeLessThan(columnAlpha(1));
-  });
-
   it("covers the whole area with planks, the same table every time", () => {
     const a = recorder();
     const b = recorder();

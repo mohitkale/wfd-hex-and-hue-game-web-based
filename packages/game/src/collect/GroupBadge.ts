@@ -15,6 +15,8 @@ export interface BadgeOptions {
   dpr: number;
   /** Colour-blind mode: draw the colour's symbol in the corner. */
   symbol?: boolean;
+  /** A raised 3D button (the front row and the trays) or a flat tile (the rows behind). Default raised. */
+  raised?: boolean;
 }
 
 /** What a group is doing, which its own box shows (there is no separate "working" area). */
@@ -23,7 +25,7 @@ export type BadgeState = "queued" | "working" | "waiting";
 /**
  * A summon group: one coloured square with the number of cubes it can still deliver. The number is
  * real remaining capacity (it changes only when a cube is delivered). A working group opens its tray
- * (a lid tips back over a dark opening, and the familiars come out of it), glows and breathes, and
+ * (the lid swings up behind it, its inside shows, and the familiars come out of it), glows and breathes, and
  * closes the tray again when it is done; a waiting group is dimmed with "zz"; a thin bar along the
  * bottom fills as it delivers.
  */
@@ -35,6 +37,8 @@ export class GroupBadge extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Image;
   private readonly opening: Phaser.GameObjects.Graphics;
   private readonly lid: Phaser.GameObjects.Graphics;
+  /** The raised and flat textures of this box (`setRaised`). */
+  private readonly keys: { raised: string; flat: string };
   private open = false;
   /** The lid has finished opening: familiars may come out (M15.13). */
   private ready = false;
@@ -53,40 +57,95 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     const tones = tonesFor(opts.colorHex);
     const radius = Math.min(w, h) * 0.22;
     const lw = Math.max(1, dpr * 1.5);
-    const key = `badge:v2:${opts.colorHex}:${Math.round(w)}x${Math.round(h)}:${lw}`;
-    // A plain block (M15.13): a white rim and the colour's face over a darker lip that gives it depth.
-    // Nothing on top: the tray look (handle, opening) belongs to boxes in the tray row only.
-    bake(scene, key, w, h, (g) => {
-      const rim = Math.max(2, Math.round(dpr * 2));
-      const lip = Math.max(2, Math.round(h * 0.1));
-      g.fillStyle(0xffffff, 1);
-      g.fillRoundedRect(0, 0, w, h, radius);
-      g.fillStyle(tones.dark, 1);
-      g.fillRoundedRect(rim, rim, w - 2 * rim, h - 2 * rim, radius * 0.8);
-      g.fillStyle(tones.base, 1);
-      g.fillRoundedRect(rim, rim, w - 2 * rim, h - 2 * rim - lip, radius * 0.8);
-    });
+    // Two looks, baked once per colour and size (owner feedback): the box you can tap is a raised
+    // button, a glossy face over a deep side and a soft shadow, like the cubes; the boxes behind it
+    // are flat tiles, fully opaque so their colours read clearly.
+    this.keys = {
+      raised: bake(
+        scene,
+        `badge:raised:${opts.colorHex}:${Math.round(w)}x${Math.round(h)}`,
+        w,
+        h,
+        (g) => {
+          const lip = Math.max(3, Math.round(h * 0.15));
+          const rim = Math.max(2, Math.round(dpr * 2));
+          g.fillStyle(0x000000, 0.22);
+          g.fillRoundedRect(1, lip * 0.6, w - 2, h - lip * 0.6, radius);
+          g.fillStyle(tones.dark, 1);
+          g.fillRoundedRect(0, 0, w, h - 1, radius);
+          g.fillStyle(0xffffff, 1);
+          g.fillRoundedRect(0, 0, w, h - lip, radius);
+          g.fillStyle(tones.base, 1);
+          g.fillRoundedRect(rim, rim, w - 2 * rim, h - lip - 2 * rim, radius * 0.8);
+          // Gloss across the top of the face, and a glint.
+          g.fillStyle(tones.light, 0.55);
+          g.fillRoundedRect(rim * 2, rim * 2, w - 4 * rim, (h - lip) * 0.34, radius * 0.6);
+          g.fillStyle(0xffffff, 0.7);
+          g.fillCircle(
+            rim * 2 + radius * 0.6,
+            rim * 2 + radius * 0.5,
+            Math.max(1.5, radius * 0.28),
+          );
+        },
+      ),
+      flat: bake(
+        scene,
+        `badge:flat:${opts.colorHex}:${Math.round(w)}x${Math.round(h)}`,
+        w,
+        h,
+        (g) => {
+          const rim = Math.max(2, Math.round(dpr * 2));
+          const lip = Math.max(2, Math.round(h * 0.06));
+          g.fillStyle(tones.dark, 1);
+          g.fillRoundedRect(0, 0, w, h, radius);
+          g.fillStyle(tones.base, 1);
+          g.fillRoundedRect(rim, rim, w - 2 * rim, h - 2 * rim - lip, radius * 0.8);
+        },
+      ),
+    };
     this.glow = scene.add
       .image(0, 0, TEX.glow)
       .setTint(tones.light)
       .setDisplaySize(w * 1.7, h * 1.7)
       .setAlpha(0);
     this.glowScale = this.glow.scale;
-    this.bg = scene.add.image(0, 0, key).setOrigin(0.5);
+    this.bg = scene.add.image(0, 0, opts.raised === false ? this.keys.flat : this.keys.raised);
     this.bar = scene.add.graphics();
-    // The tray: a dark opening on top of the box and a lid hinged along the box's top edge.
+    // The tray (owner feedback: like a box with its lid open, not a black slot): inside, the box's
+    // own colour in shade, its back wall darker; the lid stands open behind it, hinged at the top
+    // edge, its underside showing.
+    const inner = { x: -w * 0.4, y: -h * 0.5 + h * 0.06, w: w * 0.8, h: h * 0.26 };
     this.opening = scene.add.graphics();
-    this.opening.fillStyle(0x140b2e, 0.92);
-    this.opening.fillRoundedRect(-w * 0.4, -h * 0.5 + h * 0.03, w * 0.8, h * 0.2, h * 0.08);
+    this.opening.fillStyle(tones.dark, 1);
+    this.opening.fillRoundedRect(inner.x, inner.y, inner.w, inner.h, h * 0.06);
+    this.opening.fillStyle(0x000000, 0.25);
+    this.opening.fillRoundedRect(inner.x, inner.y, inner.w, inner.h * 0.45, h * 0.06);
+    this.opening.lineStyle(lw, tones.light, 0.8);
+    this.opening.strokeRoundedRect(inner.x, inner.y, inner.w, inner.h, h * 0.06);
     this.opening.setAlpha(0);
     this.lid = scene.add.graphics();
-    this.lid.setPosition(0, -h / 2);
-    this.lid.fillStyle(tones.light, 0.55);
-    this.lid.fillRoundedRect(-w / 2 + lw, lw, w - 2 * lw, h * 0.26, radius * 0.7);
-    this.lid.lineStyle(lw, tones.light, 0.9);
-    this.lid.strokeRoundedRect(-w / 2 + lw, lw, w - 2 * lw, h * 0.26, radius * 0.7);
-    this.lid.setAlpha(0);
-    this.add([this.glow, this.bg, this.bar, this.opening, this.lid]);
+    this.lid.setPosition(0, -h / 2 + lw);
+    const lidH = h * 0.42;
+    const lid = [
+      { x: -w / 2 + lw, y: 0 },
+      { x: w / 2 - lw, y: 0 },
+      { x: w * 0.44, y: -lidH },
+      { x: -w * 0.44, y: -lidH },
+    ];
+    this.lid.fillStyle(tones.dark, 1);
+    shape(this.lid, lid).fillPath();
+    this.lid.fillStyle(tones.base, 1);
+    shape(this.lid, [
+      { x: -w * 0.42, y: -lidH * 0.18 },
+      { x: w * 0.42, y: -lidH * 0.18 },
+      { x: w * 0.38, y: -lidH * 0.88 },
+      { x: -w * 0.38, y: -lidH * 0.88 },
+    ]).fillPath();
+    this.lid.lineStyle(lw, 0xffffff, 0.9);
+    shape(this.lid, lid).strokePath();
+    // Closed, the lid lies flat on the hinge (no height); opening raises it.
+    this.lid.setScale(1, 0).setAlpha(0);
+    this.add([this.glow, this.lid, this.bg, this.bar, this.opening]);
 
     const numberAt = numberLayout(w, h);
     const fontPx = numberAt.fontPx;
@@ -123,19 +182,15 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.setSize(w, h);
   }
 
-  /**
-   * In a tray the box is a bucket: a handle arches over it (drawn behind the box, so only the arch
-   * shows above the top edge).
-   */
+  /** In a tray the box is raised (its lid opens while it works). */
   setInTray(): void {
-    const { w, h, dpr } = this.opts;
-    const tones = tonesFor(this.opts.colorHex);
-    const handle = this.scene.add.graphics();
-    handle.lineStyle(Math.max(2, Math.round(dpr * 3)), tones.dark, 1);
-    handle.beginPath();
-    handle.arc(0, -h * 0.32, w * 0.3, Math.PI, 0, false);
-    handle.strokePath();
-    this.addAt(handle, 1);
+    this.setRaised(true);
+  }
+
+  /** The raised 3D button (the front box of a column, a box in a tray) or a flat tile behind it. */
+  setRaised(raised: boolean): void {
+    const key = raised ? this.keys.raised : this.keys.flat;
+    if (this.bg.texture.key !== key) this.bg.setTexture(key);
   }
 
   /** Stops the glow's endless breathing tween with the badge (a tween on a destroyed child would run on). */
@@ -193,17 +248,17 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.open = true;
     this.ready = false;
     this.scene.tweens.killTweensOf([this.lid, this.opening]);
-    this.lid.setAlpha(1).setScale(1, 1);
+    this.lid.setAlpha(1).setScale(1, 0);
     const reduced = isReducedMotion(this.scene);
     if (reduced || instant) {
-      this.lid.setScale(1, 0.12);
+      this.lid.setScale(1, 1);
       this.opening.setAlpha(1);
       this.ready = true;
       return;
     }
     this.scene.tweens.add({
       targets: this.lid,
-      scaleY: 0.12,
+      scaleY: 1,
       delay: delayMs,
       duration: openMs,
       ease: "Cubic.easeOut",
@@ -229,7 +284,7 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     }
     this.scene.tweens.add({
       targets: this.lid,
-      scaleY: 1,
+      scaleY: 0,
       duration: 180,
       ease: "Cubic.easeIn",
       onComplete: () => {
@@ -265,4 +320,15 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     // change made the box dance (owner feedback, M15.13).
     this.label.setText(String(n));
   }
+}
+
+/** Starts a closed path through `pts` on `g`, ready to fill or stroke. */
+function shape(
+  g: Phaser.GameObjects.Graphics,
+  pts: readonly { x: number; y: number }[],
+): Phaser.GameObjects.Graphics {
+  g.beginPath();
+  pts.forEach((q, i) => (i === 0 ? g.moveTo(q.x, q.y) : g.lineTo(q.x, q.y)));
+  g.closePath();
+  return g;
 }

@@ -6,7 +6,7 @@ import { activeColumnRects } from "./collectLayout";
 import { assignTrays } from "./trays";
 import { GroupBadge } from "./GroupBadge";
 import { leaveScale } from "./swarm";
-import { columnAlpha, paintPlate } from "./tableLook";
+import { paintPlate } from "./tableLook";
 
 type CollectState = collect.CollectState;
 
@@ -165,7 +165,7 @@ export class PanelsView {
             target.depth,
             colRects[target.index] ?? undefined,
           );
-          t.badge.setAlpha(columnAlpha(target.depth));
+          t.badge.setRaised(target.depth === 0);
           if (Math.abs(t.badge.x - at.x) > 0.5) {
             this.scene.tweens.killTweensOf(t.badge);
             t.badge.setPosition(at.x, at.y).setScale(1);
@@ -197,9 +197,9 @@ export class PanelsView {
         number: remaining,
         dpr: this.dpr,
         symbol: this.colorblind,
+        raised: target.place !== "column" || target.depth === 0,
       });
       badge.setDepth(10 + (target.place === "column" ? 2 - target.depth : 0));
-      badge.setAlpha(target.place === "column" ? columnAlpha(target.depth) : 1);
       if (target.place === "tray") badge.setInTray();
       badge.setMode(
         g.status === "working" ? "working" : g.status === "waiting" ? "waiting" : "queued",

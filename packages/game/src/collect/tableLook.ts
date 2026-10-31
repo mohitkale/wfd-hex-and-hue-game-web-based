@@ -166,6 +166,3 @@ export function paintHoleFront(g: PolygonPainter, h: Hole, steps = 24): void {
   g.fillStyle(TABLE.holeLip, 1);
   g.fillPoints(edge, true);
 }
-
-/** A queued box's look by its place in the column: the front one is bright, the ones behind fade. */
-export const columnAlpha = (depth: number): number => (depth <= 0 ? 1 : depth === 1 ? 0.62 : 0.42);
