@@ -2,7 +2,9 @@ import type { GrimoireEntry } from "@hexhue/learn";
 import { describe, expect, it } from "vitest";
 import {
   GRIMOIRE,
+  builtDecks,
   builtLessons,
+  builtMoonQuests,
   isReviewed,
   lessonsByBranch,
   lessonUrl,
@@ -30,6 +32,13 @@ describe("grimoire helpers", () => {
     expect(previewBuild(false, undefined)).toBe(false);
     expect(builtLessons(false).every(isReviewed)).toBe(true);
     expect(builtLessons(true)).toEqual(GRIMOIRE);
+  });
+
+  it("builds draft decks and moon quests only in preview", () => {
+    expect(builtDecks(false).every((d) => d.review.status === "reviewed")).toBe(true);
+    expect(builtDecks(true).length).toBeGreaterThan(0);
+    expect(Object.keys(builtMoonQuests(true)).sort()).toHaveLength(8);
+    expect(builtMoonQuests(true).full).toBe("moon-full");
   });
 
   it("puts every lesson under its directory URL", () => {

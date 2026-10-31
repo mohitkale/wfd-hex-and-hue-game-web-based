@@ -230,12 +230,12 @@ _The pieces every v3 feature stands on._
 
 ### M18 — F3 Living Sky and F2 Correspondence Cards
 
-- [ ] **M18.1** Moon maths — phase, illumination and moon sign worked out on the device (deterministic, no network), tested against published tables. _Needs M16.1._
-- [ ] **M18.2** Moon tracker and moon quests — tonight's moon and one short quest per phase (eight). _Needs M18.1, M16.3._
-- [ ] **M18.3** Yule event — Wheel of the Year dates, a Yule lesson, palette and journey picture; live before 21 December 2026. _Needs M18.1, M16.3._
-- [ ] **M18.4** Card decks and spaced repetition — deck model, match games, gentle review schedule; cards earned by learning only. _Needs M16.4._
-- [ ] **M18.5** Demo: the Crystals deck (12 cards). _Needs M18.4._
-- [ ] **M18.6** Demo: the Kitchen Herbs deck (12 cards, every one with a safety badge). _Needs M18.4._
+- [x] **M18.1** Moon maths — phase, illumination and moon sign worked out on the device (deterministic, no network), tested against published tables. _Needs M16.1._
+- [x] **M18.2** Moon tracker and moon quests — `/grimoire/moon/`: tonight's moon drawn (phase, light, age, sign, either hemisphere), the next four main phases, and tonight's quest (eight, one per phase). _Needs M18.1, M16.3._
+- [ ] **M18.3** Yule event — Wheel of the Year page (all eight sabbats with their next dates, north or south), a Yule lesson, and a Yule picture and palette while Yule is next; live before 21 December 2026. **Open:** the journey picture (a playable Yule level in the witch's journey changes the shipped difficulty curve and needs its own deal) waits for the owner's decision at gate V2, and the Yule lesson goes live only once a practitioner has reviewed it; the box stays unticked until then. _Needs M18.1, M16.3._
+- [x] **M18.4** Card decks and spaced repetition — deck model, match games, gentle review schedule; cards earned by learning only. _Needs M16.4._
+- [x] **M18.5** Demo: the Crystals deck (12 cards). _Needs M18.4._
+- [x] **M18.6** Demo: the Kitchen Herbs deck (12 cards, every one with a safety badge). _Needs M18.4._
 - [ ] **M18.7** Demo evaluation **(human gate V2)** — owner evaluates every demo so far and picks what comes next. _Needs M17.5, M18.2, M18.3, M18.5, M18.6._ Box ticked only on the owner's approval.
 
 ## Later (post-MVP, not scheduled)

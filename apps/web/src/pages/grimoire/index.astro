@@ -32,6 +32,27 @@ const branchNames = JSON.stringify(
       by step; a wrong move only earns a gentle hint. Everything you practise stays on your device.
     </p>
 
+    <nav class="daily" aria-label="Every day">
+      <a href="/grimoire/moon/">
+        <span class="glyph" aria-hidden="true">
+          ☾
+        </span>
+        Tonight's moon
+      </a>
+      <a href="/grimoire/wheel/">
+        <span class="glyph" aria-hidden="true">
+          ✶
+        </span>
+        Wheel of the Year
+      </a>
+      <a href="/grimoire/cards/">
+        <span class="glyph" aria-hidden="true">
+          ◆
+        </span>
+        Correspondence cards
+      </a>
+    </nav>
+
     {lessons.length === 0 && (
       <p class="note">
         The first lessons are with practitioners for review. They will appear here as soon as they
@@ -113,6 +134,33 @@ const branchNames = JSON.stringify(
   .lede {
     font-size: 1.1rem;
     color: var(--mist);
+  }
+  .daily {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin: 1rem 0;
+  }
+  .daily a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 10px 16px;
+    border-radius: 16px;
+    background: rgb(42 22 80 / 0.6);
+    border: 1px solid rgb(246 217 122 / 0.35);
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .daily a:hover,
+  .daily a:focus-visible {
+    border-color: var(--glow);
+  }
+  .glyph {
+    color: var(--glow);
+    font-size: 1.3rem;
   }
   .note {
     padding: 14px 18px;

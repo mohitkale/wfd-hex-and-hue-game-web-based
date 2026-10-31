@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./collect": "./src/collect/index.ts"
+    "./collect": "./src/collect/index.ts",
+    "./rng": "./src/rng.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

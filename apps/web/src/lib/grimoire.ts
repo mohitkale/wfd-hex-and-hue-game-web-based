@@ -3,9 +3,12 @@ import {
   isReviewed,
   visibleEntries,
   type Branch,
+  type Deck,
   type GrimoireEntry,
+  type Phase,
 } from "@hexhue/learn";
-import { GRIMOIRE } from "../../../../content/grimoire";
+import { GRIMOIRE, MOON_QUESTS } from "../../../../content/grimoire";
+import { DECKS } from "../../../../content/grimoire/decks";
 
 /** The Path's branches as the Grimoire shows them. */
 export const BRANCH_INFO: Record<Branch, { name: string; blurb: string }> = {
@@ -53,4 +56,18 @@ export function previewBuild(
 export const builtLessons = (preview: boolean = previewBuild()): GrimoireEntry[] =>
   visibleEntries(GRIMOIRE, preview);
 
-export { GRIMOIRE, isReviewed };
+/** The card decks this build contains (drafts only in development and preview builds). */
+export const builtDecks = (preview: boolean = previewBuild()): Deck[] =>
+  DECKS.filter((d) => preview || d.review.status === "reviewed");
+
+/** Each moon phase's quest lesson id, when this build contains it. */
+export function builtMoonQuests(preview: boolean = previewBuild()): Partial<Record<Phase, string>> {
+  const built = new Set(builtLessons(preview).map((e) => e.lesson.id));
+  const out: Partial<Record<Phase, string>> = {};
+  for (const [phase, entry] of Object.entries(MOON_QUESTS) as [Phase, GrimoireEntry][]) {
+    if (built.has(entry.lesson.id)) out[phase] = entry.lesson.id;
+  }
+  return out;
+}
+
+export { DECKS, GRIMOIRE, MOON_QUESTS, isReviewed };

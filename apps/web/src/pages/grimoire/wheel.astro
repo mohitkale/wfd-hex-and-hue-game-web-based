@@ -1,0 +1,236 @@
+---
+import { SABBAT_NAMES } from "@hexhue/learn";
+import Page from "../../layouts/Page.astro";
+import { builtLessons } from "../../lib/grimoire";
+import { yuleSvg } from "../../lib/yuleArt";
+
+// The Yule lesson, when this build contains it (drafts only in preview builds).
+const yule = builtLessons().find((e) => e.lesson.id === "yule");
+const BLURB: Record<string, string> = {
+  imbolc: "First stirrings of spring; hearth, candles and new beginnings.",
+  ostara: "The spring equinox: day and night in balance, seeds and eggs.",
+  beltane: "The start of summer: fire, flowers and fertility.",
+  litha: "The summer solstice: the longest day, the sun at its height.",
+  lughnasadh: "The first harvest: grain, bread and thanks.",
+  mabon: "The autumn equinox: balance again, the second harvest.",
+  samhain: "The last harvest and the thinning veil: honouring the dead.",
+  yule: "The winter solstice: the longest night, and the light's return.",
+};
+---
+
+<Page
+  title="The Wheel of the Year · The Grimoire · Hex & Hue"
+  description="The eight sabbats of the modern Wheel of the Year with their next dates, worked out on your device for your hemisphere."
+  offline
+>
+  <div
+    class="wheel"
+    data-wheel
+    data-names={JSON.stringify(SABBAT_NAMES)}
+    data-blurbs={JSON.stringify(BLURB)}
+  >
+    <p class="crumb">
+      <a href="/grimoire/">The Grimoire</a> · Sabbats
+    </p>
+    <h1>The Wheel of the Year</h1>
+    <p class="lede">
+      Eight festivals mark the turning year in many modern pagan paths: the solstices and equinoxes,
+      and the four days between them. Not every tradition keeps all eight, or by these names.
+    </p>
+
+    <section class="next-up" data-next-up>
+      <div class="art" set:html={yuleSvg(10)} />
+      <div>
+        <p class="label">Next on the wheel</p>
+        <h2 data-next-name>…</h2>
+        <p data-next-when></p>
+        {yule && (
+          <p data-yule-link hidden>
+            <a href={`/grimoire/${yule.lesson.id}/`}>{yule.lesson.title}</a>
+          </p>
+        )}
+      </div>
+    </section>
+
+    <ol class="sabbats" data-list></ol>
+
+    <div class="hemisphere">
+      <span>You are in the</span>
+      <button type="button" data-hemisphere="north">
+        north
+      </button>
+      <button type="button" data-hemisphere="south">
+        south
+      </button>
+      <span>hemisphere</span>
+    </div>
+    <p class="note">
+      Solstices and equinoxes are the exact moments the sun reaches them, worked out on this device;
+      the four days between follow their traditional dates. In the southern hemisphere the wheel is
+      turned half a year: Yule falls in June.
+    </p>
+  </div>
+</Page>
+
+<script>
+  import { wheelOfTheYear, type Sabbat } from "@hexhue/learn";
+  import {
+    HEMISPHERE_KEY,
+    calendarDate,
+    dateText,
+    readHemisphere,
+    whenText,
+  } from "../../lib/skyView";
+  import { localDay } from "../../lib/practiceStore";
+
+  const SOLAR = ["yule", "ostara", "litha", "mabon"];
+  // Solstices and equinoxes are instants; the other four are calendar dates.
+  const dateOf = (s: Sabbat, ms: number) => (SOLAR.includes(s) ? new Date(ms) : calendarDate(ms));
+
+  const root = document.querySelector<HTMLElement>("[data-wheel]");
+  if (root) {
+    const names = JSON.parse(root.dataset.names ?? "{}") as Record<Sabbat, string>;
+    const blurbs = JSON.parse(root.dataset.blurbs ?? "{}") as Record<Sabbat, string>;
+    const store = (() => {
+      try {
+        return window.localStorage;
+      } catch {
+        return null;
+      }
+    })();
+    const draw = () => {
+      const now = new Date();
+      const hemisphere = readHemisphere(store);
+      // Festivals on calendar dates are judged by the learner's own date, not the UTC one.
+      const wheel = wheelOfTheYear(now.getTime(), hemisphere, localDay(now));
+      const first = wheel[0]!;
+      const firstAt = dateOf(first.sabbat, first.at);
+      root.querySelector("[data-next-name]")!.textContent = names[first.sabbat];
+      root.querySelector("[data-next-when]")!.textContent =
+        `${dateText(firstAt, SOLAR.includes(first.sabbat))}, ${whenText(now, firstAt)}`;
+      root
+        .querySelector<HTMLElement>("[data-yule-link]")
+        ?.toggleAttribute("hidden", first.sabbat !== "yule");
+      root.querySelector<HTMLElement>("[data-next-up]")!.dataset.sabbat = first.sabbat;
+      root.querySelector("[data-list]")!.replaceChildren(
+        ...wheel.map((w) => {
+          const li = document.createElement("li");
+          const at = dateOf(w.sabbat, w.at);
+          const solarPoint = SOLAR.includes(w.sabbat);
+          const head = document.createElement("p");
+          head.className = "sabbat";
+          head.innerHTML = "<strong></strong> <span></span>";
+          head.querySelector("strong")!.textContent = names[w.sabbat];
+          head.querySelector("span")!.textContent =
+            `${dateText(at, solarPoint)} · ${whenText(now, at)}`;
+          const blurb = document.createElement("p");
+          blurb.className = "blurb";
+          blurb.textContent = blurbs[w.sabbat];
+          li.append(head, blurb);
+          return li;
+        }),
+      );
+      for (const b of root.querySelectorAll<HTMLButtonElement>("[data-hemisphere]")) {
+        b.setAttribute("aria-pressed", String(b.dataset.hemisphere === hemisphere));
+      }
+    };
+    for (const b of root.querySelectorAll<HTMLButtonElement>("[data-hemisphere]")) {
+      b.addEventListener("click", () => {
+        try {
+          store?.setItem(HEMISPHERE_KEY, b.dataset.hemisphere ?? "north");
+        } catch {
+          /* kept for this visit only */
+        }
+        draw();
+      });
+    }
+    draw();
+  }
+</script>
+
+<style>
+  .crumb {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .lede {
+    color: var(--mist);
+  }
+  .next-up {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 1.5rem 0;
+    padding: 18px;
+    border-radius: 18px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  /* The Yule palette: deep evergreen and gold, while Yule is next. */
+  .next-up[data-sabbat="yule"] {
+    background: linear-gradient(135deg, #123d27 0%, #1f5a35 60%, #3a2a10 100%);
+    border: 1px solid #c9a227;
+  }
+  .next-up:not([data-sabbat="yule"]) .art {
+    display: none;
+  }
+  .art :global(svg) {
+    max-width: 100%;
+    height: auto;
+  }
+  .label {
+    margin: 0;
+    color: var(--glow);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .next-up h2 {
+    margin: 0.2rem 0;
+  }
+  .sabbats {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .sabbats :global(.sabbat) {
+    margin: 0;
+  }
+  .sabbats :global(.sabbat span) {
+    color: var(--glow);
+    font-size: 0.9rem;
+  }
+  .sabbats :global(.blurb) {
+    margin: 0.1rem 0 0;
+    color: var(--mist);
+    font-size: 0.95rem;
+  }
+  .hemisphere {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+  .hemisphere button {
+    min-height: 44px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--mist);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .hemisphere button[aria-pressed="true"] {
+    background: var(--glow);
+    color: var(--night);
+    border-color: var(--glow);
+  }
+  .note {
+    color: var(--mist);
+    font-size: 0.85rem;
+  }
+</style>
