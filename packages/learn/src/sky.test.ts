@@ -84,6 +84,14 @@ describe("the Wheel of the Year", () => {
   it("keeps cross-quarter days on their dates, rolling to next year once past", () => {
     expect(nextSabbat(utc("2024-01-01T00:00"), "samhain")).toBe(utc("2024-10-31T00:00"));
     expect(nextSabbat(utc("2024-10-31T18:00"), "samhain")).toBe(utc("2024-10-31T00:00"));
+    // 20:00 on 31 October in New York is already 1 November in UTC: still Samhain there.
+    expect(nextSabbat(utc("2024-11-01T00:00"), "samhain", "north", "2024-10-31")).toBe(
+      utc("2024-10-31T00:00"),
+    );
+    // Morning of 1 November in Sydney is still 31 October in UTC: Samhain is over there.
+    expect(nextSabbat(utc("2024-10-31T21:00"), "samhain", "north", "2024-11-01")).toBe(
+      utc("2025-10-31T00:00"),
+    );
     expect(nextSabbat(utc("2024-11-01T00:00"), "samhain")).toBe(utc("2025-10-31T00:00"));
     expect(nextSabbat(utc("2024-01-01T00:00"), "samhain", "south")).toBe(utc("2024-05-01T00:00"));
   });

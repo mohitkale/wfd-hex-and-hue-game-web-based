@@ -14,6 +14,7 @@ export const kitchenHerbs: Deck = {
   cards: [
     {
       id: "rosemary",
+      alsoFor: ["love", "cleansing", "wisdom"],
       name: "Rosemary",
       uses: ["remembrance", "protection"],
       element: "fire",
@@ -23,6 +24,7 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "basil",
+      alsoFor: ["protection", "courage"],
       name: "Basil",
       uses: ["prosperity", "love"],
       element: "fire",
@@ -32,16 +34,19 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "bay-leaf",
+      alsoFor: ["protection", "prosperity", "wisdom"],
       name: "Bay leaf",
       uses: ["wishes", "success"],
       element: "fire",
       lore: "Write a wish on a dried leaf and keep it somewhere safe.",
       color: "#6b8f3e",
       safety: "kitchen-safe",
-      caution: "Take whole leaves out of food before eating.",
+      caution:
+        "True bay laurel only: cherry laurel and mountain laurel look alike and are poisonous. Take whole leaves out of food before eating.",
     },
     {
       id: "cinnamon",
+      alsoFor: ["love", "success", "energy", "protection"],
       name: "Cinnamon",
       uses: ["prosperity", "warmth"],
       element: "fire",
@@ -52,6 +57,7 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "lavender",
+      alsoFor: ["love", "cleansing", "protection"],
       name: "Lavender",
       uses: ["calm", "sleep"],
       element: "air",
@@ -62,15 +68,18 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "mint",
+      alsoFor: ["prosperity", "protection", "cleansing"],
       name: "Mint",
       uses: ["freshness", "safe travel"],
       element: "air",
       lore: "A sprig in the wallet or the car for safe journeys.",
       color: "#5fc28a",
       safety: "kitchen-safe",
+      caution: "Garden mint only: pennyroyal is a mint too, and toxic.",
     },
     {
       id: "garden-sage",
+      alsoFor: ["cleansing", "protection", "wishes"],
       name: "Garden sage",
       uses: ["wisdom", "long life"],
       element: "air",
@@ -81,6 +90,7 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "thyme",
+      alsoFor: ["cleansing", "sleep", "love"],
       name: "Thyme",
       uses: ["courage", "wellbeing"],
       element: "water",
@@ -90,6 +100,7 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "chamomile",
+      alsoFor: ["prosperity", "cleansing", "love"],
       name: "Chamomile",
       uses: ["calm", "sleep"],
       element: "water",
@@ -100,6 +111,7 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "ginger",
+      alsoFor: ["prosperity", "love", "courage", "warmth"],
       name: "Ginger",
       uses: ["energy", "success"],
       element: "fire",
@@ -109,6 +121,7 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "clove",
+      alsoFor: ["prosperity", "love", "cleansing"],
       name: "Clove",
       uses: ["protection", "friendship"],
       element: "fire",
@@ -119,6 +132,7 @@ export const kitchenHerbs: Deck = {
     },
     {
       id: "salt",
+      alsoFor: ["protection", "grounding"],
       name: "Salt",
       uses: ["cleansing", "boundaries"],
       element: "earth",

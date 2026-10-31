@@ -2,7 +2,8 @@
  * Correspondence Cards (F2): decks of collectible cards learned through short match games. A card
  * is earned the first time the learner matches it, never bought. What was learned comes back for
  * review on a gentle Leitner schedule: a right answer moves a card up a box and further into the
- * future, a wrong one moves it down one box, and an earned card is never taken away
+ * future, a wrong one moves it down one box, and an earned card is never taken away; answers before
+ * a card is due change nothing, so extra rounds cannot rush it through the boxes
  * (docs/V3_PLAN.md, "No guilt mechanics").
  *
  * Days are local calendar dates (`YYYY-MM-DD`) and randomness comes from a seed, both passed in, so
@@ -19,7 +20,12 @@ export interface Card {
   readonly name: string;
   /** Words a match question can ask about ("calm", "protection"); at least two. */
   readonly uses: readonly string[];
-  /** The element it is most often given, when there is a common one. */
+  /**
+   * Other uses it is also widely given in other practices. Never asked about, but a card with the
+   * use being asked about here is never offered as a wrong answer (traditions differ).
+   */
+  readonly alsoFor?: readonly string[];
+  /** The element it is most often given, when practices broadly agree (left out when they do not). */
   readonly element?: Element;
   /** A line about it, shown on the card. */
   readonly lore: string;
@@ -74,17 +80,20 @@ export function questionFor(deck: Deck, cardId: string, seed: number): Question 
     };
   }
   const use = card.uses[rng.int(0, card.uses.length - 1)] as string;
-  const wrong = others((c) => c.id !== card.id && !c.uses.includes(use));
+  const wrong = others((c) => c.id !== card.id && !servesUse(c, use));
   if (wrong.length < 2) return null;
   const options = rng.shuffle([card, ...wrong]).map((c) => ({ id: c.id, label: c.name }));
   return {
     card: card.id,
-    prompt: `Which ${deck.kind === "herbs" ? "herb" : "stone"} do many witches use ${forUse(use)}?`,
+    prompt: `Which ${deck.kind === "herbs" ? "of these" : "stone"} do many witches use ${forUse(use)}?`,
     options,
     answer: card.id,
     teach: `${card.name}: ${card.uses.join(", ")}. ${card.lore}`,
   };
 }
+
+/** Whether a card is used for `use` here or widely elsewhere: never a wrong answer for it. */
+const servesUse = (c: Card, use: string) => c.uses.includes(use) || !!c.alsoFor?.includes(use);
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** "calm" → "for calm"; a use already shaped as a phrase ("in dream work") is kept. */
@@ -128,6 +137,8 @@ export function answerCard(
     if (!right) return progress; // nothing to lose, and nothing earned yet
     return { ...progress, [card]: { box: 2, due: addDays(day, BOX_DAYS[1]), earned: day } };
   }
+  // Answered before it is due (an extra round for the keen): no change, so the spacing holds.
+  if (was.due > day) return progress;
   const box = Math.max(1, Math.min(5, was.box + (right ? 1 : -1)));
   return { ...progress, [card]: { ...was, box, due: addDays(day, BOX_DAYS[box - 1]!) } };
 }
@@ -139,14 +150,14 @@ export function answerCard(
 export function practiceRound(deck: Deck, progress: DeckProgress, day: string, size = 6): string[] {
   const due = deck.cards
     .filter((c) => progress[c.id] && (progress[c.id] as CardProgress).due <= day)
-    .sort((a, b) => (progress[a.id]!.due < progress[b.id]!.due ? -1 : 1))
+    .sort((a, b) => progress[a.id]!.due.localeCompare(progress[b.id]!.due))
     .map((c) => c.id);
   const fresh = deck.cards.filter((c) => !progress[c.id]).map((c) => c.id);
   const round = [...due, ...fresh].slice(0, size);
   if (round.length > 0) return round;
   // Everything earned and nothing due: a short round of the soonest due, for anyone keen.
   return [...deck.cards]
-    .sort((a, b) => (progress[a.id]!.due < progress[b.id]!.due ? -1 : 1))
+    .sort((a, b) => progress[a.id]!.due.localeCompare(progress[b.id]!.due))
     .slice(0, Math.min(size, 3))
     .map((c) => c.id);
 }
@@ -195,7 +206,7 @@ export function checkDeck(deck: Deck): string[] {
     }
     // Every use must leave two other cards to be wrong answers, or no question can be asked.
     for (const use of c.uses) {
-      const wrong = deck.cards.filter((o) => o.id !== c.id && !o.uses.includes(use)).length;
+      const wrong = deck.cards.filter((o) => o.id !== c.id && !servesUse(o, use)).length;
       if (wrong < 2) problems.push(`${at}: too many cards share "${use}" to ask about it`);
     }
     const text = [c.name, c.lore, c.caution ?? "", ...c.uses].join("\n");

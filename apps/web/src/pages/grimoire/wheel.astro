@@ -20,7 +20,7 @@ const BLURB: Record<string, string> = {
 
 <Page
   title="The Wheel of the Year · The Grimoire · Hex & Hue"
-  description="The eight sabbats of the modern Wheel of the Year with their next dates, worked out on your device for your hemisphere. Yule is next."
+  description="The eight sabbats of the modern Wheel of the Year with their next dates, worked out on your device for your hemisphere."
   offline
 >
   <div
@@ -81,6 +81,7 @@ const BLURB: Record<string, string> = {
     readHemisphere,
     whenText,
   } from "../../lib/skyView";
+  import { localDay } from "../../lib/practiceStore";
 
   const SOLAR = ["yule", "ostara", "litha", "mabon"];
   // Solstices and equinoxes are instants; the other four are calendar dates.
@@ -100,7 +101,8 @@ const BLURB: Record<string, string> = {
     const draw = () => {
       const now = new Date();
       const hemisphere = readHemisphere(store);
-      const wheel = wheelOfTheYear(now.getTime(), hemisphere);
+      // Festivals on calendar dates are judged by the learner's own date, not the UTC one.
+      const wheel = wheelOfTheYear(now.getTime(), hemisphere, localDay(now));
       const first = wheel[0]!;
       const firstAt = dateOf(first.sabbat, first.at);
       root.querySelector("[data-next-name]")!.textContent = names[first.sabbat];

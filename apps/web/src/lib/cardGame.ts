@@ -11,6 +11,12 @@ import { cardSvg } from "./cardArt";
 import { loadDeckProgress, storeDeckProgress } from "./cardStore";
 import { loadPractice, localDay, storePractice } from "./practiceStore";
 
+const BADGE = {
+  "kitchen-safe": "Kitchen-safe",
+  "external-only": "External use only",
+  "do-not-use": "Toxic: do not use",
+} as const;
+
 /**
  * A deck's page: the collection (earned cards face up, the rest waiting) and a practice round of
  * match questions. Right answers earn and strengthen cards; a wrong one shows the answer and why,
@@ -47,7 +53,7 @@ export function setupCardGame(root: HTMLElement): void {
           if (c.safety) {
             const badge = document.createElement("span");
             badge.className = `badge ${c.safety}`;
-            badge.textContent = c.safety === "kitchen-safe" ? "Kitchen-safe" : c.safety;
+            badge.textContent = BADGE[c.safety];
             li.append(badge);
           }
         } else {
@@ -89,6 +95,7 @@ export function setupCardGame(root: HTMLElement): void {
         const b = document.createElement("button");
         b.type = "button";
         b.textContent = o.label;
+        b.dataset.id = o.id;
         b.addEventListener("click", () => {
           const right = o.id === q.answer;
           const before = loadDeckProgress(deck, store);
@@ -98,7 +105,7 @@ export function setupCardGame(root: HTMLElement): void {
           storePractice(recordPracticeDay(loadPractice(), day));
           for (const btn of opts.querySelectorAll("button")) {
             btn.disabled = true;
-            if (btn.textContent === q.options.find((x) => x.id === q.answer)?.label) {
+            if (btn.dataset.id === q.answer) {
               btn.classList.add("right");
             }
           }

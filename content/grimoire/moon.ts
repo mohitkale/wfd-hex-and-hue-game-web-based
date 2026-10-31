@@ -145,7 +145,7 @@ export const MOON_QUESTS: Record<Phase, GrimoireEntry> = {
         ],
         order: "in-order",
         hint: "Something that can soak up the moonlight.",
-        why: "Moon water is water left in moonlight overnight, then used to water plants or rinse the altar. Use a lid, and leave out stones that dissolve or flake, such as selenite.",
+        why: "Moon water is water left in moonlight overnight in a lidded jar, then used to water plants or rinse the altar; it is not for drinking. Set stones beside the jar, never in it: selenite and other soft stones dissolve or flake.",
       },
       breathe(5, "Sitting with the full moon's light is a simple, old form of gratitude."),
       task(

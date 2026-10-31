@@ -56,6 +56,22 @@ describe("questions", () => {
     }
   });
 
+  it("never offers a card widely used for the asked use elsewhere as a wrong answer", () => {
+    const wide: Deck = {
+      ...deck,
+      cards: [
+        card("a", ["calm", "sleep"]),
+        card("b", ["luck", "x"], { alsoFor: ["calm"] }),
+        card("c", ["courage", "y"]),
+        card("d", ["focus", "z"]),
+      ],
+    };
+    for (let seed = 0; seed < 40; seed++) {
+      const q = questionFor(wide, "a", seed)!;
+      if (q.prompt.includes("calm")) expect(q.options.map((o) => o.id)).not.toContain("b");
+    }
+  });
+
   it("is the same for the same seed", () => {
     expect(questionFor(deck, "a", 7)).toEqual(questionFor(deck, "a", 7));
   });
@@ -76,13 +92,20 @@ describe("earning and reviewing", () => {
 
   it("moves up when right and gently down when wrong, never losing the card", () => {
     let p = answerCard({}, "a", true, "2026-11-01");
+    expect(answerCard(p, "a", true, "2026-11-01")).toBe(p); // not due yet: no change
     p = answerCard(p, "a", true, "2026-11-02");
     expect(p.a).toMatchObject({ box: 3, due: "2026-11-05" });
     p = answerCard(p, "a", false, "2026-11-05");
     expect(p.a).toMatchObject({ box: 2, due: "2026-11-06", earned: "2026-11-01" });
-    for (let i = 0; i < 6; i++) p = answerCard(p, "a", false, "2026-11-06");
+    p = answerCard(p, "a", false, "2026-11-06");
     expect(p.a).toMatchObject({ box: 1, due: "2026-11-06" });
-    for (let i = 0; i < 9; i++) p = answerCard(p, "a", true, "2026-11-06");
+    p = answerCard(p, "a", false, "2026-11-06");
+    expect(p.a).toMatchObject({ box: 1 });
+    let day = "2026-11-06";
+    for (let i = 0; i < 9; i++) {
+      p = answerCard(p, "a", true, day);
+      day = p.a!.due;
+    }
     expect(p.a!.box).toBe(5);
     expect(answerCard(p, "a", true, "bad day")).toBe(p);
   });

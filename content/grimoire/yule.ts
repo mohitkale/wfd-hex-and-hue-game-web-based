@@ -62,11 +62,11 @@ export const yule: GrimoireEntry = {
       },
       {
         id: "snuff",
-        prompt: "Snuff the candle, or let it burn while you stay with it.",
+        prompt: "Snuff the candle. You can relight it on each of the Yule nights.",
         expects: [{ kind: "snuff", item: "sun-candle" }],
         order: "in-order",
         hint: "Tap the lit candle to snuff it.",
-        why: "Never leave a candle burning alone; you can relight it on each of the Yule nights.",
+        why: "Never leave a candle burning alone. Many witches relight the Yule candle each night until the twelfth, or let it burn while they sit with it.",
       },
     ],
   },

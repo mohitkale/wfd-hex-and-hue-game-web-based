@@ -272,16 +272,23 @@ export function nextSolarPoint(from: number, longitude: number): number {
 
 /**
  * When `sabbat` next comes after `from`, for a hemisphere. Solstices and equinoxes are exact
- * instants; a cross-quarter day is its calendar date, given as that date's midnight UTC (read it
- * with the UTC getters), and stays "next" for the whole of its day.
+ * instants. A cross-quarter day is a calendar date, given as that date's midnight UTC (read it with
+ * the UTC getters), and is judged against `today`, the learner's own local date (`YYYY-MM-DD`;
+ * by default the UTC date of `from`), so it stays "next" all through its day wherever they live.
  */
-export function nextSabbat(from: number, sabbat: Sabbat, hemisphere: Hemisphere = "north"): number {
+export function nextSabbat(
+  from: number,
+  sabbat: Sabbat,
+  hemisphere: Hemisphere = "north",
+  today: string = new Date(from).toISOString().slice(0, 10),
+): number {
   const when = NORTH[hemisphere === "north" ? sabbat : OPPOSITE[sabbat]];
   if ("sun" in when) return nextSolarPoint(from, when.sun);
-  const year = new Date(from).getUTCFullYear();
+  const start = Date.parse(`${today}T00:00:00Z`);
+  const year = Number(today.slice(0, 4));
   for (const y of [year, year + 1]) {
     const at = Date.UTC(y, when.month - 1, when.day);
-    if (at + DAY_MS > from) return at;
+    if (at >= start) return at;
   }
   return Date.UTC(year + 1, when.month - 1, when.day);
 }
@@ -290,8 +297,10 @@ export function nextSabbat(from: number, sabbat: Sabbat, hemisphere: Hemisphere 
 export function wheelOfTheYear(
   from: number,
   hemisphere: Hemisphere = "north",
+  today?: string,
 ): { sabbat: Sabbat; at: number }[] {
-  return SABBATS.map((sabbat) => ({ sabbat, at: nextSabbat(from, sabbat, hemisphere) })).sort(
-    (a, b) => a.at - b.at,
-  );
+  return SABBATS.map((sabbat) => ({
+    sabbat,
+    at: nextSabbat(from, sabbat, hemisphere, today),
+  })).sort((a, b) => a.at - b.at);
 }
