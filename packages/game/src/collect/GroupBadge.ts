@@ -342,14 +342,3 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.label.setText(String(n));
   }
 }
-
-/** Starts a closed path through `pts` on `g`, ready to fill or stroke. */
-function shape(
-  g: Phaser.GameObjects.Graphics,
-  pts: readonly { x: number; y: number }[],
-): Phaser.GameObjects.Graphics {
-  g.beginPath();
-  pts.forEach((q, i) => (i === 0 ? g.moveTo(q.x, q.y) : g.lineTo(q.x, q.y)));
-  g.closePath();
-  return g;
-}
