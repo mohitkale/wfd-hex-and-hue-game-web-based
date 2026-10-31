@@ -297,7 +297,10 @@ journey:deal`, recorded in `journeyDeals.json`). The production gate holds each 
 - **The map's stops show the hand cursor** over any level that can be played.
 - **Boxes** (revised after owner review): flat, with no 3D side or shadow, and **fully opaque** (the
   rows behind used to fade to 62 % and 42 %, which made their colours hard to read). The front box
-  of each column, and every box in a tray, has a soft sheen across the top so it stands out.
-- **Trays** (revised after owner review): a working box shows a tray rising out of it. The tray has a
-  curved, domed rim in the box's light colour with a white edge, and the box's mouth is a light
-  curve under its top edge. There is no dark shading.
+  of each column, and every box in a tray, has a thicker white border and a soft sheen across the
+  top; the boxes behind have a thin border, so the front row stands out.
+- **Trays** (revised after owner review): a working box shows a tray sliding up out of a slot in its
+  top. The slot is a hollow in the box's own dark tone, deeper at the back. The tray is a rounded
+  rectangle in the box's light colour with a white edge, shaded where it comes out of the hollow,
+  and the box's front edge is drawn over its foot, so it rises from inside the box. There is no
+  black shading.

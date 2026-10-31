@@ -25,7 +25,7 @@ export type BadgeState = "queued" | "working" | "waiting";
 /**
  * A summon group: one coloured square with the number of cubes it can still deliver. The number is
  * real remaining capacity (it changes only when a cube is delivered). A working group opens its tray
- * (a curved tray rises out of it and the familiars come out of it), glows and breathes, and
+ * (a tray slides up out of a slot in its top and the familiars come out of it), glows and breathes, and
  * closes the tray again when it is done; a waiting group is dimmed with "zz"; a thin bar along the
  * bottom fills as it delivers.
  */
@@ -36,6 +36,8 @@ export class GroupBadge extends Phaser.GameObjects.Container {
   private readonly sleep: Phaser.GameObjects.Text;
   private readonly bg: Phaser.GameObjects.Image;
   private readonly opening: Phaser.GameObjects.Graphics;
+  /** The front edge of the tray's slot, drawn over the tray's foot. */
+  private readonly lip: Phaser.GameObjects.Graphics;
   private readonly lid: Phaser.GameObjects.Graphics;
   /** The front (with a sheen) and back (plain) textures of this box (`setRaised`). */
   private readonly keys: { raised: string; flat: string };
@@ -82,7 +84,8 @@ export class GroupBadge extends Phaser.GameObjects.Container {
         w,
         h,
         (g) => {
-          const rim = Math.max(2, Math.round(dpr * 2));
+          // A thin border: the front box, with its thicker one and the sheen, stands out.
+          const rim = Math.max(1, Math.round(dpr * 0.75));
           g.fillStyle(0xffffff, 1);
           g.fillRoundedRect(0, 0, w, h, radius);
           g.fillStyle(tones.base, 1);
@@ -98,36 +101,57 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     this.glowScale = this.glow.scale;
     this.bg = scene.add.image(0, 0, opts.raised === false ? this.keys.flat : this.keys.raised);
     this.bar = scene.add.graphics();
-    // The tray (owner feedback): when the box works, a tray rises out of it, a curved rim in the
-    // box's light colour with a white edge, and the box's mouth shows as a light curved line. No dark
-    // shading anywhere.
+    // The tray (owner feedback): when the box works, a tray slides up out of a slot in its top. The
+    // slot is a hollow in the box's own dark tone, shaded deeper at the back; the tray, a little
+    // rounded rectangle in the box's light colour with a white edge, rises from inside it, shaded
+    // where it comes out of the hollow, and the box's front edge is drawn over its foot.
+    const slot = { x: -w * 0.42, y: -h * 0.43, w: w * 0.84, h: h * 0.17 };
+    const slotMid = slot.y + slot.h * 0.45;
     this.opening = scene.add.graphics();
-    this.opening.lineStyle(Math.max(1.5, lw), 0xffffff, 0.85);
-    // A shallow curve just under the top edge, clear of the number.
-    const mouth = new Phaser.Curves.QuadraticBezier(
-      new Phaser.Math.Vector2(-w * 0.36, -h * 0.4),
-      new Phaser.Math.Vector2(0, -h * 0.3),
-      new Phaser.Math.Vector2(w * 0.36, -h * 0.4),
-    );
-    mouth.draw(this.opening, 16);
+    this.opening.fillStyle(tones.dark, 1);
+    this.opening.fillRoundedRect(slot.x, slot.y, slot.w, slot.h, slot.h * 0.45);
+    this.opening.fillStyle(0x000000, 0.28);
+    this.opening.fillRoundedRect(slot.x, slot.y, slot.w, slot.h * 0.55, slot.h * 0.4);
     this.opening.setAlpha(0);
     this.lid = scene.add.graphics();
-    this.lid.setPosition(0, -h / 2 + lw * 2);
-    const rise = h * 0.36;
-    const dome = (rx: number, ry: number, steps = 18) =>
-      Array.from({ length: steps + 1 }, (_, i) => {
-        const a = Math.PI + (i / steps) * Math.PI;
-        return { x: Math.cos(a) * rx, y: Math.sin(a) * ry };
-      });
+    this.lid.setPosition(0, slotMid);
+    const lidW = w * 0.74;
+    const lidH = h * 0.44;
+    const corner = h * 0.07;
     this.lid.fillStyle(tones.light, 1);
-    shape(this.lid, dome(w / 2 - lw, rise)).fillPath();
+    this.lid.fillRoundedRect(-lidW / 2, -lidH, lidW, lidH + 1, {
+      tl: corner,
+      tr: corner,
+      bl: 0,
+      br: 0,
+    });
     this.lid.fillStyle(tones.base, 1);
-    shape(this.lid, dome(w * 0.36, rise * 0.62)).fillPath();
+    this.lid.fillRoundedRect(-lidW * 0.36, -lidH * 0.84, lidW * 0.72, lidH * 0.42, corner * 0.6);
+    // Shade where the tray comes up out of the hollow.
+    this.lid.fillGradientStyle(tones.dark, tones.dark, tones.dark, tones.dark, 0, 0, 0.75, 0.75);
+    this.lid.fillRect(-lidW / 2, -lidH * 0.32, lidW, lidH * 0.32 + 1);
     this.lid.lineStyle(Math.max(1.5, lw), 0xffffff, 1);
-    shape(this.lid, dome(w / 2 - lw, rise)).strokePath();
+    this.lid.strokeRoundedRect(-lidW / 2, -lidH, lidW, lidH + 1, {
+      tl: corner,
+      tr: corner,
+      bl: 0,
+      br: 0,
+    });
     // Down in the box, the tray has no height; opening raises it.
     this.lid.setScale(1, 0).setAlpha(0);
-    this.add([this.glow, this.lid, this.bg, this.bar, this.opening]);
+    // The front edge of the slot, over the tray's foot.
+    this.lip = scene.add.graphics();
+    this.lip.fillStyle(tones.base, 1);
+    this.lip.fillRoundedRect(slot.x, slotMid, slot.w, slot.y + slot.h - slotMid, {
+      tl: 0,
+      tr: 0,
+      bl: slot.h * 0.4,
+      br: slot.h * 0.4,
+    });
+    this.lip.lineStyle(Math.max(1, lw * 0.7), tones.light, 0.9);
+    this.lip.lineBetween(slot.x + slot.h * 0.3, slotMid, slot.x + slot.w - slot.h * 0.3, slotMid);
+    this.lip.setAlpha(0);
+    this.add([this.glow, this.bg, this.bar, this.opening, this.lid, this.lip]);
 
     const numberAt = numberLayout(w, h);
     const fontPx = numberAt.fontPx;
@@ -177,7 +201,14 @@ export class GroupBadge extends Phaser.GameObjects.Container {
 
   /** Stops the glow's endless breathing tween with the badge (a tween on a destroyed child would run on). */
   override destroy(fromScene?: boolean): void {
-    this.scene?.tweens.killTweensOf([this.glow, this.label, this, this.lid, this.opening]);
+    this.scene?.tweens.killTweensOf([
+      this.glow,
+      this.label,
+      this,
+      this.lid,
+      this.opening,
+      this.lip,
+    ]);
     super.destroy(fromScene);
   }
 
@@ -229,12 +260,13 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     if (this.open) return;
     this.open = true;
     this.ready = false;
-    this.scene.tweens.killTweensOf([this.lid, this.opening]);
+    this.scene.tweens.killTweensOf([this.lid, this.opening, this.lip]);
     this.lid.setAlpha(1).setScale(1, 0);
     const reduced = isReducedMotion(this.scene);
     if (reduced || instant) {
       this.lid.setScale(1, 1);
       this.opening.setAlpha(1);
+      this.lip.setAlpha(1);
       this.ready = true;
       return;
     }
@@ -246,7 +278,12 @@ export class GroupBadge extends Phaser.GameObjects.Container {
       ease: "Cubic.easeOut",
       onComplete: () => (this.ready = this.open),
     });
-    this.scene.tweens.add({ targets: this.opening, alpha: 1, delay: delayMs, duration: openMs });
+    this.scene.tweens.add({
+      targets: [this.opening, this.lip],
+      alpha: 1,
+      delay: delayMs,
+      duration: openMs,
+    });
   }
 
   /** Closes the tray (the lid comes down), then calls `done`; with reduced motion, at once. */
@@ -257,10 +294,11 @@ export class GroupBadge extends Phaser.GameObjects.Container {
     }
     this.open = false;
     this.ready = false;
-    this.scene.tweens.killTweensOf([this.lid, this.opening]);
+    this.scene.tweens.killTweensOf([this.lid, this.opening, this.lip]);
     if (isReducedMotion(this.scene)) {
       this.lid.setAlpha(0);
       this.opening.setAlpha(0);
+      this.lip.setAlpha(0);
       done();
       return;
     }
@@ -272,10 +310,11 @@ export class GroupBadge extends Phaser.GameObjects.Container {
       onComplete: () => {
         this.lid.setAlpha(0);
         this.opening.setAlpha(0);
+        this.lip.setAlpha(0);
         done();
       },
     });
-    this.scene.tweens.add({ targets: this.opening, alpha: 0, duration: 180 });
+    this.scene.tweens.add({ targets: [this.opening, this.lip], alpha: 0, duration: 180 });
   }
 
   /** How much of the group is delivered (0..1): a thin bar along the bottom of a whole box. */
