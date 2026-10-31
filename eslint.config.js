@@ -14,7 +14,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/core/**/*.ts"],
+    files: ["packages/core/**/*.ts", "packages/learn/**/*.ts"],
     rules: {
       // The engine must stay deterministic: use the seeded RNG and step counters instead.
       "no-restricted-properties": [

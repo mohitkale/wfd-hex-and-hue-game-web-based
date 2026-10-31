@@ -12,6 +12,8 @@ cleared. Repo: `mohitkale/wfd-hex-and-hue-game-web-based`.
 - Plan and progress: `docs/ROADMAP.md` (milestones `M0…M15`, one PR per task, mirrored as GitHub
   milestones + issues). `M0…M7` are the shipped v1.0.0 record; `M8…M15` are the v2.0.0 redesign.
 - Why v2 exists and what is reusable: `docs/V2_GAMEPLAY_AUDIT.md`.
+- v3, the Grimoire (learning and practice next to the puzzle): `docs/V3_PLAN.md`; milestones
+  `M16…` in the roadmap. Every v3 PR waits for the owner's approval before merging.
 
 ## Autonomous delivery loop
 
@@ -67,6 +69,7 @@ a session without another specific request in this project, run the **continue-r
 ```
 packages/core   pure TS engine: core/src/collect (rules, simulation, solver, simulated players,
                 generator), seeded RNG, ASCII art parser (no DOM, no Phaser)
+packages/learn  pure TS v3 learning engine: lessons and the lesson runner (no DOM, no Phaser)
 packages/game   Phaser 4: src/collect (board, home map, Spellbook, familiars, journey pictures);
                 shared audio, haptics, analytics, rewards, save, view helpers
 apps/web        Astro site: / landing, /play (mounts the game full-screen), /spellbook, /blog
