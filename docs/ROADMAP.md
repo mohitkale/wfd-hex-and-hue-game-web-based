@@ -183,6 +183,61 @@ _Deliver a production-quality upgrade validated by automated tests and human pla
 
 - [x] **M15.15** Stale code and copy cleanup — owner request (2026-10-31), before the next release: the game's leftover Undo booster, unsent v1 analytics events, unused ad placements, the motes layer, the unused Slider control and the old three-world plan removed; the browser's install prompt no longer held back for a v1 offer that no longer exists; the FAQ, privacy page, landing page and blog posts describe the current game; docs updated (#160).
 
+## v3.0.0 — The Grimoire (M16–M18, first round)
+
+v3 adds a place to learn and practise next to the puzzle: rituals rehearsed on a pixel altar,
+correspondence cards, the real moon and the Wheel of the Year. The plan, principles and the full
+feature list (F1–F9, at most two demos each) are in `docs/V3_PLAN.md`; the owner approved starting
+with M16 on 2026-11-01 and evaluates the demos before more content is made.
+
+Rules for M16+:
+
+- **One milestone = one branch = one PR** (owner, 2026-11-01): every task of a milestone is done
+  on the milestone's branch with local commits and `npm run verify`, and nothing is pushed until
+  the milestone is complete, so CI and preview builds run once per milestone. The PR ticks the
+  boxes, is reviewed, waits for green CI and is then squash-merged; the next milestone starts.
+  (M16.1 was opened as its own PR, #178, before this rule; the rest of M16 joins that PR.)
+- The run stops at the human gates below; a gate box is ticked only on the owner's approval.
+- v3 is additive: the puzzle at `/play` is not changed by it.
+- A lesson ships to players only after a real practitioner has reviewed it; until then it is a
+  draft, built only into development and preview builds (Netlify deploy previews), never into
+  the production site (M16.2). Simulated or AI review never
+  counts.
+
+**Human gates**
+
+| Gate | Task  | What is needed                                                                         |
+| ---- | ----- | -------------------------------------------------------------------------------------- |
+| V1   | M17.5 | Owner has rehearsed both rituals and a practitioner has reviewed their content.        |
+| V2   | M18.7 | Owner has evaluated every M16–M18 demo: keep, change or drop, and which features next. |
+
+### M16 — v3 foundation: lesson engine, content, Grimoire hub
+
+_The pieces every v3 feature stands on._
+
+- [x] **M16.1** v3 plan and the lesson engine — `docs/V3_PLAN.md`; new pure package `packages/learn` with the lesson model (steps that expect actions, in order or in any order), a runner that answers every action with "right", "try again" (a gentle hint, never a penalty) or "done", a structural lesson check and the "why" summary.
+- [x] **M16.2** Grimoire content format and check — lessons as data in `content/grimoire/`, a `grimoire:check` in verify (every lesson passes the lesson check; candle and fire lessons carry fire safety; herbs carry a safety badge; no closed-practice topics; every lesson has a review record) and draft/reviewed status (drafts only in development and preview builds). _Needs M16.1._
+- [x] **M16.3** The Grimoire hub — a `/grimoire` page on the site and in the offline PWA, linked from the landing page and the home map, listing lessons by branch. _Needs M16.2._
+- [x] **M16.4** The Path skeleton and practice save — branches and nodes in `learn`, progress saved on the device apart from the game save, practice days that only count up, export and import as a file. _Needs M16.1._
+
+### M17 — F1 Ritual Rehearsal
+
+- [ ] **M17.1** The altar scene — Phaser scene that plays a lesson: place tools, light candles, walk or trace a path, breathe with a pulse; the familiar helps; same-frame touch, haptics. _Needs M16.2._
+- [ ] **M17.2** Demo 1: casting and closing a circle. _Needs M17.1._
+- [ ] **M17.3** Demo 2: a candle intention spell (colour, dressing, focus, safe snuffing). _Needs M17.1._
+- [ ] **M17.4** "Why" pages and the ritual card — after a run, every step explained; the ritual saved to the Spellbook as a printable and shareable card. _Needs M17.2, M16.4._
+- [ ] **M17.5** Ritual review **(human gate V1)** — owner rehearses both rituals; practitioner review recorded on each lesson. _Needs M17.3, M17.4._ Box ticked only on the owner's approval.
+
+### M18 — F3 Living Sky and F2 Correspondence Cards
+
+- [ ] **M18.1** Moon maths — phase, illumination and moon sign worked out on the device (deterministic, no network), tested against published tables. _Needs M16.1._
+- [ ] **M18.2** Moon tracker and moon quests — tonight's moon and one short quest per phase (eight). _Needs M18.1, M16.3._
+- [ ] **M18.3** Yule event — Wheel of the Year dates, a Yule lesson, palette and journey picture; live before 21 December 2026. _Needs M18.1, M16.3._
+- [ ] **M18.4** Card decks and spaced repetition — deck model, match games, gentle review schedule; cards earned by learning only. _Needs M16.4._
+- [ ] **M18.5** Demo: the Crystals deck (12 cards). _Needs M18.4._
+- [ ] **M18.6** Demo: the Kitchen Herbs deck (12 cards, every one with a safety badge). _Needs M18.4._
+- [ ] **M18.7** Demo evaluation **(human gate V2)** — owner evaluates every demo so far and picks what comes next. _Needs M17.5, M18.2, M18.3, M18.5, M18.6._ Box ticked only on the owner's approval.
+
 ## Later (post-MVP, not scheduled)
 
 More chapters of the witch's journey · real ad provider (Google Ad Manager

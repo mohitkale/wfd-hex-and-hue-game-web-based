@@ -9,19 +9,23 @@ interface Props {
   jsonLd?: object | undefined;
   imageAlt?: string | undefined;
   noindex?: boolean | undefined;
+  /** Registers the offline service worker (the game and the Grimoire). */
+  offline?: boolean | undefined;
 }
 const props = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, "") || "/";
 const footerLinks = [
   { href: "/play/", label: "Play" },
   { href: "/spellbook/", label: "Spellbook" },
+  { href: "/grimoire/", label: "Grimoire" },
   { href: "/blog/", label: "Blog" },
   { href: "/faq/", label: "FAQ" },
   { href: "/privacy/", label: "Privacy" },
 ];
+// Three links and Play fit one row on a phone; the blog is in the footer.
 const nav = [
+  { href: "/grimoire/", label: "Grimoire" },
   { href: "/spellbook/", label: "Spellbook" },
-  { href: "/blog/", label: "Blog" },
   { href: "/faq/", label: "FAQ" },
 ];
 ---

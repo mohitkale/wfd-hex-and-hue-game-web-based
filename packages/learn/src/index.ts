@@ -1,0 +1,55 @@
+/**
+ * Hex & Hue v3, the Grimoire: the pure learning engine (lessons and the runner that plays them).
+ * No DOM, no Phaser; deterministic, like `core`. The plan is in docs/V3_PLAN.md.
+ */
+export {
+  BRANCHES,
+  act,
+  checkLesson,
+  lessonProgress,
+  lessonSummary,
+  resumeLesson,
+  sameAction,
+  startLesson,
+  type Action,
+  type Branch,
+  type Lesson,
+  type LessonRun,
+  type Reply,
+  type Step,
+  type StepSummary,
+} from "./lesson";
+export {
+  CLOSED_TERMS,
+  HERB_SAFETY,
+  TOPICS,
+  checkEntry,
+  checkLibrary,
+  closedTermsIn,
+  entryText,
+  hasFlame,
+  isReviewed,
+  visibleEntries,
+  type GrimoireEntry,
+  type Herb,
+  type HerbSafety,
+  type Review,
+  type Topic,
+} from "./grimoire";
+export {
+  PRACTICE_FILE,
+  emptyPractice,
+  exportPractice,
+  importPractice,
+  mergePractice,
+  parsePractice,
+  pathProgress,
+  practiceDays,
+  recordFinish,
+  recordPracticeDay,
+  saveRun,
+  type BranchProgress,
+  type Finished,
+  type ImportResult,
+  type PracticeSave,
+} from "./practice";

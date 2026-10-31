@@ -4,8 +4,8 @@ import { SITE, absolute } from "../lib/site";
 interface Props {
   title: string;
   description?: string | undefined;
-  /** Registers the offline service worker (the game page only; see pwa/client.ts). */
-  offline?: boolean;
+  /** Registers the offline service worker (the game and the Grimoire; see pwa/client.ts). */
+  offline?: boolean | undefined;
   /** Share-card image path (default: the site card). */
   image?: string | undefined;
   /** Open Graph type: "website" or "article". */

@@ -2,7 +2,7 @@ import { watchUpdates } from "./updates";
 
 /**
  * Page side of the PWA: registers the service worker (production builds, on pages that opt in
- * with `<body data-offline>`: the game) and offers a refresh when a new version is ready. Installing
+ * with `<body data-offline>`: the game and the Grimoire) and offers a refresh when a new version is ready. Installing
  * is left to the browser's own prompt and menu.
  */
 
@@ -19,7 +19,10 @@ export function setupPwa(): void {
       .then((all) => all.forEach((r) => void r.unregister()));
     return;
   }
-  // Only the game registers the worker, so landing / blog visitors don't download the game.
+  // Only the game and the Grimoire register the worker, so landing / blog visitors don't download
+  // the game. A Grimoire reader does download it (the Grimoire is part of the offline app, one tap
+  // from the home map), and a Grimoire edit changes the worker version, so players see the usual
+  // "new version" offer for lesson changes too.
   if (!("offline" in document.body.dataset)) return;
   window.addEventListener("load", () => void register());
 }
