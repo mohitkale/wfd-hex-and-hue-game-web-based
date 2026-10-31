@@ -19,3 +19,20 @@ export {
   type Step,
   type StepSummary,
 } from "./lesson";
+export {
+  CLOSED_TERMS,
+  HERB_SAFETY,
+  TOPICS,
+  checkEntry,
+  checkLibrary,
+  closedTermsIn,
+  entryText,
+  hasFlame,
+  isReviewed,
+  visibleEntries,
+  type GrimoireEntry,
+  type Herb,
+  type HerbSafety,
+  type Review,
+  type Topic,
+} from "./grimoire";

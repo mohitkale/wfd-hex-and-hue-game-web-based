@@ -192,8 +192,12 @@ with M16 on 2026-11-01 and evaluates the demos before more content is made.
 
 Rules for M16+:
 
-- Same loop as v2 (one task = one branch = one PR; the PR ticks its box). `main` is the deploy
-  branch, so **every PR waits for the owner's approval before it is merged** (CLAUDE.md).
+- **One milestone = one branch = one PR** (owner, 2026-11-01): every task of a milestone is done
+  on the milestone's branch with local commits and `npm run verify`, and nothing is pushed until
+  the milestone is complete, so CI and preview builds run once per milestone. The PR ticks the
+  boxes, is reviewed, waits for green CI and is then squash-merged; the next milestone starts.
+  (M16.1 was opened as its own PR, #178, before this rule; the rest of M16 joins that PR.)
+- The run stops at the human gates below; a gate box is ticked only on the owner's approval.
 - v3 is additive: the puzzle at `/play` is not changed by it.
 - A lesson ships to players only after a real practitioner has reviewed it; until then it is a
   draft, visible only in development or with `?preview=1` (M16.2). Simulated or AI review never
@@ -211,7 +215,7 @@ Rules for M16+:
 _The pieces every v3 feature stands on._
 
 - [x] **M16.1** v3 plan and the lesson engine — `docs/V3_PLAN.md`; new pure package `packages/learn` with the lesson model (steps that expect actions, in order or in any order), a runner that answers every action with "right", "try again" (a gentle hint, never a penalty) or "done", a structural lesson check and the "why" summary.
-- [ ] **M16.2** Grimoire content format and check — lessons as data in `content/grimoire/`, a `grimoire:check` in verify (every lesson passes the lesson check; candle and fire lessons carry fire safety; herbs carry a safety badge; no closed-practice topics; every lesson has a review record) and draft/reviewed status (drafts only in development or `?preview=1`). _Needs M16.1._
+- [x] **M16.2** Grimoire content format and check — lessons as data in `content/grimoire/`, a `grimoire:check` in verify (every lesson passes the lesson check; candle and fire lessons carry fire safety; herbs carry a safety badge; no closed-practice topics; every lesson has a review record) and draft/reviewed status (drafts only in development or `?preview=1`). _Needs M16.1._
 - [ ] **M16.3** The Grimoire hub — a `/grimoire` page on the site and in the offline PWA, linked from the landing page and the home map, listing lessons by branch. _Needs M16.2._
 - [ ] **M16.4** The Path skeleton and practice save — branches and nodes in `learn`, progress saved on the device apart from the game save, practice days that only count up, export and import as a file. _Needs M16.1._
 

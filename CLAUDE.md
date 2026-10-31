@@ -13,7 +13,8 @@ cleared. Repo: `mohitkale/wfd-hex-and-hue-game-web-based`.
   milestones + issues). `M0…M7` are the shipped v1.0.0 record; `M8…M15` are the v2.0.0 redesign.
 - Why v2 exists and what is reusable: `docs/V2_GAMEPLAY_AUDIT.md`.
 - v3, the Grimoire (learning and practice next to the puzzle): `docs/V3_PLAN.md`; milestones
-  `M16…` in the roadmap. Every v3 PR waits for the owner's approval before merging.
+  `M16…` in the roadmap. v3 is one PR per milestone, pushed only when the milestone is done, merged
+  once reviewed and green; the run stops at the v3 gates (V1 M17.5, V2 M18.7).
 
 ## Autonomous delivery loop
 
