@@ -1,6 +1,6 @@
 /**
  * Builds the service worker from the files in the production build. It precaches the game's app
- * shell (the /play page, its bundles and the icons) and serves it cache-first, so the game starts
+ * shell (the /play page, its bundles and the icons) and the Grimoire's pages and serves it cache-first, so the game starts
  * instantly and plays fully offline. Other pages (landing, blog) are cached as they are visited,
  * network-first, so content updates never wait on the game.
  *
@@ -12,13 +12,14 @@
  */
 
 /**
- * Pages and files that make up the playable game. Everything else is cached at runtime. (The v2
+ * Pages and files that make up the playable game and the Grimoire. Everything else is cached at runtime. (The v2
  * review board lives in `v2/`, outside this rule on purpose: it is never precached and does not
  * change the worker version.)
  */
 function isShell(file: string): boolean {
   return (
     file === "play/index.html" ||
+    (file.startsWith("grimoire/") && file.endsWith("index.html")) ||
     file.startsWith("_astro/") ||
     file.startsWith("icons/") ||
     file === "manifest.webmanifest" ||

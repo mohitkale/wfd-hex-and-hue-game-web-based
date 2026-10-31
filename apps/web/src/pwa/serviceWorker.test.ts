@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { pageKeys, precacheUrls, serviceWorkerSource, shellFiles } from "./serviceWorker";
 
 describe("service worker build", () => {
-  it("precaches only the game's shell, pages under their directory URL", () => {
+  it("precaches only the game's shell and the Grimoire, pages under their directory URL", () => {
     const shell = shellFiles([
       "index.html",
       "blog/first-post/index.html",
       "play/index.html",
+      "grimoire/index.html",
+      "grimoire/four-elements/index.html",
       "_astro/play.abc.js",
       "_astro/hint.worker-x.js",
       "_astro/play.abc.js.map",
@@ -23,6 +25,8 @@ describe("service worker build", () => {
       "/_astro/hint.worker-x.js",
       "/_astro/play.abc.js",
       "/favicon.svg",
+      "/grimoire/",
+      "/grimoire/four-elements/",
       "/icons/icon-192.png",
       "/manifest.webmanifest",
       "/play/",

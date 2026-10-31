@@ -1,0 +1,248 @@
+---
+import Page from "../../layouts/Page.astro";
+import { BRANCH_INFO, GRIMOIRE, isReviewed, lessonUrl, lessonsByBranch } from "../../lib/grimoire";
+
+const groups = lessonsByBranch(GRIMOIRE);
+const reviewed = GRIMOIRE.filter(isReviewed).length;
+const dev = import.meta.env.DEV;
+const panelLessons = JSON.stringify(
+  GRIMOIRE.map((e) => ({
+    id: e.lesson.id,
+    branch: e.lesson.branch,
+    title: e.lesson.title,
+    reviewed: isReviewed(e),
+  })),
+);
+const branchNames = JSON.stringify(
+  Object.fromEntries(Object.entries(BRANCH_INFO).map(([k, v]) => [k, v.name])),
+);
+---
+
+<Page
+  title="The Grimoire: learn witchcraft by doing · Hex & Hue"
+  description="Learn rituals, correspondences and the moon by doing them, step by step, on a pixel altar. Free, private and offline."
+  offline
+>
+  <div data-grimoire class:list={["grimoire", { preview: dev }]}>
+    <h1>The Grimoire</h1>
+    <p class="lede">
+      Learn by doing, then by knowing why. Rehearse a ritual on the altar with your familiar, step
+      by step; a wrong move only earns a gentle hint. Everything you practise stays on your device.
+    </p>
+
+    <p class="soon" class:list={{ hidden: reviewed > 0 }}>
+      The first lessons are with practitioners for review. They will appear here as soon as they are
+      checked.
+    </p>
+    <p class="draft-note">
+      Preview: lessons marked <span class="badge">Draft</span> are not yet reviewed and are hidden
+      from players.
+    </p>
+
+    <section
+      class="path"
+      aria-labelledby="path-title"
+      data-path
+      data-lessons={panelLessons}
+      data-branches={branchNames}
+      hidden
+    >
+      <h2 id="path-title">Your path</h2>
+      <p class="days" data-days></p>
+      <ul class="path-branches" data-branches></ul>
+      <p class="private">
+        Your practice is kept on this device only. Save it as a file to keep a copy or move it to
+        another device.
+      </p>
+      <div class="path-actions">
+        <button type="button" data-export>
+          Save practice file
+        </button>
+        <label class="import">
+          Add a practice file
+          <input type="file" accept="application/json,.json" data-import />
+        </label>
+      </div>
+      <p class="status" role="status" data-status></p>
+    </section>
+
+    {groups.map((g) => (
+      <section
+        class:list={["branch", { draft: g.entries.every((e) => !isReviewed(e)) }]}
+        id={g.branch}
+      >
+        <h2>{g.name}</h2>
+        <p class="blurb">{g.blurb}</p>
+        <ul class="lessons">
+          {g.entries.map((e) => (
+            <li class:list={["lesson", { draft: !isReviewed(e) }]}>
+              <a href={lessonUrl(e.lesson.id)}>
+                <span class="title">{e.lesson.title}</span>
+                <span class="meta">
+                  {e.lesson.minutes} min · {e.lesson.steps.length} steps
+                  {!isReviewed(e) && <span class="badge">Draft</span>}
+                </span>
+                <span class="intro">{e.lesson.intro}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+
+    <p class="play-more">
+      Between lessons, <a href="/play/">play the witch's journey</a>.
+    </p>
+  </div>
+</Page>
+
+<script>
+  import { setupPathPanel } from "../../lib/pathPanel";
+  import { setupPreview } from "../../lib/preview";
+  setupPreview();
+  const panel = document.querySelector<HTMLElement>("[data-path]");
+  if (panel) setupPathPanel(panel);
+</script>
+
+<style>
+  .lede {
+    font-size: 1.1rem;
+    color: var(--mist);
+  }
+  .grimoire:not(.preview) .draft,
+  .grimoire:not(.preview) .draft-note,
+  .grimoire.preview .soon,
+  .hidden {
+    display: none;
+  }
+  .soon,
+  .draft-note {
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  .blurb {
+    margin-top: -0.4rem;
+    color: var(--mist);
+  }
+  .lessons {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    list-style: none;
+    padding: 0;
+  }
+  .lesson a {
+    display: grid;
+    gap: 4px;
+    height: 100%;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgb(42 22 80 / 0.6);
+    color: var(--text);
+    text-decoration: none;
+    border: 1px solid rgb(201 184 255 / 0.12);
+  }
+  .lesson a:hover,
+  .lesson a:focus-visible {
+    border-color: var(--glow);
+  }
+  .title {
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+  .meta {
+    color: var(--glow);
+    font-size: 0.85rem;
+  }
+  .intro {
+    color: var(--mist);
+    font-size: 0.95rem;
+  }
+  .badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--glow);
+    color: var(--night);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .path {
+    margin: 1.5rem 0;
+    padding: 18px;
+    border-radius: 18px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  .path[hidden] {
+    display: none;
+  }
+  .path h2 {
+    margin-top: 0;
+  }
+  .days {
+    color: var(--glow);
+    font-weight: 700;
+  }
+  .path-branches {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .path-branches :global(li) {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .path-branches :global(.nodes) {
+    display: flex;
+    gap: 6px;
+  }
+  .path-branches :global(.node) {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--mist);
+  }
+  .path-branches :global(.node.lit) {
+    background: var(--glow);
+    border-color: var(--glow);
+    box-shadow: 0 0 8px var(--glow);
+  }
+  .private {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .path-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .path-actions button,
+  .import {
+    padding: 10px 16px;
+    min-height: 44px;
+    border-radius: 999px;
+    border: 1px solid var(--mist);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .import input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .import:focus-within {
+    outline: 2px solid var(--glow);
+  }
+  .play-more {
+    margin-top: 2rem;
+    text-align: center;
+  }
+</style>

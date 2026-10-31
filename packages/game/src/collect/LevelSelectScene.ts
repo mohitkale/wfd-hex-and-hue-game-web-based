@@ -47,7 +47,7 @@ const CHALLENGE_RING = { hard: 0xb06cff, extreme: 0xff5a4a } as const;
  * every level as a stop on a winding trail of stepping stones from the first level at the bottom up to
  * the last: cleared stops are gold coins, the next one glows with the chosen familiar beside it, and
  * later ones are stone and locked until the one before is cleared; Hard and Extreme stops wear their
- * colour. Below it, on a wooden shelf, the familiar picker, today's daily and the Spellbook. A win
+ * colour. Below it, on a wooden shelf, the familiar picker, today's daily, the Spellbook and the Grimoire. A win
  * leads here, and the player picks what to play next.
  */
 export class LevelSelectScene extends Phaser.Scene {
@@ -554,19 +554,18 @@ export class LevelSelectScene extends Phaser.Scene {
     const before = this.children.list.length;
     this.drawPicker(frame, shelfTop + 6 * dpr, 96 * dpr, dpr);
     const by = shelfTop + (8 + 96 + 30) * dpr;
-    const half = (frame.w - 48 * dpr) / 2 - 6 * dpr;
-    this.add.existing(
-      new Button(this, cx - half / 2 - 6 * dpr, by, half, "Today's daily", {
-        dpr,
-        onPress: () => this.play("daily"),
-      }),
-    );
-    this.add.existing(
-      new Button(this, cx + half / 2 + 6 * dpr, by, half, "Spellbook", {
-        dpr,
-        onPress: () => this.openSpellbook(),
-      }),
-    );
+    // Three doors on the shelf: today's daily, the Spellbook and the Grimoire (v3, on the site).
+    const gap = 8 * dpr;
+    const third = (frame.w - 48 * dpr - 2 * gap) / 3;
+    const doors: [string, () => void][] = [
+      ["Daily", () => this.play("daily")],
+      ["Spellbook", () => this.openSpellbook()],
+      ["Grimoire", () => window.location.assign("/grimoire/")],
+    ];
+    doors.forEach(([label, onPress], i) => {
+      const x = cx + (i - 1) * (third + gap);
+      this.add.existing(new Button(this, x, by, third, label, { dpr, onPress }));
+    });
     cam.ignore(this.children.list.slice(before));
   }
 

@@ -216,8 +216,8 @@ _The pieces every v3 feature stands on._
 
 - [x] **M16.1** v3 plan and the lesson engine — `docs/V3_PLAN.md`; new pure package `packages/learn` with the lesson model (steps that expect actions, in order or in any order), a runner that answers every action with "right", "try again" (a gentle hint, never a penalty) or "done", a structural lesson check and the "why" summary.
 - [x] **M16.2** Grimoire content format and check — lessons as data in `content/grimoire/`, a `grimoire:check` in verify (every lesson passes the lesson check; candle and fire lessons carry fire safety; herbs carry a safety badge; no closed-practice topics; every lesson has a review record) and draft/reviewed status (drafts only in development or `?preview=1`). _Needs M16.1._
-- [ ] **M16.3** The Grimoire hub — a `/grimoire` page on the site and in the offline PWA, linked from the landing page and the home map, listing lessons by branch. _Needs M16.2._
-- [ ] **M16.4** The Path skeleton and practice save — branches and nodes in `learn`, progress saved on the device apart from the game save, practice days that only count up, export and import as a file. _Needs M16.1._
+- [x] **M16.3** The Grimoire hub — a `/grimoire` page on the site and in the offline PWA, linked from the landing page and the home map, listing lessons by branch. _Needs M16.2._
+- [x] **M16.4** The Path skeleton and practice save — branches and nodes in `learn`, progress saved on the device apart from the game save, practice days that only count up, export and import as a file. _Needs M16.1._
 
 ### M17 — F1 Ritual Rehearsal
 

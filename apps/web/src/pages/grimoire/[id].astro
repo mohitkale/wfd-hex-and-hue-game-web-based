@@ -1,0 +1,136 @@
+---
+import type { GrimoireEntry } from "@hexhue/learn";
+import Page from "../../layouts/Page.astro";
+import { BRANCH_INFO, GRIMOIRE, isReviewed } from "../../lib/grimoire";
+
+export function getStaticPaths() {
+  return GRIMOIRE.map((entry) => ({ params: { id: entry.lesson.id }, props: { entry } }));
+}
+
+interface Props {
+  entry: GrimoireEntry;
+}
+const { entry } = Astro.props;
+const { lesson, safety } = entry;
+const reviewed = isReviewed(entry);
+const dev = import.meta.env.DEV;
+const BADGE = {
+  "kitchen-safe": "Safe to cook with",
+  "external-only": "External use only",
+  "do-not-use": "Toxic: do not use",
+} as const;
+---
+
+<Page
+  title={`${lesson.title} · The Grimoire · Hex & Hue`}
+  description={lesson.intro}
+  noindex={!reviewed}
+  offline
+>
+  <div data-grimoire class:list={["grimoire", { preview: reviewed || dev }]}>
+    <p class="crumb">
+      <a href="/grimoire/">The Grimoire</a> · {BRANCH_INFO[lesson.branch].name}
+    </p>
+    <h1>{lesson.title}</h1>
+
+    <div class="pending">
+      <p>
+        This lesson is still with a practitioner for review. It will open here once it is checked.
+      </p>
+      <p>
+        <a href="/grimoire/">Back to the Grimoire</a>
+      </p>
+    </div>
+
+    <div class="body">
+      {!reviewed && <p class="draft-note">Draft: not yet reviewed by a practitioner.</p>}
+      <p class="meta">
+        {lesson.minutes} min · {lesson.steps.length} steps
+      </p>
+      <p class="lede">{lesson.intro}</p>
+
+      {safety.fire && (
+        <aside class="safety" aria-label="Fire safety">
+          <strong>Fire safety.</strong> {safety.fire}
+        </aside>
+      )}
+      {safety.herbs && safety.herbs.length > 0 && (
+        <aside class="safety" aria-label="Herb safety">
+          <strong>Herbs in this lesson.</strong>
+          <ul>
+            {safety.herbs.map((h) => (
+              <li>
+                {h.name}: <span class:list={["herb", h.safety]}>{BADGE[h.safety]}</span>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
+
+      <p class="altar-soon">Rehearsing at the altar is coming soon. Until then, read it through:</p>
+      <ol class="steps">
+        {lesson.steps.map((s) => (
+          <li>
+            <p class="prompt">{s.prompt}</p>
+            <p class="why">{s.why}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+</Page>
+
+<script>
+  import { setupPreview } from "../../lib/preview";
+  setupPreview();
+</script>
+
+<style>
+  .grimoire:not(.preview) .body,
+  .grimoire.preview .pending {
+    display: none;
+  }
+  .crumb {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .meta {
+    color: var(--glow);
+  }
+  .lede {
+    font-size: 1.1rem;
+  }
+  .pending,
+  .draft-note,
+  .altar-soon {
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  .safety {
+    margin: 1rem 0;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border-left: 4px solid var(--glow);
+    background: rgb(246 217 122 / 0.08);
+  }
+  .safety ul {
+    margin: 0.4rem 0 0;
+  }
+  .herb.do-not-use {
+    color: #ff9d9d;
+    font-weight: 700;
+  }
+  .steps li {
+    margin-bottom: 1rem;
+  }
+  .prompt {
+    margin: 0;
+    font-weight: 600;
+  }
+  .why {
+    margin: 0.2rem 0 0;
+    color: var(--mist);
+    font-style: italic;
+  }
+</style>
