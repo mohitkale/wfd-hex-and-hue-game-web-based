@@ -66,6 +66,8 @@ export const elementsWelcome: GrimoireEntry = {
     ],
   },
   topics: ["elements", "circle"],
-  safety: {},
+  safety: {
+    fire: "This lesson only places a candle, it does not light it. Whenever you do light one: use a sturdy holder on a heat-proof surface, keep it clear of hair, sleeves, paper and curtains, and never leave a flame alone.",
+  },
   review: { status: "draft" },
 };

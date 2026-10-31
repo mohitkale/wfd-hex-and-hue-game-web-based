@@ -1,17 +1,19 @@
 ---
 import Page from "../../layouts/Page.astro";
-import { BRANCH_INFO, GRIMOIRE, isReviewed, lessonUrl, lessonsByBranch } from "../../lib/grimoire";
+import {
+  BRANCH_INFO,
+  builtLessons,
+  isReviewed,
+  lessonUrl,
+  lessonsByBranch,
+} from "../../lib/grimoire";
 
-const groups = lessonsByBranch(GRIMOIRE);
-const reviewed = GRIMOIRE.filter(isReviewed).length;
-const dev = import.meta.env.DEV;
+// A production build holds reviewed lessons only; development and preview builds add the drafts.
+const lessons = builtLessons();
+const groups = lessonsByBranch(lessons);
+const drafts = lessons.some((e) => !isReviewed(e));
 const panelLessons = JSON.stringify(
-  GRIMOIRE.map((e) => ({
-    id: e.lesson.id,
-    branch: e.lesson.branch,
-    title: e.lesson.title,
-    reviewed: isReviewed(e),
-  })),
+  lessons.map((e) => ({ id: e.lesson.id, branch: e.lesson.branch, title: e.lesson.title })),
 );
 const branchNames = JSON.stringify(
   Object.fromEntries(Object.entries(BRANCH_INFO).map(([k, v]) => [k, v.name])),
@@ -23,28 +25,32 @@ const branchNames = JSON.stringify(
   description="Learn rituals, correspondences and the moon by doing them, step by step, on a pixel altar. Free, private and offline."
   offline
 >
-  <div data-grimoire class:list={["grimoire", { preview: dev }]}>
+  <div class="grimoire">
     <h1>The Grimoire</h1>
     <p class="lede">
       Learn by doing, then by knowing why. Rehearse a ritual on the altar with your familiar, step
       by step; a wrong move only earns a gentle hint. Everything you practise stays on your device.
     </p>
 
-    <p class="soon" class:list={{ hidden: reviewed > 0 }}>
-      The first lessons are with practitioners for review. They will appear here as soon as they are
-      checked.
-    </p>
-    <p class="draft-note">
-      Preview: lessons marked <span class="badge">Draft</span> are not yet reviewed and are hidden
-      from players.
-    </p>
+    {lessons.length === 0 && (
+      <p class="note">
+        The first lessons are with practitioners for review. They will appear here as soon as they
+        are checked.
+      </p>
+    )}
+    {drafts && (
+      <p class="note">
+        Preview build: lessons marked <span class="badge">Draft</span> are not yet reviewed and are
+        left out of the production site.
+      </p>
+    )}
 
     <section
       class="path"
       aria-labelledby="path-title"
       data-path
       data-lessons={panelLessons}
-      data-branches={branchNames}
+      data-branch-names={branchNames}
       hidden
     >
       <h2 id="path-title">Your path</h2>
@@ -67,15 +73,12 @@ const branchNames = JSON.stringify(
     </section>
 
     {groups.map((g) => (
-      <section
-        class:list={["branch", { draft: g.entries.every((e) => !isReviewed(e)) }]}
-        id={g.branch}
-      >
+      <section class="branch" id={g.branch}>
         <h2>{g.name}</h2>
         <p class="blurb">{g.blurb}</p>
         <ul class="lessons">
           {g.entries.map((e) => (
-            <li class:list={["lesson", { draft: !isReviewed(e) }]}>
+            <li class="lesson">
               <a href={lessonUrl(e.lesson.id)}>
                 <span class="title">{e.lesson.title}</span>
                 <span class="meta">
@@ -98,8 +101,6 @@ const branchNames = JSON.stringify(
 
 <script>
   import { setupPathPanel } from "../../lib/pathPanel";
-  import { setupPreview } from "../../lib/preview";
-  setupPreview();
   const panel = document.querySelector<HTMLElement>("[data-path]");
   if (panel) setupPathPanel(panel);
 </script>
@@ -109,14 +110,7 @@ const branchNames = JSON.stringify(
     font-size: 1.1rem;
     color: var(--mist);
   }
-  .grimoire:not(.preview) .draft,
-  .grimoire:not(.preview) .draft-note,
-  .grimoire.preview .soon,
-  .hidden {
-    display: none;
-  }
-  .soon,
-  .draft-note {
+  .note {
     padding: 14px 18px;
     border-radius: 14px;
     background: rgb(42 22 80 / 0.6);

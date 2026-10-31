@@ -1,6 +1,13 @@
 import type { GrimoireEntry } from "@hexhue/learn";
 import { describe, expect, it } from "vitest";
-import { GRIMOIRE, lessonsByBranch, lessonUrl } from "./grimoire";
+import {
+  GRIMOIRE,
+  builtLessons,
+  isReviewed,
+  lessonsByBranch,
+  lessonUrl,
+  previewBuild,
+} from "./grimoire";
 
 const at = (id: string, branch: GrimoireEntry["lesson"]["branch"]): GrimoireEntry => ({
   ...GRIMOIRE[0]!,
@@ -15,6 +22,14 @@ describe("grimoire helpers", () => {
       ["moon", ["b", "c"]],
     ]);
     expect(groups[0]!.name).toBe("Elements");
+  });
+
+  it("builds drafts only in development and preview builds", () => {
+    expect(previewBuild(true, undefined)).toBe(true);
+    expect(previewBuild(false, "1")).toBe(true);
+    expect(previewBuild(false, undefined)).toBe(false);
+    expect(builtLessons(false).every(isReviewed)).toBe(true);
+    expect(builtLessons(true)).toEqual(GRIMOIRE);
   });
 
   it("puts every lesson under its directory URL", () => {

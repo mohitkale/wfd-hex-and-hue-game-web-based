@@ -41,6 +41,9 @@ export class Button extends Phaser.GameObjects.Container {
         color: primary ? "#1a0f33" : theme.text,
       })
       .setOrigin(0.5);
+    // A long label on a narrow pill (three to a shelf on a 320 px phone) shrinks to fit.
+    const room = width - 2 * 12 * dpr;
+    if (text.width > room) text.setScale(room / text.width);
     this.add([bg, text]);
     this.setSize(width, height);
     this.setInteractive({ useHandCursor: true });

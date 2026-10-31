@@ -1,4 +1,10 @@
-import { BRANCHES, isReviewed, type Branch, type GrimoireEntry } from "@hexhue/learn";
+import {
+  BRANCHES,
+  isReviewed,
+  visibleEntries,
+  type Branch,
+  type GrimoireEntry,
+} from "@hexhue/learn";
 import { GRIMOIRE } from "../../../../content/grimoire";
 
 /** The Path's branches as the Grimoire shows them. */
@@ -28,5 +34,23 @@ export function lessonsByBranch(entries: readonly GrimoireEntry[] = GRIMOIRE): B
 }
 
 export const lessonUrl = (id: string) => `/grimoire/${id}/`;
+
+/**
+ * Whether this build includes drafts: `astro dev`, or a preview build (`GRIMOIRE_PREVIEW=1`, set
+ * for Netlify deploy previews in netlify.toml). A production build has reviewed lessons only, so an
+ * unreviewed lesson never reaches a player's page, share preview or offline cache.
+ */
+export function previewBuild(
+  dev: boolean = import.meta.env.DEV,
+  env: string | undefined = typeof process === "undefined"
+    ? undefined
+    : process.env.GRIMOIRE_PREVIEW,
+): boolean {
+  return dev || env === "1";
+}
+
+/** The lessons this build contains. */
+export const builtLessons = (preview: boolean = previewBuild()): GrimoireEntry[] =>
+  visibleEntries(GRIMOIRE, preview);
 
 export { GRIMOIRE, isReviewed };

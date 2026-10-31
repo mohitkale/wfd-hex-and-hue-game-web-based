@@ -20,7 +20,9 @@ export function setupPwa(): void {
     return;
   }
   // Only the game and the Grimoire register the worker, so landing / blog visitors don't download
-  // the game.
+  // the game. A Grimoire reader does download it (the Grimoire is part of the offline app, one tap
+  // from the home map), and a Grimoire edit changes the worker version, so players see the usual
+  // "new version" offer for lesson changes too.
   if (!("offline" in document.body.dataset)) return;
   window.addEventListener("load", () => void register());
 }

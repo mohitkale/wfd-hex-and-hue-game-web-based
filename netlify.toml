@@ -11,3 +11,8 @@
 
 # Caching and security headers live in apps/web/public/_headers (shared with deploy/nginx, and
 # checked to match by tools/deploy/headers.test.ts). 404s use the built 404.html automatically.
+
+# Deploy previews build the Grimoire's draft lessons too, for the owner and reviewers; production
+# builds hold reviewed lessons only (apps/web/src/lib/grimoire.ts).
+[context.deploy-preview.environment]
+  GRIMOIRE_PREVIEW = "1"

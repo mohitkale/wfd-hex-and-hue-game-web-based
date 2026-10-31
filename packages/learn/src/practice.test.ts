@@ -52,6 +52,12 @@ describe("practice save", () => {
     expect(save.days).toEqual(["2026-11-01", "2026-11-05"]);
   });
 
+  it("ignores a finish with a broken day, so nothing is stored that a load would drop", () => {
+    const save = recordFinish(emptyPractice(), "a", "2026-11-01");
+    expect(recordFinish(save, "a", "1/11/2026")).toBe(save);
+    expect(recordFinish(save, "__proto__", "2026-11-02")).toBe(save);
+  });
+
   it("clears a finished run", () => {
     const run = { ...startLesson(lesson), step: 1, finished: true };
     expect(saveRun(emptyPractice(), run).runs).toEqual({});
@@ -61,17 +67,22 @@ describe("practice save", () => {
     expect(parsePractice(null)).toEqual(emptyPractice());
     expect(parsePractice({ version: 2 })).toEqual(emptyPractice());
     const run = startLesson(lesson);
-    const parsed = parsePractice({
-      version: 1,
-      finished: {
-        good: { first: "2026-11-01", times: 2 },
-        zero: { first: "2026-11-01", times: 0 },
-        badDay: { first: "yesterday", times: 1 },
-        __proto__: { first: "2026-11-01", times: 1 },
-      },
-      days: ["2026-11-02", "2026-11-01", "2026-11-01", 5],
-      runs: { "four-elements": run, other: run, broken: { lesson: "broken" } },
-    });
+    // Built from JSON, as a crafted import file would be: `__proto__` is then an own key.
+    const parsed = parsePractice(
+      JSON.parse(
+        JSON.stringify({
+          version: 1,
+          finished: {
+            good: { first: "2026-11-01", times: 2 },
+            zero: { first: "2026-11-01", times: 0 },
+            badDay: { first: "yesterday", times: 1 },
+            proto: { first: "2026-11-01", times: 1 },
+          },
+          days: ["2026-11-02", "2026-11-01", "2026-11-01", 5],
+          runs: { "four-elements": run, other: run, broken: { lesson: "broken" } },
+        }).replace('"proto"', '"__proto__"'),
+      ),
+    );
     expect(parsed).toEqual({
       version: 1,
       finished: { good: { first: "2026-11-01", times: 2 } },

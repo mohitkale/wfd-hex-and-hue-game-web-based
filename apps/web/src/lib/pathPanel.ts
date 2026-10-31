@@ -11,30 +11,30 @@ interface PanelLesson {
   id: string;
   branch: Branch;
   title: string;
-  reviewed: boolean;
 }
+
+/** Practice files are small; anything bigger is not one. */
+const MAX_FILE_BYTES = 1024 * 1024;
 
 /**
  * "Your path" on the Grimoire hub: practice days, each branch's lessons as lit or unlit nodes, and
- * export / import of the practice file. Reads the lesson list from the panel's `data-lessons`.
+ * export / import of the practice file. Reads the lessons this build contains from `data-lessons`.
  */
 export function setupPathPanel(root: HTMLElement): void {
   const lessons = JSON.parse(root.dataset.lessons ?? "[]") as PanelLesson[];
-  const names = JSON.parse(root.dataset.branches ?? "{}") as Record<string, string>;
-  const preview = root.closest(".grimoire")?.classList.contains("preview") ?? false;
-  const visible = lessons.filter((l) => preview || l.reviewed);
+  const names = JSON.parse(root.dataset.branchNames ?? "{}") as Record<string, string>;
   const days = root.querySelector<HTMLElement>("[data-days]");
   const list = root.querySelector<HTMLElement>("[data-branches]");
   const status = root.querySelector<HTMLElement>("[data-status]");
   if (!days || !list || !status) return;
-  root.hidden = visible.length === 0;
+  root.hidden = lessons.length === 0;
 
   const render = () => {
     const save = loadPractice();
     const n = practiceDays(save);
     days.textContent = n === 1 ? "1 practice day" : `${n} practice days`;
     list.replaceChildren(
-      ...pathProgress(visible, save).map((b) => {
+      ...pathProgress(lessons, save).map((b) => {
         const li = document.createElement("li");
         const name = document.createElement("span");
         name.className = "branch-name";
@@ -69,6 +69,10 @@ export function setupPathPanel(root: HTMLElement): void {
     const chosen = file.files?.[0];
     file.value = "";
     if (!chosen) return;
+    if (chosen.size > MAX_FILE_BYTES) {
+      status.textContent = "That file is too big to be a practice file.";
+      return;
+    }
     const out = importPractice(loadPractice(), await chosen.text());
     if (!out.ok) {
       status.textContent = out.error;

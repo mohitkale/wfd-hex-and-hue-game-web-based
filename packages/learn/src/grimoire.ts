@@ -4,14 +4,17 @@
  * applies to everything in `content/grimoire/` (docs/V3_PLAN.md, "Principles for v3"):
  *
  * - the lesson is structurally sound (`checkLesson`);
- * - a lesson with flame (a candle or fire topic, or a light or snuff step) carries fire safety;
- * - every herb a lesson uses has a safety badge, and a herb marked "do-not-use" is never handled;
+ * - a lesson with a flame (a candle or fire topic, a light or snuff step, or a candle, incense or
+ *   other flame item) carries fire safety;
+ * - every herb has a safety badge: in a herbs or herbs-and-stones lesson every handled item is a
+ *   listed herb or a listed tool, and a "do-not-use" herb is never handled or taught as an answer;
  * - no closed-practice topic appears anywhere in the text;
  * - a review record exists, and a reviewed lesson names its reviewer and date.
  *
- * A draft is only shown in development or with `?preview=1`; players see reviewed lessons only.
+ * Drafts are built only into development and preview builds (`GRIMOIRE_PREVIEW=1`, set for Netlify
+ * deploy previews); a production build contains reviewed lessons only.
  */
-import { checkLesson, type Lesson } from "./lesson";
+import { checkLesson, type Action, type Lesson } from "./lesson";
 
 export const TOPICS = [
   "circle",
@@ -60,14 +63,20 @@ export interface GrimoireEntry {
     /** Fire safety, shown before the lesson starts; required for any lesson with a flame. */
     readonly fire?: string;
     readonly herbs?: readonly Herb[];
+    /**
+     * Items a herbs or herbs-and-stones lesson handles that are not herbs (a bowl, a crystal, a
+     * cloth), so that in those lessons nothing unlisted, and so unbadged, is handled.
+     */
+    readonly tools?: readonly string[];
   };
   readonly review: Review;
 }
 
 /**
  * Closed or initiatory practices the Grimoire does not teach (docs/V3_PLAN.md). Matched as whole
- * words, ignoring case and accents. White sage smudging is included: it is a closed Indigenous
- * practice for many nations, and the open alternatives (incense, sound, a broom) are taught instead.
+ * words, ignoring case, accents, hyphens and underscores; a trailing `*` matches any ending (smudge,
+ * smudged, smudging). White sage smudging is included: it is a closed Indigenous practice for many
+ * nations, and the open alternatives (incense, sound, a broom) are taught instead.
  */
 export const CLOSED_TERMS = [
   "hoodoo",
@@ -81,8 +90,7 @@ export const CLOSED_TERMS = [
   "quimbanda",
   "candomble",
   "obeah",
-  "smudge",
-  "smudging",
+  "smudg*",
   "white sage",
   "orisha",
   "loa",
@@ -90,43 +98,75 @@ export const CLOSED_TERMS = [
 ] as const;
 
 function plain(text: string): string {
-  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[-_]/g, " ");
 }
 
-/** Closed-practice terms found in `text`. */
+/** Closed-practice words found in `text`, as written there (lower case, accents dropped). */
 export function closedTermsIn(text: string): string[] {
   const t = plain(text);
-  return CLOSED_TERMS.filter((term) => new RegExp(`(^|[^a-z])${term}([^a-z]|$)`).test(t));
+  return CLOSED_TERMS.flatMap((term) => {
+    const word = term.endsWith("*") ? `${term.slice(0, -1)}[a-z]*` : term;
+    const found = new RegExp(`(?:^|[^a-z])(${word})(?:[^a-z]|$)`).exec(t);
+    return found?.[1] ? [found[1]] : [];
+  });
 }
 
-/** Every piece of text a learner reads in the entry. */
+/** The names an action carries (items, spots, paths, shapes, options). */
+function actionNames(a: Action): string[] {
+  switch (a.kind) {
+    case "place":
+      return [a.item, a.spot];
+    case "light":
+    case "snuff":
+      return [a.item];
+    case "walk":
+      return [a.path];
+    case "trace":
+      return [a.shape];
+    case "choose":
+      return [a.option];
+    case "breathe":
+    case "continue":
+      return [];
+  }
+}
+
+/** Every piece of text in the entry; ids too, since the altar can show them as labels. */
 export function entryText(entry: GrimoireEntry): string {
   const l = entry.lesson;
   return [
     l.title,
     l.intro,
-    ...l.steps.flatMap((s) => [s.prompt, s.hint, s.why]),
+    ...l.steps.flatMap((s) => [s.prompt, s.hint, s.why, ...s.expects.flatMap(actionNames)]),
     entry.safety.fire ?? "",
-    ...(entry.safety.herbs ?? []).map((h) => h.name),
+    ...(entry.safety.herbs ?? []).flatMap((h) => [h.name, h.item]),
+    ...(entry.safety.tools ?? []),
   ].join("\n");
 }
 
-/** Item ids the lesson handles (places, lights, snuffs). */
+/** Items the lesson handles or teaches as an answer: places, lights, snuffs and chosen options. */
 function handledItems(lesson: Lesson): Set<string> {
   const items = new Set<string>();
   for (const s of lesson.steps) {
     for (const a of s.expects) {
       if (a.kind === "place" || a.kind === "light" || a.kind === "snuff") items.add(a.item);
+      if (a.kind === "choose") items.add(a.option);
     }
   }
   return items;
 }
 
+/** Item names that mean a flame or smoke, whatever the lesson's topics say. */
+const FLAME_ITEM = /candle|incense|charcoal|flame|match|lighter|taper|torch|bonfire/;
+
 export function hasFlame(entry: GrimoireEntry): boolean {
   return (
     entry.topics.includes("candle") ||
     entry.topics.includes("fire") ||
-    entry.lesson.steps.some((s) => s.expects.some((a) => a.kind === "light" || a.kind === "snuff"))
+    entry.lesson.steps.some((s) =>
+      s.expects.some((a) => a.kind === "light" || a.kind === "snuff"),
+    ) ||
+    [...handledItems(entry.lesson)].some((item) => FLAME_ITEM.test(plain(item)))
   );
 }
 
@@ -147,6 +187,14 @@ export function checkEntry(entry: GrimoireEntry): string[] {
     problems.push('a "herbs" lesson must list its herbs with safety badges');
   }
   const handled = handledItems(entry.lesson);
+  if (entry.topics.includes("herbs") || entry.lesson.branch === "herbs-stones") {
+    const known = new Set([...herbs.map((h) => h.item), ...(entry.safety.tools ?? [])]);
+    for (const item of handled) {
+      if (!known.has(item)) {
+        problems.push(`"${item}" is neither a listed herb (with a safety badge) nor a listed tool`);
+      }
+    }
+  }
   for (const h of herbs) {
     if (!HERB_SAFETY.includes(h.safety)) problems.push(`herb "${h.item}" has no safety badge`);
     if (!h.name.trim()) problems.push(`herb "${h.item}" has no name`);
@@ -186,7 +234,7 @@ export function isReviewed(entry: GrimoireEntry): boolean {
   return entry.review.status === "reviewed";
 }
 
-/** What a learner may see: reviewed lessons, plus drafts in development or preview. */
+/** What a build contains: reviewed lessons, plus drafts in development and preview builds. */
 export function visibleEntries(
   entries: readonly GrimoireEntry[],
   preview: boolean,

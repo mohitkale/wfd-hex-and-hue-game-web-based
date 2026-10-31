@@ -81,8 +81,13 @@ export function saveRun(save: PracticeSave, run: LessonRun): PracticeSave {
   return { ...save, runs };
 }
 
-/** A lesson finished on `day`: counted, its run cleared, the day marked as a practice day. */
+/**
+ * A lesson finished on `day`: counted, its run cleared, the day marked as a practice day. A day
+ * that is not `YYYY-MM-DD` (a caller bug) changes nothing, rather than storing a finish the next
+ * load would drop.
+ */
 export function recordFinish(save: PracticeSave, lesson: string, day: string): PracticeSave {
+  if (!isDay(day) || !isId(lesson)) return save;
   const was = save.finished[lesson];
   const finished = {
     ...save.finished,

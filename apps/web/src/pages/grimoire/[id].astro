@@ -1,10 +1,11 @@
 ---
 import type { GrimoireEntry } from "@hexhue/learn";
 import Page from "../../layouts/Page.astro";
-import { BRANCH_INFO, GRIMOIRE, isReviewed } from "../../lib/grimoire";
+import { BRANCH_INFO, builtLessons, isReviewed } from "../../lib/grimoire";
 
+// Drafts get a page only in development and preview builds (lib/grimoire.ts).
 export function getStaticPaths() {
-  return GRIMOIRE.map((entry) => ({ params: { id: entry.lesson.id }, props: { entry } }));
+  return builtLessons().map((entry) => ({ params: { id: entry.lesson.id }, props: { entry } }));
 }
 
 interface Props {
@@ -13,7 +14,6 @@ interface Props {
 const { entry } = Astro.props;
 const { lesson, safety } = entry;
 const reviewed = isReviewed(entry);
-const dev = import.meta.env.DEV;
 const BADGE = {
   "kitchen-safe": "Safe to cook with",
   "external-only": "External use only",
@@ -23,24 +23,15 @@ const BADGE = {
 
 <Page
   title={`${lesson.title} · The Grimoire · Hex & Hue`}
-  description={lesson.intro}
+  description={reviewed ? lesson.intro : "A Grimoire lesson in review."}
   noindex={!reviewed}
   offline
 >
-  <div data-grimoire class:list={["grimoire", { preview: reviewed || dev }]}>
+  <div class="grimoire">
     <p class="crumb">
       <a href="/grimoire/">The Grimoire</a> · {BRANCH_INFO[lesson.branch].name}
     </p>
     <h1>{lesson.title}</h1>
-
-    <div class="pending">
-      <p>
-        This lesson is still with a practitioner for review. It will open here once it is checked.
-      </p>
-      <p>
-        <a href="/grimoire/">Back to the Grimoire</a>
-      </p>
-    </div>
 
     <div class="body">
       {!reviewed && <p class="draft-note">Draft: not yet reviewed by a practitioner.</p>}
@@ -80,16 +71,7 @@ const BADGE = {
   </div>
 </Page>
 
-<script>
-  import { setupPreview } from "../../lib/preview";
-  setupPreview();
-</script>
-
 <style>
-  .grimoire:not(.preview) .body,
-  .grimoire.preview .pending {
-    display: none;
-  }
   .crumb {
     color: var(--mist);
     font-size: 0.9rem;
@@ -100,7 +82,6 @@ const BADGE = {
   .lede {
     font-size: 1.1rem;
   }
-  .pending,
   .draft-note,
   .altar-soon {
     padding: 14px 18px;

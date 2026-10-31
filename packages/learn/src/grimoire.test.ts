@@ -41,6 +41,7 @@ const entry: GrimoireEntry = {
   safety: {
     fire: "Never leave a flame alone; keep it clear of hair, cloth and paper.",
     herbs: [{ item: "rosemary", name: "Rosemary", safety: "kitchen-safe" }],
+    tools: ["candle"],
   },
   review: { status: "reviewed", by: "A. Practitioner", date: "2026-11-01" },
 };
@@ -67,6 +68,7 @@ describe("checkEntry", () => {
       ...entry,
       safety: {
         fire: "Care.",
+        tools: ["candle"],
         herbs: [
           { item: "rosemary", name: "Rosemary", safety: "do-not-use" },
           { item: "x", name: "", safety: "nope" as "kitchen-safe" },
@@ -77,6 +79,86 @@ describe("checkEntry", () => {
       'herb "rosemary" is marked do-not-use but a step handles it',
       'herb "x" has no safety badge',
       'herb "x" has no name',
+    ]);
+  });
+
+  it("never teaches a toxic herb as an answer", () => {
+    const quiz: GrimoireEntry = {
+      ...entry,
+      topics: ["herbs"],
+      lesson: {
+        ...lesson,
+        steps: [
+          {
+            ...lesson.steps[0]!,
+            expects: [{ kind: "choose", option: "foxglove" }],
+          },
+        ],
+      },
+      safety: { herbs: [{ item: "foxglove", name: "Foxglove", safety: "do-not-use" }] },
+    };
+    expect(checkEntry(quiz)).toEqual([
+      'herb "foxglove" is marked do-not-use but a step handles it',
+    ]);
+  });
+
+  it("badges every herb a herbs-and-stones lesson handles, whatever its topics", () => {
+    const sneaky: GrimoireEntry = {
+      ...entry,
+      topics: ["crystals"],
+      lesson: {
+        ...lesson,
+        branch: "herbs-stones",
+        steps: [
+          {
+            ...lesson.steps[0]!,
+            expects: [{ kind: "place", item: "mugwort", spot: "bowl" }],
+          },
+        ],
+      },
+      safety: { tools: ["quartz"] },
+    };
+    expect(checkEntry(sneaky)).toEqual([
+      '"mugwort" is neither a listed herb (with a safety badge) nor a listed tool',
+    ]);
+  });
+
+  it("treats a flame item as a flame without a candle topic", () => {
+    const incense: GrimoireEntry = {
+      ...entry,
+      topics: ["meditation"],
+      lesson: {
+        ...lesson,
+        steps: [
+          {
+            ...lesson.steps[0]!,
+            expects: [{ kind: "place", item: "incense-stick", spot: "east" }],
+          },
+        ],
+      },
+      safety: {},
+    };
+    expect(hasFlame(incense)).toBe(true);
+    expect(checkEntry(incense)).toEqual(["a lesson with a flame needs fire safety"]);
+  });
+
+  it("reads action ids for closed practices too", () => {
+    const ids: GrimoireEntry = {
+      ...entry,
+      lesson: {
+        ...lesson,
+        steps: [
+          { ...lesson.steps[0]!, expects: [{ kind: "place", item: "white-sage", spot: "altar" }] },
+          lesson.steps[1]!,
+        ],
+      },
+      safety: {
+        ...entry.safety,
+        herbs: [{ item: "white-sage", name: "Sage", safety: "external-only" }],
+      },
+    };
+    expect(checkEntry(ids)).toEqual([
+      'mentions "white sage", a closed practice the Grimoire does not teach',
     ]);
   });
 
@@ -116,7 +198,8 @@ describe("closedTermsIn", () => {
   it("matches whole words, ignoring case and accents", () => {
     expect(closedTermsIn("Santería and VOODOO")).toEqual(["voodoo", "santeria"]);
     expect(closedTermsIn("a burning bundle of white sage")).toEqual(["white sage"]);
-    expect(closedTermsIn("a floating balloon, a smudged page")).toEqual([]);
+    expect(closedTermsIn("a smudged page and white_sage")).toEqual(["smudged", "white sage"]);
+    expect(closedTermsIn("a floating balloon, a loaf, lawn")).toEqual([]);
   });
 });
 
