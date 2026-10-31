@@ -231,7 +231,7 @@ _The pieces every v3 feature stands on._
 - [ ] **M18.4** Card decks and spaced repetition — deck model, match games, gentle review schedule; cards earned by learning only. _Needs M16.4._
 - [ ] **M18.5** Demo: the Crystals deck (12 cards). _Needs M18.4._
 - [ ] **M18.6** Demo: the Kitchen Herbs deck (12 cards, every one with a safety badge). _Needs M18.4._
-- [ ] **M18.7** Demo evaluation **(human gate V2)** — owner evaluates every demo so far and picks what comes next. _Needs M17.5, M18.2, M18.3, M18.5, M18.6._
+- [ ] **M18.7** Demo evaluation **(human gate V2)** — owner evaluates every demo so far and picks what comes next. _Needs M17.5, M18.2, M18.3, M18.5, M18.6._ Box ticked only on the owner's approval.
 
 ## Later (post-MVP, not scheduled)
 

@@ -8,6 +8,7 @@ export {
   checkLesson,
   lessonProgress,
   lessonSummary,
+  resumeLesson,
   sameAction,
   startLesson,
   type Action,

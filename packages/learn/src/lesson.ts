@@ -105,12 +105,36 @@ export function sameAction(wanted: Action, got: Action): boolean {
   }
 }
 
+/**
+ * A saved run checked against the lesson it is resumed on. Lessons change after review, so a run
+ * that no longer fits (another lesson, a step or action index past the end, a different number of
+ * steps) starts the lesson again rather than leaving the learner stuck.
+ */
+export function resumeLesson(lesson: Lesson, run: LessonRun): LessonRun {
+  const n = lesson.steps.length;
+  const step = lesson.steps[run.step];
+  const actions = step?.expects.length ?? 0;
+  const fits =
+    run.lesson === lesson.id &&
+    Number.isInteger(run.step) &&
+    run.step >= 0 &&
+    run.step <= n &&
+    run.finished === (run.step === n) &&
+    run.tries.length === n &&
+    run.tries.every((t) => Number.isInteger(t) && t >= 0) &&
+    new Set(run.doneInStep).size === run.doneInStep.length &&
+    run.doneInStep.length < Math.max(actions, 1) &&
+    run.doneInStep.every((i) => Number.isInteger(i) && i >= 0 && i < actions);
+  return fits ? run : startLesson(lesson);
+}
+
 /** Applies one move. Never throws on a wrong or late move; the run is returned unchanged then. */
 export function act(
   lesson: Lesson,
-  run: LessonRun,
+  saved: LessonRun,
   action: Action,
 ): { run: LessonRun; reply: Reply } {
+  const run = resumeLesson(lesson, saved);
   const step = lesson.steps[run.step];
   if (run.finished || !step) return { run, reply: { kind: "done" } };
 
@@ -138,11 +162,12 @@ export function act(
 }
 
 /** Share of the lesson's actions done, 0…1, for a progress ring. */
-export function lessonProgress(lesson: Lesson, run: LessonRun): number {
+export function lessonProgress(lesson: Lesson, saved: LessonRun): number {
+  const run = resumeLesson(lesson, saved);
   const total = lesson.steps.reduce((n, s) => n + s.expects.length, 0);
   if (run.finished || total === 0) return 1;
   const before = lesson.steps.slice(0, run.step).reduce((n, s) => n + s.expects.length, 0);
-  return (before + run.doneInStep.length) / total;
+  return Math.min(1, (before + run.doneInStep.length) / total);
 }
 
 export interface StepSummary {
@@ -186,17 +211,23 @@ export function checkLesson(lesson: Lesson): string[] {
     if (s.expects.some((a) => a.kind === "continue") && s.expects.length > 1) {
       problems.push(`${at(s)} mixes "continue" with other actions`);
     }
+    if (s.order !== "in-order" && s.order !== "any-order") {
+      problems.push(`${at(s)} has an unknown order "${String(s.order)}"`);
+    }
     for (const a of s.expects) {
+      const ids = Object.entries(a).filter(([k]) => k !== "kind" && k !== "breaths");
+      if (ids.some(([, v]) => typeof v !== "string" || !v.trim())) {
+        problems.push(`${at(s)} has a ${a.kind} action with a blank name`);
+      }
       if (a.kind === "breathe" && !(Number.isInteger(a.breaths) && a.breaths >= 1)) {
         problems.push(`${at(s)} asks for a breath count that is not a whole number of 1 or more`);
       }
     }
     // Two wanted actions that the same move would satisfy can never be told apart.
-    s.expects.forEach((a, i) => {
-      if (s.expects.slice(i + 1).some((b) => sameAction(a, b) || sameAction(b, a))) {
-        problems.push(`${at(s)} expects the same action twice`);
-      }
-    });
+    const twice = s.expects.some((a, i) =>
+      s.expects.slice(i + 1).some((b) => sameAction(a, b) || sameAction(b, a)),
+    );
+    if (twice) problems.push(`${at(s)} expects the same action twice`);
   }
   return problems;
 }

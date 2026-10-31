@@ -4,11 +4,13 @@ import {
   checkLesson,
   lessonProgress,
   lessonSummary,
+  resumeLesson,
   sameAction,
   startLesson,
   type Action,
   type Lesson,
   type LessonRun,
+  type Step,
 } from "./lesson";
 
 const lesson: Lesson = {
@@ -156,6 +158,45 @@ describe("lesson runner", () => {
   });
 });
 
+describe("resumeLesson", () => {
+  const fresh = startLesson(lesson);
+  const midway: LessonRun = { ...fresh, step: 1, doneInStep: [0], tries: [2, 0, 0] };
+
+  it("keeps a run that still fits the lesson", () => {
+    expect(resumeLesson(lesson, midway)).toBe(midway);
+    const done = { ...fresh, step: 3, finished: true };
+    expect(resumeLesson(lesson, done)).toBe(done);
+  });
+
+  it.each<[string, Partial<LessonRun>]>([
+    ["another lesson", { lesson: "other" }],
+    ["a step past the end", { step: 4 }],
+    ["a negative step", { step: -1 }],
+    ["finished out of step", { finished: true }],
+    ["fewer tries than steps (steps added)", { tries: [0, 0] }],
+    ["an action index past the step", { doneInStep: [2] }],
+    ["a repeated action index", { doneInStep: [0, 0] }],
+    ["the whole step marked done", { step: 0, doneInStep: [0, 1] }],
+  ])("starts again on %s", (_, change) => {
+    expect(resumeLesson(lesson, { ...midway, ...change })).toEqual(fresh);
+  });
+
+  it("never soft-locks or overdraws progress on a run from an edited lesson", () => {
+    const edited: Lesson = {
+      ...lesson,
+      steps: [
+        lesson.steps[0]!,
+        { ...lesson.steps[1]!, expects: [{ kind: "light", item: "east" }] },
+      ],
+    };
+    const stale: LessonRun = { ...fresh, step: 1, doneInStep: [0, 1], tries: [0, 0] };
+    expect(lessonProgress(edited, stale)).toBeLessThanOrEqual(1);
+    const out = act(edited, stale, { kind: "place", item: "feather", spot: "east" });
+    expect(out.reply).toEqual({ kind: "right", stepDone: false });
+    expect(out.run.step).toBe(0);
+  });
+});
+
 describe("sameAction", () => {
   it("compares every field of the move", () => {
     expect(sameAction({ kind: "light", item: "a" }, { kind: "snuff", item: "a" })).toBe(false);
@@ -178,6 +219,8 @@ describe("checkLesson", () => {
     const bad: Lesson = {
       ...lesson,
       id: " ",
+      title: "",
+      intro: " ",
       minutes: 0,
       branch: "nowhere" as Lesson["branch"],
       steps: [
@@ -198,10 +241,27 @@ describe("checkLesson", () => {
           ],
         },
         { ...step, id: "half", expects: [{ kind: "breathe", breaths: 1.5 }] },
+        { ...step, id: "", prompt: "" },
+        {
+          ...step,
+          id: "blank",
+          order: "sideways" as Step["order"],
+          expects: [
+            { kind: "light", item: "" },
+            { kind: "place", item: "bowl", spot: " " },
+          ],
+        },
+        {
+          ...step,
+          id: "thrice",
+          expects: [{ kind: "continue" }, { kind: "continue" }, { kind: "continue" }],
+        },
       ],
     };
     expect(checkLesson(bad)).toEqual([
       "lesson has no id",
+      "lesson has no title",
+      "lesson has no intro",
       'unknown branch "nowhere"',
       "minutes must be more than 0",
       'step "tools" has no hint',
@@ -211,6 +271,17 @@ describe("checkLesson", () => {
       'step "mixed" mixes "continue" with other actions',
       'step "twice" expects the same action twice',
       'step "half" asks for a breath count that is not a whole number of 1 or more',
+      "a step has no id",
+      'step "" has no prompt',
+      'step "blank" has an unknown order "sideways"',
+      'step "blank" has a light action with a blank name',
+      'step "blank" has a place action with a blank name',
+      'step "thrice" mixes "continue" with other actions',
+      'step "thrice" expects the same action twice',
     ]);
+  });
+
+  it("finds a lesson with no steps", () => {
+    expect(checkLesson({ ...lesson, steps: [] })).toEqual(["lesson has no steps"]);
   });
 });

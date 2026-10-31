@@ -1,4 +1,4 @@
-# Hex & Hue v3: the Grimoire (draft plan)
+# Hex & Hue v3: the Grimoire
 
 Status: **approved to start (2026-11-01).** M16–M18 are scheduled in `docs/ROADMAP.md`; the
 rest waits for the gate V2 evaluation. Every feature ships with at most **two demos** (topics) so it
@@ -59,7 +59,8 @@ element") with gentle spaced repetition, so what you learn stays.
 ### F3. Living Sky: moon and Wheel of the Year
 
 The real moon phase and sign, worked out on the device with no network (a deterministic astronomy
-routine in `core`, tested against published tables). Each phase has a small "moon quest"; each
+routine in `packages/learn`, tested against published tables; it takes the date as a parameter
+and the caller reads the clock, so the maths stays deterministic). Each phase has a small "moon quest"; each
 sabbat is a seasonal event with its own lesson, palette and a journey picture.
 
 - Demo 1: **Moon tracker and moon quests** (eight phases, one quest each).
@@ -152,7 +153,7 @@ Not scheduled until gate V2:
 
 ## Questions for the owner
 
-1. Which features to start with (the recommendation: F1, F3 and F2, in that order).
+1. ~~Which features to start with~~ Answered 2026-11-01: F1, then F3 and F2 (M16–M18).
 2. Who reviews the lessons as a practitioner (you, or someone you trust)?
 3. Is a backend (for example Supabase) acceptable later for F9, with the privacy work that implies?
 4. Any traditions you want named or left out, beyond the closed practices above?
