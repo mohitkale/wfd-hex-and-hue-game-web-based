@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { absolute, gallery, sitemapPaths } from "./site";
 
 describe("site helpers", () => {
+  it("keeps the board designs review page out of the sitemap", () => {
+    expect(sitemapPaths(["./designs.astro", "./faq.astro"])).toEqual(["/faq/"]);
+  });
+
   it("lists pages in canonical directory form, without 404 or dynamic routes", () => {
     expect(
       sitemapPaths([

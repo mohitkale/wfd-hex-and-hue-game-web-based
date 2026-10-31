@@ -79,10 +79,14 @@ export const ogCardUrl = (id: string) => `/og/${id}.png`;
  * Sitemap paths from page module paths ("./faq.astro", "./blog/index.astro"…): dynamic routes and
  * the 404 page left out, every page in its canonical directory form ("/faq/").
  */
+/** Pages for the owner only (direct link, never listed or indexed): the board designs review. */
+export const HIDDEN_PAGES: readonly string[] = ["/designs/"];
+
 export function sitemapPaths(files: readonly string[]): string[] {
   return files
     .map((f) => f.replace(/^\.\//, "/").replace(/\.(astro|md)$/, ""))
     .filter((p) => !p.includes("[") && !p.endsWith("/404"))
+    .filter((p) => !HIDDEN_PAGES.includes(`${p.replace(/\/index$/, "")}/`))
     .map((p) => (p.endsWith("/index") ? p.slice(0, -"index".length) : p))
     .map((p) => (p.endsWith("/") ? p : `${p}/`))
     .sort();
