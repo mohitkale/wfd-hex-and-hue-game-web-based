@@ -1,0 +1,95 @@
+---
+import Page from "../../../layouts/Page.astro";
+import { cardSvg } from "../../../lib/cardArt";
+import { builtDecks } from "../../../lib/grimoire";
+
+const decks = builtDecks();
+---
+
+<Page
+  title="Correspondence cards · The Grimoire · Hex & Hue"
+  description="Collect crystals and kitchen herbs as cards by matching them to what witches use them for. Earned by learning, never bought."
+  offline
+>
+  <p class="crumb">
+    <a href="/grimoire/">The Grimoire</a> · Cards
+  </p>
+  <h1>Correspondence cards</h1>
+  <p class="lede">
+    Earn each card by matching it to what many witches use it for. The ones you know come back for a
+    quick review every few days, so they stay learned. Nothing is lost for a wrong answer.
+  </p>
+  {decks.length === 0 && (
+    <p class="note">
+      The first decks are with practitioners for review. They will appear here soon.
+    </p>
+  )}
+  <ul class="decks">
+    {decks.map((d) => (
+      <li>
+        <a href={`/grimoire/cards/${d.id}/`}>
+          <span set:html={cardSvg(d.kind, d.cards[0]?.color ?? "#9b6ad6", 56)} />
+          <span class="name">{d.name}</span>
+          <span class="meta">
+            {d.cards.length} cards
+            {d.review.status !== "reviewed" && <span class="badge">Draft</span>}
+          </span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</Page>
+
+<style>
+  .crumb {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .lede {
+    color: var(--mist);
+  }
+  .note {
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  .decks {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .decks a {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 18px;
+    border-radius: 18px;
+    background: rgb(42 22 80 / 0.6);
+    color: var(--text);
+    text-decoration: none;
+    border: 1px solid rgb(201 184 255 / 0.12);
+  }
+  .decks a:hover,
+  .decks a:focus-visible {
+    border-color: var(--glow);
+  }
+  .name {
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+  .meta {
+    color: var(--glow);
+    font-size: 0.85rem;
+  }
+  .badge {
+    margin-left: 6px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--glow);
+    color: var(--night);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+</style>

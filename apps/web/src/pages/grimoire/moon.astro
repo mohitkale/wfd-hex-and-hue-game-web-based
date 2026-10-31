@@ -1,0 +1,211 @@
+---
+import Page from "../../layouts/Page.astro";
+import { builtMoonQuests, MOON_QUESTS } from "../../lib/grimoire";
+
+// Each phase's quest title, for the quests this build contains (drafts only in preview builds).
+const quests = builtMoonQuests();
+const titles = Object.fromEntries(
+  Object.entries(quests).map(([phase, id]) => [
+    phase,
+    { id, title: MOON_QUESTS[phase as keyof typeof MOON_QUESTS].lesson.title },
+  ]),
+);
+---
+
+<Page
+  title="Tonight's moon · The Grimoire · Hex & Hue"
+  description="The moon's phase, light and sign right now, the next new and full moons, and a small quest for tonight. Worked out on your device, offline."
+  offline
+>
+  <div class="sky" data-moon data-quests={JSON.stringify(titles)}>
+    <p class="crumb">
+      <a href="/grimoire/">The Grimoire</a> · Moon
+    </p>
+    <h1>Tonight's moon</h1>
+    <div class="now">
+      <svg class="disc" viewBox="0 0 100 100" role="img" aria-labelledby="moon-name">
+        <circle cx="50" cy="50" r="50" fill="#2a2140"></circle>
+        <path data-lit fill="#f6efd2"></path>
+      </svg>
+      <div>
+        <p class="phase" id="moon-name" data-phase>
+          Reading the sky…
+        </p>
+        <p class="facts" data-facts></p>
+        <p class="facts" data-sign></p>
+      </div>
+    </div>
+    <section class="quest" data-quest hidden>
+      <h2>Tonight's quest</h2>
+      <p>
+        <a data-quest-link></a>
+      </p>
+    </section>
+    <section>
+      <h2>Coming up</h2>
+      <ul class="next" data-next></ul>
+    </section>
+    <div class="hemisphere">
+      <span>You are in the</span>
+      <button type="button" data-hemisphere="north">
+        north
+      </button>
+      <button type="button" data-hemisphere="south">
+        south
+      </button>
+      <span>hemisphere</span>
+    </div>
+    <p class="note">
+      Worked out on this device from the date and time; nothing is sent anywhere. Moon signs follow
+      the tropical zodiac of modern western astrology.
+    </p>
+  </div>
+</Page>
+
+<script>
+  import { PHASE_NAMES, moonAt, nextPhases, type MainPhase } from "@hexhue/learn";
+  import { HEMISPHERE_KEY, dateText, moonPath, readHemisphere, whenText } from "../../lib/skyView";
+
+  const root = document.querySelector<HTMLElement>("[data-moon]");
+  if (root) {
+    const quests = JSON.parse(root.dataset.quests ?? "{}") as Record<
+      string,
+      { id: string; title: string }
+    >;
+    const store = (() => {
+      try {
+        return window.localStorage;
+      } catch {
+        return null;
+      }
+    })();
+    const draw = () => {
+      const now = new Date();
+      const moon = moonAt(now.getTime());
+      const south = readHemisphere(store) === "south";
+      const lit = root.querySelector<SVGPathElement>("[data-lit]");
+      lit?.setAttribute("d", moonPath(moon.elongation, 50));
+      // Seen from the southern hemisphere the moon is lit from the other side.
+      lit?.setAttribute("transform", south ? "matrix(-1 0 0 1 100 0)" : "");
+      root.querySelector("[data-phase]")!.textContent = PHASE_NAMES[moon.phase];
+      root.querySelector("[data-facts]")!.textContent =
+        `${Math.round(moon.illumination * 100)}% lit, ${moon.waxing ? "waxing" : "waning"}, about ${Math.round(moon.age)} days since the new moon`;
+      root.querySelector("[data-sign]")!.textContent = `Moon in ${moon.sign}`;
+      const quest = quests[moon.phase];
+      const box = root.querySelector<HTMLElement>("[data-quest]")!;
+      box.hidden = !quest;
+      if (quest) {
+        const a = box.querySelector<HTMLAnchorElement>("[data-quest-link]")!;
+        a.href = `/grimoire/${quest.id}/`;
+        a.textContent = quest.title;
+      }
+      const names: Record<MainPhase, string> = {
+        new: "New moon",
+        "first-quarter": "First quarter",
+        full: "Full moon",
+        "last-quarter": "Last quarter",
+      };
+      root.querySelector("[data-next]")!.replaceChildren(
+        ...nextPhases(now.getTime()).map((p) => {
+          const li = document.createElement("li");
+          const at = new Date(p.at);
+          li.innerHTML = `<strong></strong> <span></span>`;
+          li.querySelector("strong")!.textContent = names[p.phase];
+          li.querySelector("span")!.textContent = `${dateText(at, true)}, ${whenText(now, at)}`;
+          return li;
+        }),
+      );
+      for (const b of root.querySelectorAll<HTMLButtonElement>("[data-hemisphere]")) {
+        b.setAttribute(
+          "aria-pressed",
+          String(b.dataset.hemisphere === (south ? "south" : "north")),
+        );
+      }
+    };
+    for (const b of root.querySelectorAll<HTMLButtonElement>("[data-hemisphere]")) {
+      b.addEventListener("click", () => {
+        try {
+          store?.setItem(HEMISPHERE_KEY, b.dataset.hemisphere ?? "north");
+        } catch {
+          /* kept for this visit only */
+        }
+        draw();
+      });
+    }
+    draw();
+    setInterval(draw, 10 * 60 * 1000);
+  }
+</script>
+
+<style>
+  .crumb {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .now {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .disc {
+    width: 140px;
+    height: 140px;
+    filter: drop-shadow(0 0 24px rgb(246 239 210 / 0.35));
+  }
+  .phase {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+  .facts {
+    margin: 0.2rem 0 0;
+    color: var(--mist);
+  }
+  .quest {
+    margin: 1.5rem 0;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: rgb(246 217 122 / 0.1);
+    border: 1px solid rgb(246 217 122 / 0.4);
+  }
+  .quest h2 {
+    margin: 0 0 0.3rem;
+    font-size: 1.1rem;
+  }
+  .next {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .next span {
+    color: var(--mist);
+  }
+  .hemisphere {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+  .hemisphere button {
+    min-height: 44px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--mist);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .hemisphere button[aria-pressed="true"] {
+    background: var(--glow);
+    color: var(--night);
+    border-color: var(--glow);
+  }
+  .note {
+    color: var(--mist);
+    font-size: 0.85rem;
+  }
+</style>

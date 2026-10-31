@@ -7,5 +7,15 @@ import type { GrimoireEntry } from "@hexhue/learn";
 import { candleIntention } from "./candle";
 import { castingCircle } from "./circle";
 import { elementsWelcome } from "./elements";
+import { MOON_QUESTS } from "./moon";
+import { yule } from "./yule";
 
-export const GRIMOIRE: readonly GrimoireEntry[] = [elementsWelcome, castingCircle, candleIntention];
+export const GRIMOIRE: readonly GrimoireEntry[] = [
+  elementsWelcome,
+  castingCircle,
+  candleIntention,
+  ...Object.values(MOON_QUESTS),
+  yule,
+];
+
+export { MOON_QUESTS };

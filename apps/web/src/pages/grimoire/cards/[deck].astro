@@ -1,0 +1,154 @@
+---
+import type { Deck } from "@hexhue/learn";
+import Page from "../../../layouts/Page.astro";
+import { builtDecks } from "../../../lib/grimoire";
+
+// Draft decks get a page only in development and preview builds.
+export function getStaticPaths() {
+  return builtDecks().map((deck) => ({ params: { deck: deck.id }, props: { deck } }));
+}
+
+interface Props {
+  deck: Deck;
+}
+const { deck } = Astro.props;
+const draft = deck.review.status !== "reviewed";
+---
+
+<Page
+  title={`${deck.name} cards · The Grimoire · Hex & Hue`}
+  description={draft ? "A Grimoire card deck in review." : deck.intro}
+  noindex={draft}
+  offline
+>
+  <div class="deck" data-deck={JSON.stringify(deck)}>
+    <p class="crumb">
+      <a href="/grimoire/">The Grimoire</a> · <a href="/grimoire/cards/">Cards</a>
+    </p>
+    <h1>{deck.name}</h1>
+    {draft && <p class="draft-note">Draft: not yet reviewed by a practitioner.</p>}
+    <p class="lede">{deck.intro}</p>
+    <section class="practise">
+      <button type="button" class="start" data-start>
+        Practise a round
+      </button>
+      <div data-play></div>
+    </section>
+    <h2>Your collection</h2>
+    <p class="count" data-count></p>
+    <ul class="grid" data-grid></ul>
+  </div>
+</Page>
+
+<script>
+  import { setupCardGame } from "../../../lib/cardGame";
+  const root = document.querySelector<HTMLElement>("[data-deck]");
+  if (root) setupCardGame(root);
+</script>
+
+<style>
+  .crumb {
+    color: var(--mist);
+    font-size: 0.9rem;
+  }
+  .lede {
+    color: var(--mist);
+  }
+  .draft-note {
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgb(42 22 80 / 0.6);
+  }
+  .start,
+  .practise :global(.next) {
+    min-height: 48px;
+    padding: 10px 24px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--glow);
+    color: var(--night);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .practise :global(.question) {
+    margin-top: 1rem;
+    padding: 18px;
+    border-radius: 18px;
+    background: rgb(42 22 80 / 0.6);
+    display: grid;
+    gap: 12px;
+  }
+  .practise :global(.prompt) {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+  .practise :global(.prompt:focus) {
+    outline: none;
+  }
+  .practise :global(.options) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .practise :global(.options button) {
+    min-height: 48px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1px solid var(--mist);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .practise :global(.options button.right) {
+    background: rgb(63 164 91 / 0.35);
+    border-color: #3fa45b;
+  }
+  .practise :global(.options button.wrong) {
+    background: rgb(246 217 122 / 0.15);
+  }
+  .practise :global(.result) {
+    margin: 0;
+    color: var(--mist);
+  }
+  .count {
+    color: var(--glow);
+  }
+  .grid {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .grid :global(.card) {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 14px 10px;
+    border-radius: 16px;
+    background: rgb(42 22 80 / 0.4);
+    border: 1px dashed rgb(201 184 255 / 0.3);
+    text-align: center;
+  }
+  .grid :global(.card.earned) {
+    background: rgb(42 22 80 / 0.8);
+    border: 1px solid rgb(246 217 122 / 0.5);
+  }
+  .grid :global(.uses) {
+    color: var(--glow);
+    font-size: 0.8rem;
+  }
+  .grid :global(.lore) {
+    color: var(--mist);
+    font-size: 0.8rem;
+  }
+  .grid :global(.badge) {
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgb(63 164 91 / 0.3);
+    font-size: 0.75rem;
+  }
+</style>
