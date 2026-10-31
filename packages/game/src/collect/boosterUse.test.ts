@@ -1,8 +1,8 @@
 import { EMPTY } from "@hexhue/core";
 import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
-import { MAX_EXTRA_SLOTS, useExtraSlot, useHint, useUndo } from "./boosterUse";
-import { startingPouch, PRICES, type Pouch } from "./pouch";
+import { MAX_EXTRA_SLOTS, useExtraSlot, useHint } from "./boosterUse";
+import { startingPouch, type Pouch } from "./pouch";
 
 /** Rows of colour characters (`.` open) and columns of [colour, capacity], as in core's fixtures. */
 function board(
@@ -41,7 +41,7 @@ const settle = (s: collect.CollectSession) => {
 const broke = (): Pouch => ({
   ...startingPouch(),
   coins: 0,
-  boosters: { undo: 0, extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
+  boosters: { extraSlot: 0, hint: 0, call: 0, sweep: 0, lantern: 0 },
 });
 const lostSession = () => {
   const s = new collect.CollectSession(fixtureB());
@@ -52,45 +52,6 @@ const lostSession = () => {
   expect(s.state.status).toBe("lost");
   return s;
 };
-
-describe("Undo", () => {
-  it("goes back one action and spends one from stock", () => {
-    const s = new collect.CollectSession(fixtureB());
-    s.tap(select(0));
-    const r = useUndo(startingPouch(), s, false);
-    expect(r.used).toBe(true);
-    expect(s.log).toHaveLength(0);
-    expect(r.pouch.boosters.undo).toBe(startingPouch().boosters.undo - 1);
-  });
-
-  it("buys with coins when the stock is empty", () => {
-    const s = new collect.CollectSession(fixtureB());
-    s.tap(select(0));
-    const r = useUndo({ ...broke(), coins: 20 }, s, false);
-    expect(r.used).toBe(true);
-    expect(r.pouch.coins).toBe(20 - PRICES.undo);
-  });
-
-  it("when the player cannot pay, nothing changes and Retry is mentioned", () => {
-    const s = new collect.CollectSession(fixtureB());
-    s.tap(select(0));
-    const r = useUndo(broke(), s, false);
-    expect(r.used).toBe(false);
-    expect(r.pouch).toEqual(broke());
-    expect(s.log).toHaveLength(1);
-    expect(r.message).toMatch(/Retry is always free/);
-  });
-
-  it("charges nothing when there is nothing to undo, or in the tutorial", () => {
-    const fresh = new collect.CollectSession(fixtureB());
-    expect(useUndo(startingPouch(), fresh, false)).toMatchObject({ used: false });
-    const s = new collect.CollectSession(fixtureB());
-    s.tap(select(0));
-    const r = useUndo(broke(), s, true);
-    expect(r.used).toBe(true);
-    expect(r.pouch).toEqual(broke());
-  });
-});
 
 describe("Extra Slot", () => {
   it("adds a slot for the level and charges once", () => {
@@ -184,7 +145,7 @@ describe("refusals that must cost nothing", () => {
     expect(s.extraSlots).toBe(0);
   });
 
-  it("Undo after a win is refused without charge", () => {
+  it("an Extra Slot after a win is refused without charge", () => {
     const s = new collect.CollectSession(
       board(["RRR"], [[["R", 2]], [["R", 1]]], { colors: "R", slots: 2, squad: 1, spawnGap: 1 }),
     );
@@ -193,7 +154,7 @@ describe("refusals that must cost nothing", () => {
     s.tap(select(1));
     settle(s);
     expect(s.state.status).toBe("won");
-    const r = useUndo(startingPouch(), s, false);
+    const r = useExtraSlot(startingPouch(), s, false);
     expect(r.used).toBe(false);
     expect(r.pouch).toEqual(startingPouch());
   });
@@ -203,15 +164,12 @@ describe("what the gameplay events are told", () => {
   it("reports how each booster was paid for", () => {
     const s = new collect.CollectSession(fixtureB());
     s.tap(select(0));
-    expect(useUndo(startingPouch(), s, false).paid).toEqual({ booster: "undo", how: "owned" });
-    s.tap(select(0));
-    expect(useUndo({ ...broke(), coins: 99 }, s, false).paid).toEqual({
-      booster: "undo",
+    expect(useHint(startingPouch(), s, false).paid).toEqual({ booster: "hint", how: "owned" });
+    expect(useHint({ ...broke(), coins: 99 }, s, false).paid).toEqual({
+      booster: "hint",
       how: "coins",
     });
-    s.tap(select(0));
-    expect(useUndo(broke(), s, true).paid).toEqual({ booster: "undo", how: "free" });
-    expect(useHint(startingPouch(), s, false).paid).toEqual({ booster: "hint", how: "owned" });
+    expect(useHint(broke(), s, true).paid).toEqual({ booster: "hint", how: "free" });
     expect(useExtraSlot(broke(), s, true).paid).toEqual({ booster: "extraSlot", how: "free" });
     expect(useExtraSlot(broke(), s, false).paid).toBeUndefined();
   });

@@ -1,7 +1,6 @@
 import * as collect from "@hexhue/core/collect";
 import { describe, expect, it } from "vitest";
 import { AudioEngine, type AudioLike } from "../audio";
-import { MOTES, moteAt } from "./ambient";
 import { planCues, playCues, rejectionCue, type Cue } from "./cues";
 import { Emitter, Particles } from "./particles";
 import { PENTATONIC, soundSpec } from "../audio/sounds";
@@ -324,30 +323,7 @@ describe("effects", () => {
   });
 });
 
-describe("environment motion and the pickup squash", () => {
-  it("motes stay inside the frame, are deterministic and rise over time", () => {
-    for (let i = 0; i < MOTES; i++) {
-      for (const t of [0, 1500, 60_000, 1e7]) {
-        const m = moteAt(i, t, false);
-        expect(m.y).toBeGreaterThanOrEqual(0);
-        expect(m.y).toBeLessThan(1);
-        expect(m.glow).toBeGreaterThanOrEqual(0);
-        expect(m.glow).toBeLessThanOrEqual(1);
-        expect(moteAt(i, t, false)).toEqual(m);
-      }
-    }
-    // Rising: a little later, a mote is higher on screen (a smaller y) unless it wrapped.
-    const a = moteAt(2, 1000, false);
-    const b = moteAt(2, 2000, false);
-    expect(b.y < a.y || b.y > 0.9).toBe(true);
-  });
-
-  it("reduced motion keeps every mote still and steady", () => {
-    for (let i = 0; i < MOTES; i++) {
-      expect(moteAt(i, 0, true)).toEqual(moteAt(i, 123_456, true));
-    }
-  });
-
+describe("the pickup squash", () => {
   it("the squash flattens and widens at its peak, and rests at the plain scale", () => {
     expect(squashX(4, 0)).toBe(4);
     expect(squashY(4, 0)).toBe(4);

@@ -24,26 +24,27 @@ Anonymous, consent-gated events that say where v2 levels are too hard, too easy 
 | ---------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
 | `play_start`           | level opened, and after each Retry                       | `level`, `kind` (tutorial/daily/picture/other), `replay` |
 | `play_first_move`      | first accepted summon/resume of an attempt               | `level`, `seconds`                                       |
-| `play_win`             | every cube delivered                                     | `level`, `seconds`, `moves`, `undos`, `boosters`         |
+| `play_win`             | every cube delivered                                     | `level`, `seconds`, `moves`, `boosters`                  |
 | `play_loss`            | `slotsFull` or `deadlock`                                | `level`, `seconds`, `moves`, `reason`                    |
 | `play_retry`           | Retry pressed                                            | `level`, `after` (playing/won/lost), `seconds`           |
 | `play_abandon`         | an unfinished attempt is left (next level, page closing) | `level`, `seconds`, `moves`                              |
-| `play_undo`            | Undo used                                                | `level`, `paid` (owned/coins/free)                       |
-| `play_booster`         | Extra Slot or Hint used (hint usage = `booster: "hint"`) | `level`, `booster`, `paid`                               |
-| `play_ad_offer`        | once per level: could the optional 2× ad be offered      | `level`, `placement`, `available`                        |
-| `ad_result` (existing) | the 2× ad ended                                          | `placement: "speed2x"`, `result`                         |
+| `play_booster`         | a booster used (hint usage = `booster: "hint"`)          | `level`, `booster`, `paid` (owned/coins/free)            |
+| `play_ad_offer`        | once per level: could the optional 3× ad be offered      | `level`, `placement`, `available`                        |
+| `ad_result` (existing) | the 3× ad ended                                          | `placement: "speed2x"`, `result`                         |
 
 `seconds` is **active play only**: it stops during an ad wait, on an end card and while the tab is
-hidden. A lost attempt continued by Undo or Extra Slot is reopened, so its eventual `play_win`
-still counts (it follows a `play_loss`, with `undos`/`boosters` > 0).
+hidden. A lost attempt continued by an Extra Slot is reopened, so its eventual `play_win` still
+counts (it follows a `play_loss`, with `boosters` > 0). The v1 events (`level_start`, `level_win`
+with stars, `level_skip`, `tutorial_tip`, `booster_use`, `install_prompt`) and `play_undo` were
+removed in M15.15; only `app_open` and `ad_result` remain from before.
 
 ## Reading them (aggregated metrics notes)
 
 - **Funnel per level:** `play_start` → `play_first_move` → `play_win`. A big start-to-first-move gap
   means the opening is confusing; first-move-to-win drop-off is difficulty.
 - **Too hard:** high loss share, `play_retry` with `after: "lost"` repeated, `play_abandon` after a loss,
-  many `play_undo` / `hint` per win.
-- **Too easy:** wins with few seconds, 0 undos and 0 moves beyond the minimum.
+  many boosters (hints above all) per win.
+- **Too easy:** wins with few seconds, no boosters and no moves beyond the minimum.
 - **Where players stop:** `play_abandon.seconds` and `.moves`.
 - **Ads:** `available` rate vs `ad_result.result`; the game never waits on either.
 - Compare by `kind` so tutorial and daily numbers do not blur the picture levels. Counts only: there

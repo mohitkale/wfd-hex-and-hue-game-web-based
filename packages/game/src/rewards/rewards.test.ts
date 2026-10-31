@@ -53,8 +53,8 @@ describe("providers", () => {
 
   it("mock is unavailable without a document", async () => {
     const p = new MockProvider(3, null);
-    expect(p.isAvailable("coins")).toBe(false);
-    expect(await p.show("coins")).toBe("unavailable");
+    expect(p.isAvailable("speed2x")).toBe(false);
+    expect(await p.show("speed2x")).toBe("unavailable");
   });
 
   it("safeShow turns hangs and errors into unavailable", async () => {
@@ -63,7 +63,7 @@ describe("providers", () => {
       isAvailable: () => true,
       show: () => new Promise(() => {}),
     };
-    const pending = safeShow(hang, "coins", 1000);
+    const pending = safeShow(hang, "speed2x", 1000);
     await vi.advanceTimersByTimeAsync(1000);
     expect(await pending).toBe("unavailable");
     const boom: RewardsProvider = {
@@ -71,7 +71,7 @@ describe("providers", () => {
       isAvailable: () => true,
       show: () => Promise.reject(new Error("sdk crashed")),
     };
-    expect(await safeShow(boom, "coins")).toBe("unavailable");
+    expect(await safeShow(boom, "speed2x")).toBe("unavailable");
   });
 });
 
@@ -138,7 +138,7 @@ describe("MockProvider", () => {
 
   it("rewards after the countdown and removes its overlay", async () => {
     const { doc, nodes } = fakeDocument();
-    const shown = new MockProvider(3, doc).show("coins");
+    const shown = new MockProvider(3, doc).show("speed2x");
     await vi.advanceTimersByTimeAsync(3000);
     expect(await shown).toBe("rewarded");
     expect(nodes[0]!.removed).toBe(true);
@@ -146,7 +146,7 @@ describe("MockProvider", () => {
 
   it("closing early is a dismissal", async () => {
     const { doc, nodes } = fakeDocument();
-    const shown = new MockProvider(3, doc).show("coins");
+    const shown = new MockProvider(3, doc).show("speed2x");
     await vi.advanceTimersByTimeAsync(1000);
     nodes[2]!.listeners.click!(); // the Close button
     expect(await shown).toBe("dismissed");

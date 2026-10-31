@@ -1,5 +1,9 @@
 # The three v2 worlds (M13.1, structure)
 
+> **Historical (M15.15).** The three worlds were replaced by the witch's journey (24 pictures in six
+> chapters, `packages/game/src/collect/journey.ts`). The plan `content/worldsV2.ts` was removed; the
+> game keeps only each world's seal and backdrop colour for the win screen (`worldIdentity.ts`).
+
 What each world is, how the sixty levels are laid out on the difficulty curve, and how much of it
 exists. The data is `content/worldsV2.ts` (the plan) and
 `packages/game/src/collect/worldIdentity.ts` (identity and atmosphere); tests check this page against them.

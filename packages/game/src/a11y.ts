@@ -1,6 +1,6 @@
 /**
  * Accessibility helpers that don't need Phaser: colorblind symbols (one shape per palette color,
- * drawn on wisps and fragments so matching never depends on hue alone) and the reduced-motion
+ * drawn on cubes and boxes so matching never depends on hue alone) and the reduced-motion
  * decision.
  */
 

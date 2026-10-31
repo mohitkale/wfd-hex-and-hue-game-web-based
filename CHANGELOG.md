@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Install:** the browser's own "Install app" prompt is no longer held back (it waited for an
+  in-game offer that v2 does not have).
+- **Fix:** the game no longer stops loading when its window is briefly very narrow (a booster button
+  could get a negative size while the window was being resized).
+- **Site:** the FAQ, privacy page, landing page and blog posts now describe the current game (its
+  boosters, the 3× speed ad, the journey's chapters, sound and music switches), not v1.
+- **Cleanup:** leftover v1 code removed: the game's Undo booster (an old pouch's Undo count is
+  dropped), analytics events no longer sent, unused ad placements, the motes layer, an unused slider
+  control and the old three-world plan.
+
 ## 2.0.0 (2026-10-31)
 
 A new game on the same site: the v1 track puzzle is replaced by the familiars.
@@ -11,7 +23,7 @@ A new game on the same site: the v1 track puzzle is replaced by the familiars.
   Crystals, Moon & Stars, Familiars & Spirits, The Grimoire), each climbing from easy to an extreme
   finale with a word in it. Every level is solver-verified and held to its tier: random tapping wins at
   most about 45 % of medium, 25 % of hard and 10 % of extreme levels.
-- **Look:** bright, finely detailed pixel mosaics (thousands of small cubes per picture), the
+- **Look:** bright, finely detailed pixel mosaics (about 700 to 1,850 small cubes per picture), the
   boxes' trays shown as stoppered potion bottles.
 - **Choose your familiar:** bat, cat, ant, owl, frog or spider, each drawn from above with its own
   anatomy and walk.

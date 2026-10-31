@@ -11,7 +11,7 @@ describe("the chapter's part of a completion (M15.13: the journey)", () => {
     const m = worldMoment(win(["amethyst"]), "amethyst", true)!;
     expect(m.worldName).toBe("Crystals");
     expect(m.seal).toBe(WORLD_IDENTITIES.crystal.seal);
-    expect(m.backdrop).toBe(WORLD_IDENTITIES.crystal.atmosphere.backdrop);
+    expect(m.backdrop).toBe(WORLD_IDENTITIES.crystal.backdrop);
   });
 
   it("says first page, then progress, then every page once the chapter is complete", () => {

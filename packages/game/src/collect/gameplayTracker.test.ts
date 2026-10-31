@@ -23,7 +23,7 @@ describe("GameplayTracker", () => {
     expect(names()).toEqual(["play_start", "play_first_move", "play_win"]);
     expect(log[0]!.props).toEqual({ level: "moon-1", kind: "picture", replay: false });
     expect(log[1]!.props).toEqual({ level: "moon-1", seconds: 2 });
-    expect(log[2]!.props).toEqual({ level: "moon-1", seconds: 5, moves: 2, undos: 0, boosters: 0 });
+    expect(log[2]!.props).toEqual({ level: "moon-1", seconds: 5, moves: 2, boosters: 0 });
   });
 
   it("a loss, then Retry: loss, retry(after lost) and a new replay attempt with clean counters", () => {
@@ -58,23 +58,21 @@ describe("GameplayTracker", () => {
     expect(log.find((e) => e.event === "play_retry")!.props.after).toBe("playing");
   });
 
-  it("boosters and undo are counted, with how they were paid for", () => {
+  it("boosters are counted, with how they were paid for", () => {
     const { t, log } = setup();
     t.start();
-    t.undo("owned");
     t.booster("hint", "coins");
     t.booster("extraSlot", "free");
     t.move();
     t.win();
-    expect(log.filter((e) => e.event === "play_undo")[0]!.props.paid).toBe("owned");
     expect(log.filter((e) => e.event === "play_booster").map((e) => e.props)).toEqual([
       { level: "moon-1", booster: "hint", paid: "coins" },
       { level: "moon-1", booster: "extraSlot", paid: "free" },
     ]);
-    expect(log.at(-1)!.props).toMatchObject({ undos: 1, boosters: 2 });
+    expect(log.at(-1)!.props).toMatchObject({ boosters: 2 });
   });
 
-  it("a loss brought back by Undo or Extra Slot still ends in a counted win", () => {
+  it("a loss brought back by an Extra Slot still ends in a counted win", () => {
     const { t, names } = setup();
     t.start();
     t.move();
@@ -132,7 +130,6 @@ describe("GameplayTracker", () => {
     const { t, log } = setup("daily");
     t.start();
     t.move();
-    t.undo("owned");
     t.booster("hint", "coins");
     t.loss("deadlock");
     t.retry("lost");
@@ -144,7 +141,6 @@ describe("GameplayTracker", () => {
       "replay",
       "seconds",
       "moves",
-      "undos",
       "boosters",
       "reason",
       "after",

@@ -43,22 +43,6 @@ function affordable(pouch: Pouch, booster: Booster, free: boolean): string | nul
   return `Not enough coins (${p.missing} more). Retry is always free`;
 }
 
-/** Undo: back to before the last select/resume. */
-export function useUndo(pouch: Pouch, session: collect.CollectSession, free: boolean): UseResult {
-  if (session.state.status === "won") return nothing(pouch, "The level is already won");
-  if (!session.canUndo) return nothing(pouch, "Nothing to undo");
-  const short = affordable(pouch, "undo", free);
-  if (short) return nothing(pouch, short);
-  session.undo();
-  const how = howPaid(pouch, "undo", free);
-  return {
-    pouch: charge(pouch, "undo", free),
-    used: true,
-    message: "Undone",
-    paid: { booster: "undo", how },
-  };
-}
-
 /**
  * Extra Slot: one more holding slot for this level; after a slots-full loss (or, with shared trays, a
  * deadlock a new tray opens up) it revives the game.

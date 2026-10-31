@@ -16,26 +16,34 @@ your progress is never taken away.
 
 ## Every booster can be earned
 
-Undo, Shuffle, +1 Slot and the Magic Wand all cost coins, and you earn coins by clearing mosaics,
-with a bonus when you don't use boosters. Some optional rewards can be unlocked by watching an ad
-if you want, but nothing requires it, and when no ad is available the game simply carries on.
+The Extra Tray, Familiar's Call, Besom Sweep, the Crystal Lantern and Hints all cost coins, and you
+earn coins by clearing pictures, with a bonus for the hard and extreme ones. A short, optional ad
+can speed a level up to 3× if you want, but nothing requires it, and when no ad is available the
+game simply carries on.
 
 ## A way out of every corner
 
-If a level really doesn't click, after a few tries you can skip it and come back later. The idle
-hint system also gently points at a good next move when you have been thinking for a while.
+When every tray is waiting on a buried colour, you are stuck, and that is part of the puzzle: pick
+the boxes in a better order. An Extra Tray can rescue a jammed board, the Crystal Lantern shows
+every box still to come, and a Hint points at a good next pick.
 
 ## Every level is solvable
 
-Behind every mosaic there is a solver: a program that searches for a winning sequence of launches.
-A level only ships if the solver finds one, so a lost board always means "try a different order",
+Behind every picture there is a solver: a program that searches for a winning order of picks. A
+level only ships if the solver finds one, so a lost board always means "try a different order",
 never "this was impossible".
+
+## Short levels
+
+A level may take longer because it is harder, never because it is bigger. Every level has a
+budget of cubes for its difficulty, and boxes are big, so a picture is a few dozen taps, not
+hundreds.
 
 ## Comfortable to play
 
 Color symbols put a shape on every color, so matching never depends on telling hues apart.
-Reduced motion turns off particles, flashes and shakes. Sound and music each have their own
-volume, and vibration can be switched off.
+Reduced motion turns off particles, flashes and shakes. Sound effects, music and vibration each
+have their own switch.
 
 ## Free, offline, yours
 

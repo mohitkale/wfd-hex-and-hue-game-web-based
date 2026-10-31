@@ -28,7 +28,7 @@ export interface Settings {
   sfxVolume: number;
   /** 0..1 */
   musicVolume: number;
-  /** A symbol per color on wisps and fragments (matching never depends on hue alone). */
+  /** A symbol per color on cubes and boxes (matching never depends on hue alone). */
   colorblind: boolean;
   /** "system" follows the OS reduce-motion preference. */
   reducedMotion: MotionSetting;
